@@ -1,0 +1,114 @@
+syntax = "proto3";
+
+package chord_invoke;
+
+service InvokeService {
+
+    rpc IdentifyAgent(IdentifyAgentRequest) returns (IdentifyAgentResult);
+
+    rpc CreateMachine(CreateMachineRequest) returns (CreateMachineResult);
+
+    rpc SignCertificates(SignCertificatesRequest) returns (SignCertificatesResult);
+
+    rpc AdvertiseEndpoints(AdvertiseEndpointsRequest) returns (AdvertiseEndpointsResult);
+
+    rpc RunMachine(RunMachineRequest) returns (RunMachineResult);
+
+    rpc DeleteMachine(DeleteMachineRequest) returns (DeleteMachineResult);
+}
+
+message IdentifyAgentRequest {
+}
+
+message IdentifyAgentResult {
+    string agent_name = 1;
+    uint64 uptime_millis = 2;
+}
+
+message CreateMachineRequest {
+    string execution_uri = 1;
+    string name = 2;
+    string config_hash = 3;
+    repeated RequestedPort requested_ports = 4;
+}
+
+message CreateMachineResult {
+    string machine_uri = 1;
+    repeated DeclaredPort declared_ports = 2;
+    repeated DeclaredEndpoint declared_endpoints = 3;
+}
+
+message SignCertificatesRequest {
+    string machine_uri = 1;
+    repeated DeclaredPort declared_ports = 2;
+    repeated DeclaredEndpoint declared_endpoints = 3;
+}
+
+message SignCertificatesResult {
+    repeated SignedEndpoint signed_endpoints = 1;
+}
+
+message AdvertiseEndpointsRequest {
+    string machine_uri = 1;
+    repeated BoundEndpoint bound_endpoints = 2;
+}
+
+message AdvertiseEndpointsResult {
+}
+
+message RunMachineRequest {
+    string machine_uri = 1;
+    repeated SignedEndpoint signed_endpoints = 2;
+}
+
+message RunMachineResult {
+    repeated BoundEndpoint bound_endpoints = 1;
+}
+
+message DeleteMachineRequest {
+    string machine_uri = 1;
+}
+
+message DeleteMachineResult {
+    uint32 exit_status = 1;
+}
+
+enum PortType {
+    InvalidPortType = 0;
+    OneShot = 1;
+    Streaming = 2;
+}
+
+enum PortDirection {
+    InvalidPortDirection = 0;
+    Client = 1;
+    Server = 2;
+    BiDirectional = 3;
+}
+
+message RequestedPort {
+    string protocol_uri = 1;
+    PortType port_type = 2;
+    PortDirection port_direction = 3;
+}
+
+message DeclaredPort {
+    string protocol_uri = 1;
+    PortType port_type = 2;
+    PortDirection port_direction = 3;
+    uint32 endpoint_index = 4;
+}
+
+message DeclaredEndpoint {
+    string endpoint_uri = 1;
+    bytes csr = 2;
+}
+
+message SignedEndpoint {
+    string endpoint_uri = 1;
+    bytes certificate = 2;
+}
+
+message BoundEndpoint {
+    string endpoint_uri = 1;
+}

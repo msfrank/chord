@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package chord_remoting;
+
+service RemotingService {
+
+    rpc Attach(AttachRequest) returns (AttachResult);
+
+    rpc Communicate(stream Message) returns (stream Message);
+
+    rpc Detach(DetachRequest) returns (DetachResult);
+}
+
+message AttachRequest {
+    string port_identifier = 1;
+    string machine_uri = 2;
+}
+
+message AttachResult {
+}
+
+enum MessageVersion {
+    UnknownVersion = 0;
+    Version1 = 1;
+}
+
+message Header {
+    string name = 1;
+    string value = 2;
+}
+
+message Message {
+    MessageVersion version = 1;
+    repeated Header headers = 2;
+    string authorization = 3;
+    bytes data = 4;
+}
+
+message DetachRequest {
+    string port_identifier = 1;
+    string machine_uri = 2;
+}
+
+message DetachResult {
+}

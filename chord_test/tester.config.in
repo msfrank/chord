@@ -1,0 +1,13 @@
+{
+    "global": {
+        "sourceBaseUrl": "/src",
+        "packageDirectoryPathList": [ "@ZURI_INSTALL_PACKAGES_DIR@" ],
+        "packageMap": {
+            "std": "@ZURI_STD_PACKAGE_AUTHORITY@"
+        }
+    },
+    "domains": {
+    },
+    "tasks": {
+    }
+}

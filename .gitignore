@@ -1,0 +1,9 @@
+cmake-build-*
+/build
+CMakeUserPresets.json
+dist
+.pids
+.cache
+.DS_Store
+*.swp
+/.idea

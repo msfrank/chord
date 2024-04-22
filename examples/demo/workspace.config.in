@@ -1,0 +1,17 @@
+{
+    "zuri-build": {
+        "global": {
+            "sourceBaseUrl": "file://@SOURCE_DIRECTORY@"
+        },
+        "tasks": {
+            "package:": {
+                "packageDomain": "examples",
+                "packageName": "demo",
+                "majorVersion": @MAJOR_VERSION@,
+                "minorVersion": @MINOR_VERSION@,
+                "patchVersion": @PATCH_VERSION@,
+                "mainLocation": "/helloworld"
+            }
+        }
+    }
+}

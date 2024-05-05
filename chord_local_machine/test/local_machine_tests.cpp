@@ -28,7 +28,7 @@ TEST(LocalMachine, Construct)
     AsyncQueue<RunnerReply> processor;
     ASSERT_TRUE (processor.initialize(&loop).isOk());
 
-    auto machine = std::make_shared<LocalMachine>(machineUrl, state, &processor);
+    auto machine = std::make_shared<LocalMachine>(machineUrl, true, state, &processor);
     ASSERT_EQ (InterpreterRunnerState::INITIAL, machine->getRunnerState());
     ASSERT_EQ (machineUrl, machine->getMachineUrl());
 
@@ -63,10 +63,10 @@ TEST(LocalMachine, Start)
     AsyncQueue<RunnerReply> processor;
     ASSERT_TRUE (processor.initialize(&loop).isOk());
 
-    auto machine = std::make_shared<LocalMachine>(machineUrl, state, &processor);
+    auto machine = std::make_shared<LocalMachine>(machineUrl, true, state, &processor);
 
     // start the machine and wait for state change
-    ASSERT_TRUE (machine->start().isOk());
+    ASSERT_TRUE (machine->resume().isOk());
     auto *message1 = processor.waitForMessage();
     ASSERT_EQ (RunnerReply::MessageType::Running, message1->type);
     delete message1;

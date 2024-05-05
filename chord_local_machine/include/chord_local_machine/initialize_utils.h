@@ -29,6 +29,13 @@ tempo_utils::Status make_local_machine(
     std::shared_ptr<lyric_runtime::InterpreterState> interpreterState,
     AbstractMessageSender<RunnerReply> *processor);
 
+tempo_utils::Status make_remoting_service(
+    std::unique_ptr<RemotingService> &remotingService,
+    const ComponentConstructor &componentConstructor,
+    const ChordLocalMachineConfig &chordLocalMachineConfig,
+    std::shared_ptr<LocalMachine> localMachine,
+    uv_async_t *initComplete);
+
 tempo_utils::Status make_custom_channel(
     std::shared_ptr<grpc::ChannelInterface> &channel,
     const ComponentConstructor &componentConstructor,

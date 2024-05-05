@@ -4,24 +4,85 @@ package chord_remoting;
 
 service RemotingService {
 
-    rpc Attach(AttachRequest) returns (AttachResult);
+    rpc SuspendMachine(SuspendMachineRequest) returns (SuspendMachineResult);
 
+    rpc ResumeMachine(ResumeMachineRequest) returns (ResumeMachineResult);
+
+    // HaltMachine
+    rpc TerminateMachine(TerminateMachineRequest) returns (TerminateMachineResult);
+
+    /**
+     * Request to communicate with a port on the machine via the protocol specified
+     * by the x-zuri-protocol-uri header.
+     *
+     */
     rpc Communicate(stream Message) returns (stream Message);
 
-    rpc Detach(DetachRequest) returns (DetachResult);
-}
+    /**
+     * Request to monitor the machine. The MonitorMachine rpc returns a stream of
+     * monitoring events until the machine exits.
+     */
+    rpc Monitor(MonitorRequest) returns (stream MonitorEvent);
 
-message AttachRequest {
-    string port_identifier = 1;
-    string machine_uri = 2;
-}
+    /**
+     *
+     */
+    rpc PreparePort(PreparePortRequest) returns (PreparePortResult);
 
-message AttachResult {
+    /**
+     *
+     */
+    rpc BindPort(BindPortRequest) returns (BindPortResult);
+
+    /**
+     *
+     */
+    rpc ClosePort(ClosePortRequest) returns (ClosePortResult);
 }
 
 enum MessageVersion {
     UnknownVersion = 0;
     Version1 = 1;
+}
+
+enum PortType {
+    InvalidPortType = 0;
+    OneShot = 1;
+    Streaming = 2;
+}
+
+enum PortDirection {
+    InvalidPortDirection = 0;
+    Client = 1;
+    Server = 2;
+    BiDirectional = 3;
+}
+
+enum MachineState {
+    UnknownState = 0;
+    Running = 1;
+    Suspended = 2;
+    Completed = 3;
+    Cancelled = 4;
+    Failure = 5;
+}
+
+message SuspendMachineRequest {
+}
+
+message SuspendMachineResult {
+}
+
+message ResumeMachineRequest {
+}
+
+message ResumeMachineResult {
+}
+
+message TerminateMachineRequest {
+}
+
+message TerminateMachineResult {
 }
 
 message Header {
@@ -36,10 +97,46 @@ message Message {
     bytes data = 4;
 }
 
-message DetachRequest {
-    string port_identifier = 1;
-    string machine_uri = 2;
+message PreparePortRequest {
+    string protocol_uri = 1;
+    PortType port_type = 2;
+    PortDirection port_direction = 3;
 }
 
-message DetachResult {
+message PreparePortResult {
+    bytes csr = 1;
+}
+
+message BindPortRequest {
+    string protocol_uri = 1;
+    bytes certificate = 2;
+}
+
+message BindPortResult {
+    string endpoint_uri = 1;
+}
+
+message ClosePortRequest {
+    string protocol_uri = 1;
+}
+
+message ClosePortResult {
+}
+
+message StateChangedEvent {
+    MachineState curr_state = 1;
+}
+
+message MachineExitEvent {
+    sint32 exit_status = 1;
+}
+
+message MonitorRequest {
+}
+
+message MonitorEvent {
+    oneof event {
+        StateChangedEvent state_changed = 1;
+        MachineExitEvent machine_exit = 2;
+    }
 }

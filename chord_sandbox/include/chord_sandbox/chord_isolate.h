@@ -17,6 +17,9 @@
 
 namespace chord_sandbox {
 
+    // forward declarations
+    struct SandboxPriv;
+
     enum class AgentDiscoveryPolicy {
         USE_SPECIFIED_ENDPOINT,
         SPAWN_IF_MISSING,
@@ -35,8 +38,14 @@ namespace chord_sandbox {
         std::filesystem::path pemRootCABundleFile;
     };
 
-    struct SandboxPriv;
+    struct RequestedPortAndHandler {
+        chord_protocol::RequestedPort requestedPort;
+        std::shared_ptr<chord_protocol::AbstractProtocolHandler> handler;
+    };
 
+    /**
+     *
+     */
     class ChordIsolate {
 
     public:
@@ -50,10 +59,8 @@ namespace chord_sandbox {
             std::string_view name,
             const lyric_common::AssemblyLocation &mainLocation,
             const tempo_config::ConfigMap &configMap,
-            const absl::flat_hash_set<chord_protocol::RequestedPort> &requestedPorts,
-            const absl::flat_hash_map<tempo_utils::Url,std::shared_ptr<chord_protocol::AbstractProtocolHandler>> &plugs,
-            RunProtocolCallback cb,
-            void *cbData);
+            const std::vector<RequestedPortAndHandler> &plugs = {},
+            bool startSuspended = false);
 
         tempo_utils::Status shutdown();
 

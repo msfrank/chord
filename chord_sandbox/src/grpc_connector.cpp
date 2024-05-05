@@ -14,12 +14,20 @@ chord_sandbox::GrpcConnector::GrpcConnector(
     const lyric_common::RuntimePolicy &policy)
     : m_machineUrl(machineUrl),
       m_policy(policy),
-      m_running(false)
+      m_machineMonitor(std::make_shared<MachineMonitor>()),
+      m_connected(false),
+      m_monitorStream(nullptr)
 {
     TU_ASSERT (m_machineUrl.isValid());
 }
 
-chord_sandbox::SandboxStatus
+std::shared_ptr<chord_sandbox::MachineMonitor>
+chord_sandbox::GrpcConnector::getMonitor() const
+{
+    return m_machineMonitor;
+}
+
+tempo_utils::Status
 chord_sandbox::GrpcConnector::registerProtocolHandler(
     const tempo_utils::Url &protocolUrl,
     std::shared_ptr<chord_protocol::AbstractProtocolHandler> handler,
@@ -29,12 +37,9 @@ chord_sandbox::GrpcConnector::registerProtocolHandler(
 {
     absl::MutexLock lock(&m_lock);
 
-    if (m_running)
-        return SandboxStatus::forCondition(
-            SandboxCondition::kSandboxInvariant, "connector is already running");
     if (m_clients.contains(protocolUrl))
-        return SandboxStatus::forCondition(
-            SandboxCondition::kSandboxInvariant, "handler is already registered for protocol");
+        return SandboxStatus::forCondition(SandboxCondition::kSandboxInvariant,
+            "handler is already registered for protocol {}", protocolUrl.toString());
 
     // construct the channel credentials
     grpc::SslCredentialsOptions options;
@@ -54,33 +59,242 @@ chord_sandbox::GrpcConnector::registerProtocolHandler(
 }
 
 tempo_utils::Status
-chord_sandbox::GrpcConnector::start()
+chord_sandbox::GrpcConnector::connect(
+    const tempo_utils::Url &controlUrl,
+    const std::filesystem::path &pemRootCABundleFile,
+    const std::string &endpointServerName)
 {
     absl::MutexLock lock(&m_lock);
 
-    if (m_running)
-        return SandboxStatus::ok();
+    if (m_connected)
+        return SandboxStatus::forCondition(
+            SandboxCondition::kSandboxInvariant, "already connected to machine");
 
-    for (auto iterator = m_clients.cbegin(); iterator != m_clients.cend(); iterator++) {
-        auto priv = iterator->second;
-        TU_LOG_INFO << "connecting protocol " << iterator->first;
-        auto status = priv->client->connect();
-        if (status.notOk())
-            return status;
+    // construct the channel credentials
+    grpc::SslCredentialsOptions options;
+    tempo_utils::FileReader rootCABundleReader(pemRootCABundleFile);
+    if (!rootCABundleReader.isValid())
+        return SandboxStatus::forCondition(
+            SandboxCondition::kSandboxInvariant, "failed to read root CA bundle");
+    auto rootCABytes = rootCABundleReader.getBytes();
+    options.pem_root_certs = std::string((const char *) rootCABytes->getData(), rootCABytes->getSize());
+    auto credentials = grpc::SslCredentials(options);
+
+    // construct the control client
+    grpc::ChannelArguments channelArguments;
+    if (!endpointServerName.empty()) {
+        TU_LOG_INFO << "using target name override " << endpointServerName << " for controller " << controlUrl;
+        channelArguments.SetSslTargetNameOverride(endpointServerName);
     }
 
-    m_running = true;
-    return SandboxStatus::ok();
+    auto channel = grpc::CreateCustomChannel(controlUrl.toString(), credentials, channelArguments);
+    m_stub = chord_remoting::RemotingService::NewStub(channel);
+
+    // start machine monitor
+    m_monitorStream = new ClientMonitorStream(m_stub.get(), m_machineMonitor, false);
+
+    // connect plug clients
+    for (auto &client : m_clients) {
+        TU_LOG_INFO << "connecting protocol " << client.first;
+        auto priv = client.second;
+        TU_RETURN_IF_NOT_OK (priv->client->connect());
+    }
+
+    m_connected = true;
+
+    return {};
+}
+
+tempo_utils::Status
+chord_sandbox::GrpcConnector::resume()
+{
+    absl::MutexLock lock(&m_lock);
+
+    if (!m_connected)
+        return SandboxStatus::forCondition(
+            SandboxCondition::kSandboxInvariant, "not connected to machine");
+
+    grpc::ClientContext ctx;
+    chord_remoting::ResumeMachineRequest request;
+    chord_remoting::ResumeMachineResult result;
+
+    auto status = m_stub->ResumeMachine(&ctx, request, &result);
+    if (!status.ok())
+        return SandboxStatus::forCondition(SandboxCondition::kMachineError,
+            "failed to resume machine: {}", status.error_message());
+
+    return {};
+}
+
+tempo_utils::Status
+chord_sandbox::GrpcConnector::suspend()
+{
+    absl::MutexLock lock(&m_lock);
+
+    if (!m_connected)
+        return SandboxStatus::forCondition(
+            SandboxCondition::kSandboxInvariant, "not connected to machine");
+
+    grpc::ClientContext ctx;
+    chord_remoting::SuspendMachineRequest request;
+    chord_remoting::SuspendMachineResult result;
+
+    auto status = m_stub->SuspendMachine(&ctx, request, &result);
+    if (!status.ok())
+        return SandboxStatus::forCondition(SandboxCondition::kMachineError,
+            "failed to suspend machine: {}", status.error_message());
+
+    return {};
+}
+
+tempo_utils::Status
+chord_sandbox::GrpcConnector::terminate()
+{
+    absl::MutexLock lock(&m_lock);
+
+    if (!m_connected)
+        return SandboxStatus::forCondition(
+            SandboxCondition::kSandboxInvariant, "not connected to machine");
+
+    grpc::ClientContext ctx;
+    chord_remoting::TerminateMachineRequest request;
+    chord_remoting::TerminateMachineResult result;
+
+    auto status = m_stub->TerminateMachine(&ctx, request, &result);
+    if (!status.ok())
+        return SandboxStatus::forCondition(SandboxCondition::kMachineError,
+            "failed to terminate machine: {}", status.error_message());
+
+    return {};
+}
+
+chord_sandbox::MachineMonitor::MachineMonitor()
+    : m_state(chord_remoting::MachineState::UnknownState),
+      m_exitStatus(-1)
+{
+}
+
+chord_remoting::MachineState
+chord_sandbox::MachineMonitor::getState()
+{
+    absl::MutexLock locker(&m_lock);
+    return m_state;
+}
+
+chord_remoting::MachineState
+chord_sandbox::MachineMonitor::waitForStateChange(chord_remoting::MachineState prevState, int timeoutMillis)
+{
+    m_lock.Lock();
+
+    // if the caller supplied previous state equals the current state (the normal case) then wait
+    // on the condition variable until signaled by setState().
+    if (prevState == m_state) {
+        if (timeoutMillis > 0) {
+            m_cond.WaitWithTimeout(&m_lock, absl::Milliseconds(timeoutMillis));
+        } else {
+            m_cond.Wait(&m_lock);
+        }
+    }
+
+    // we hold the lock here, either reacquired by Wait or we didn't release it
+    auto state = m_state;
+    m_lock.Unlock();
+
+    return state;
 }
 
 void
-chord_sandbox::GrpcConnector::stop()
+chord_sandbox::MachineMonitor::setState(chord_remoting::MachineState state)
 {
-    absl::MutexLock lock(&m_lock);
+    m_lock.Lock();
+    if (state != m_state) {
+        m_state = state;
+        m_cond.SignalAll();
+    }
+    m_lock.Unlock();
+}
 
-    if (m_running) {
-        m_clients.clear();
-        m_running = false;
+tu_int32
+chord_sandbox::MachineMonitor::getExitStatus()
+{
+    absl::MutexLock locker(&m_lock);
+    return m_exitStatus;
+}
+
+void
+chord_sandbox::MachineMonitor::setExitStatus(tu_int32 exitStatus)
+{
+    absl::MutexLock locker(&m_lock);
+    m_exitStatus = exitStatus;
+}
+
+chord_sandbox::ClientMonitorStream::ClientMonitorStream(
+    chord_remoting::RemotingService::StubInterface *stub,
+    std::shared_ptr<MachineMonitor> machineMonitor,
+    bool freeWhenDone)
+    : m_machineMonitor(machineMonitor),
+      m_freeWhenDone(freeWhenDone)
+{
+    TU_ASSERT (stub != nullptr);
+    TU_ASSERT (m_machineMonitor != nullptr);
+    auto *async = stub->async();
+    chord_remoting::MonitorRequest request;
+    async->Monitor(&m_context, &request, this);
+    StartCall();
+    TU_LOG_INFO << "Monitor starting";
+}
+
+chord_sandbox::ClientMonitorStream::~ClientMonitorStream()
+{
+}
+
+void
+chord_sandbox::ClientMonitorStream::OnReadInitialMetadataDone(bool ok)
+{
+    if (!ok) {
+        TU_LOG_WARN << "Monitor failed to read initial metadata";
+    } else {
+        TU_LOG_INFO << "Monitor read initial metadata";
+    }
+    StartRead(&m_incoming);
+}
+
+void
+chord_sandbox::ClientMonitorStream::OnReadDone(bool ok)
+{
+    if (!ok) {
+        TU_LOG_WARN << "Monitor read failed";
+        return;
+    }
+
+    TU_LOG_INFO << "Monitor received event: " << m_incoming.DebugString();
+
+    switch (m_incoming.event_case()) {
+        case chord_remoting::MonitorEvent::kStateChanged: {
+            const auto &event = m_incoming.state_changed();
+            m_machineMonitor->setState(event.curr_state());
+            break;
+        }
+        case chord_remoting::MonitorEvent::kMachineExit: {
+            const auto &event = m_incoming.machine_exit();
+            m_machineMonitor->setExitStatus(event.exit_status());
+            break;
+        }
+        default:
+            break;
+    }
+
+    m_incoming.Clear();
+    StartRead(&m_incoming);
+}
+
+void
+chord_sandbox::ClientMonitorStream::OnDone(const grpc::Status &status)
+{
+    TU_LOG_INFO << "Monitor remote end closed with status "
+                << status.error_message() << " (" << status.error_details() << ")";
+    if (m_freeWhenDone) {
+        delete this;
     }
 }
 

@@ -59,18 +59,18 @@ InterpreterRunner::run()
 
         switch (request->type) {
 
-            case RunnerRequest::MessageType::Start: {
+            case RunnerRequest::MessageType::Resume: {
                 beforeRunInterpreter();
                 runInterpreter();
                 break;
             }
 
-            case RunnerRequest::MessageType::Interrupt: {
+            case RunnerRequest::MessageType::Suspend: {
                 suspendInterpreter();
                 break;
             }
 
-            case RunnerRequest::MessageType::Shutdown: {
+            case RunnerRequest::MessageType::Terminate: {
                 shutdownInterpreter();
                 return m_status;
             }

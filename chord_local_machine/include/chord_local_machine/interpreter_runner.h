@@ -11,24 +11,27 @@
 
 struct RunnerRequest : public AbstractMessage {
     enum class MessageType {
-        Start,
-        Interrupt,
-        Shutdown,
+        Suspend,
+        Resume,
+        Terminate,
     };
     MessageType type;
     explicit RunnerRequest(MessageType type): type(type) {};
 };
 
-struct StartRunner : public RunnerRequest {
-    StartRunner() : RunnerRequest(RunnerRequest::MessageType::Start) {};
+struct SuspendRunner : public RunnerRequest {
+    SuspendRunner() : RunnerRequest(RunnerRequest::MessageType::Suspend) {};
+    std::string toString() const override { return "SuspendRunner"; };
 };
 
-struct InterruptRunner : public RunnerRequest {
-    InterruptRunner() : RunnerRequest(RunnerRequest::MessageType::Interrupt) {};
+struct ResumeRunner : public RunnerRequest {
+    ResumeRunner() : RunnerRequest(RunnerRequest::MessageType::Resume) {};
+    std::string toString() const override { return "ResumeRunner"; };
 };
 
-struct ShutdownRunner : public RunnerRequest {
-    ShutdownRunner() : RunnerRequest(RunnerRequest::MessageType::Shutdown) {};
+struct TerminateRunner : public RunnerRequest {
+    TerminateRunner() : RunnerRequest(RunnerRequest::MessageType::Terminate) {};
+    std::string toString() const override { return "TerminateRunner"; };
 };
 
 struct RunnerReply : public AbstractMessage {
@@ -47,24 +50,28 @@ struct RunnerRunning : public RunnerReply {
     RunnerRunning()
         : RunnerReply(RunnerReply::MessageType::Running)
     {};
+    std::string toString() const override { return "RunnerRunning"; };
 };
 
 struct RunnerSuspended : public RunnerReply {
     RunnerSuspended()
         : RunnerReply(RunnerReply::MessageType::Suspended)
     {};
+    std::string toString() const override { return "RunnerSuspended"; };
 };
 
 struct RunnerCancelled : public RunnerReply {
     RunnerCancelled()
         : RunnerReply(RunnerReply::MessageType::Cancelled)
     {};
+    std::string toString() const override { return "RunnerCancelled"; };
 };
 
 struct RunnerCompleted : public RunnerReply {
     explicit RunnerCompleted()
         : RunnerReply(RunnerReply::MessageType::Completed)
     {};
+    std::string toString() const override { return "RunnerCompleted"; };
 };
 
 struct RunnerFailure : public RunnerReply {
@@ -73,6 +80,7 @@ struct RunnerFailure : public RunnerReply {
         : RunnerReply(RunnerReply::MessageType::Failure),
           status(status)
     {};
+    std::string toString() const override { return absl::StrCat("RunnerFailure(",status.toString(),")"); };
 };
 
 enum class InterpreterRunnerState {

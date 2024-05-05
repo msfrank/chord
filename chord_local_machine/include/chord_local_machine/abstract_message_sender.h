@@ -3,6 +3,7 @@
 
 struct AbstractMessage {
     virtual ~AbstractMessage() = default;
+    virtual std::string toString() const { return "AbstractMessage"; };
 };
 
 template<class MessageType>

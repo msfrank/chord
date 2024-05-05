@@ -136,88 +136,88 @@ chord_sandbox::ChordIsolate::spawn(
     std::string_view name,
     const lyric_common::AssemblyLocation &mainLocation,
     const tempo_config::ConfigMap &configMap,
-    const absl::flat_hash_set<chord_protocol::RequestedPort> &requestedPorts,
-    const absl::flat_hash_map<tempo_utils::Url,std::shared_ptr<chord_protocol::AbstractProtocolHandler>> &plugs,
-    RunProtocolCallback cb,
-    void *cbData)
+    const std::vector<RequestedPortAndHandler> &plugs,
+    bool startSuspended)
 {
-    auto zuriRunProtocolUrl = tempo_utils::Url::fromString(kRunProtocolUri);
-    if (plugs.contains(zuriRunProtocolUrl))
-        return SandboxStatus::forCondition(SandboxCondition::kInvalidPlug,
-            "plug {} is managed automatically", zuriRunProtocolUrl.toString());
+    TU_ASSERT (!name.empty());
+    TU_ASSERT (mainLocation.isValid());
 
-    // copy the given plugs map and insert the run plug
-    absl::flat_hash_map<
-        tempo_utils::Url,
-        std::shared_ptr<chord_protocol::AbstractProtocolHandler>> plugsMap = plugs;
-    auto runPlug = std::make_shared<RunProtocolPlug>(cb, cbData);
-    plugsMap[zuriRunProtocolUrl] = runPlug;
+    absl::flat_hash_set<chord_protocol::RequestedPort> requestedPortsSet;
+    absl::flat_hash_map<tempo_utils::Url,std::shared_ptr<chord_protocol::AbstractProtocolHandler>> plugHandlersMap;
 
-    // copy the given requested ports set and insert the run port
-    absl::flat_hash_set<chord_protocol::RequestedPort> requestedPortsSet = requestedPorts;
-    requestedPortsSet.insert(chord_protocol::RequestedPort(zuriRunProtocolUrl,
-        chord_protocol::PortType::Streaming, chord_protocol::PortDirection::BiDirectional));
-
-    // verify that each requested port has a plug implementing the protocol
-    for (const auto &port : requestedPortsSet) {
-        if (!plugsMap.contains(port.getUrl()))
+    // extract requested port and plug handler from plugs list
+    for (const auto &plug : plugs) {
+        const auto &requestedPort = plug.requestedPort;
+        const auto protocolUrl = requestedPort.getUrl();
+        if (plug.handler == nullptr)
             return SandboxStatus::forCondition( SandboxCondition::kInvalidConfiguration,
-                "requested port {} has no plug", port.getUrl().toString());
+                "requested port {} has invalid handler", protocolUrl.toString());
+        if (plugHandlersMap.contains(protocolUrl))
+            return SandboxStatus::forCondition( SandboxCondition::kInvalidConfiguration,
+                "requested port {} was already specified", protocolUrl.toString());
+        plugHandlersMap[protocolUrl] = plug.handler;
+        requestedPortsSet.insert(requestedPort);
     }
 
     // call CreateMachine on the agent endpoint
-    chord_invoke::CreateMachineResult createMachineResult;
+    internal::CreateMachineResult createMachineResult;
     TU_ASSIGN_OR_RETURN (createMachineResult, internal::create_machine(m_priv->stub.get(),
-        name, mainLocation.toUrl(), configMap, requestedPortsSet));
-
-    auto machineUrl = tempo_utils::Url::fromString(createMachineResult.machine_uri());
-    auto machineHostAndPort = machineUrl.getHostAndPort();
-
-    // construct a map of declared endpoint to csr
-    absl::flat_hash_map<std::string,std::string> declaredEndpointCsrs;
-    for (const auto &declaredEndpoint : createMachineResult.declared_endpoints()) {
-        const auto &endpointUrl = declaredEndpoint.endpoint_uri();
-        if (declaredEndpointCsrs.contains(endpointUrl))
-            return SandboxStatus::forCondition( SandboxCondition::kInvalidConfiguration,
-                "duplicate declared endpoint {}", endpointUrl);
-        declaredEndpointCsrs[endpointUrl] = declaredEndpoint.csr();
-    }
+        name, mainLocation.toUrl(), configMap, requestedPortsSet, /* startSuspended= */ true));
 
     // call RunMachine on the agent endpoint
-    chord_invoke::RunMachineResult runMachineResult;
+    internal::RunMachineResult runMachineResult;
     TU_ASSIGN_OR_RETURN (runMachineResult, internal::run_machine(m_priv->stub.get(),
-        machineUrl, declaredEndpointCsrs, m_options.caKeyPair, std::chrono::seconds(3600)));
+        createMachineResult.machineUrl, createMachineResult.protocolEndpoints, createMachineResult.endpointCsrs,
+        m_options.caKeyPair, std::chrono::seconds(3600)));
 
     // create the connector
-    auto connector = std::make_shared<GrpcConnector>(machineUrl, lyric_common::RuntimePolicy());
+    auto connector = std::make_shared<GrpcConnector>(
+        createMachineResult.machineUrl, lyric_common::RuntimePolicy());
 
     // register plugs with the connector
-    for (const auto &declaredPort : createMachineResult.declared_ports()) {
-        auto protocolUrl = tempo_utils::Url::fromString(declaredPort.protocol_uri());
-        if (!protocolUrl.isValid())
+    for (const auto &entry : createMachineResult.protocolEndpoints) {
+        auto protocolUrl = entry.first;
+        TU_ASSERT (protocolUrl.isValid());
+
+        if (!plugHandlersMap.contains(protocolUrl))
             return SandboxStatus::forCondition(SandboxCondition::kInvalidPort,
-                "invalid declared port {}", protocolUrl.toString());
+                "no registered plug for protocol {}", protocolUrl.toString());
+        auto &handler = plugHandlersMap.at(protocolUrl);
 
-        if (plugsMap.contains(protocolUrl)) {
-            auto endpointIndex = declaredPort.endpoint_index();
-            if (createMachineResult.declared_endpoints_size() <= endpointIndex)
-                return SandboxStatus::forCondition(SandboxCondition::kInvalidPort,
-                    "invalid endpoint index {} for declared port {}", endpointIndex, protocolUrl.toString());
-            auto &declaredEndpoint = createMachineResult.declared_endpoints((int) declaredPort.endpoint_index());
-            auto endpointUrl = tempo_utils::Url::fromString(declaredEndpoint.endpoint_uri());
-
-            auto handler = plugsMap.at(protocolUrl);
-            TU_RETURN_IF_NOT_OK (connector->registerProtocolHandler(protocolUrl, handler, endpointUrl,
-                m_options.pemRootCABundleFile, machineHostAndPort));
-            TU_LOG_INFO << "registering handler for protocol " << protocolUrl << " using endpoint " << endpointUrl;
-        } else {
-            TU_LOG_WARN << "ignoring protocol " << protocolUrl << " because there is no registered plug";
+        // get the endpoint name override
+        auto &endpointUrl = entry.second;
+        std::string nameOverride;
+        if (runMachineResult.endpointNameOverrides.contains(endpointUrl)) {
+            nameOverride = runMachineResult.endpointNameOverrides.at(endpointUrl);
         }
+
+        TU_RETURN_IF_NOT_OK (connector->registerProtocolHandler(protocolUrl, handler, endpointUrl,
+            m_options.pemRootCABundleFile, nameOverride));
+        TU_LOG_INFO << "registering handler for protocol " << protocolUrl << " using endpoint " << endpointUrl;
     }
 
-    // create the machine and return it
-    auto machine = std::make_shared<RemoteMachine>(name, mainLocation, machineUrl, connector, runPlug);
+    // get the control name override
+    auto &controlUrl = createMachineResult.controlUrl;
+    std::string nameOverride;
+    if (runMachineResult.endpointNameOverrides.contains(controlUrl)) {
+        nameOverride = runMachineResult.endpointNameOverrides.at(controlUrl);
+    }
+
+    // connect to the control and remoting endpoints
+    TU_RETURN_IF_NOT_OK (connector->connect(createMachineResult.controlUrl,
+        m_options.pemRootCABundleFile, nameOverride));
+
+    // create the remote machine
+    auto &machineUrl = createMachineResult.machineUrl;
+    auto machine = std::make_shared<RemoteMachine>(
+        name, mainLocation, machineUrl, connector);
     m_machines[machineUrl] = machine;
+
+    // the remote machine is suspended, so if startSuspended is false then resume the machine
+    if (!startSuspended) {
+        TU_RETURN_IF_NOT_OK (machine->resume());
+    }
+
     return machine;
 }
 

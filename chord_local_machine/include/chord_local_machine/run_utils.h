@@ -24,7 +24,7 @@ struct ChordLocalMachineData {
     std::unique_ptr<chord_invoke::InvokeService::StubInterface> invokeStub;
     std::shared_ptr<lyric_runtime::InterpreterState> interpreterState;
     std::shared_ptr<LocalMachine> localMachine;
-    std::shared_ptr<RunProtocolSocket> runSocket;
+    //std::shared_ptr<RunProtocolSocket> runSocket;
     tempo_security::CSRKeyPair csrKeyPair;
     std::filesystem::path pemCertificateFile;
     std::shared_ptr<GrpcBinder> grpcBinder;

@@ -24,24 +24,17 @@ sign_certificates(
     chord_invoke::SignCertificatesResult signCertificatesResult;
 
     //
-    signCertificatesRequest.set_machine_uri(chordLocalMachineConfig.machineUrl.toString());
+    signCertificatesRequest.set_machine_url(chordLocalMachineConfig.machineUrl.toString());
 
     //
     auto *declaredEndpoint = signCertificatesRequest.add_declared_endpoints();
-    declaredEndpoint->set_endpoint_uri(chordLocalMachineConfig.binderEndpoint);
+    declaredEndpoint->set_endpoint_url(chordLocalMachineConfig.binderEndpoint);
     declaredEndpoint->set_csr(std::string((const char *) csrBytes->getData(), csrBytes->getSize()));
-
-    //
-//    auto *declaredPort = signCertificatesRequest.add_declared_ports();
-//    declaredPort->set_protocol_uri(kRunProtocolUri);
-//    declaredPort->set_port_type(chord_invoke::PortType::Streaming);
-//    declaredPort->set_port_direction(chord_invoke::PortDirection::BiDirectional);
-//    declaredPort->set_endpoint_index(0);
 
     //
     for (const auto &expectedPort : chordLocalMachineConfig.expectedPorts) {
         auto *declaredPort = signCertificatesRequest.add_declared_ports();
-        declaredPort->set_protocol_uri(expectedPort.toString());
+        declaredPort->set_protocol_url(expectedPort.toString());
         declaredPort->set_endpoint_index(0);
     }
 
@@ -58,7 +51,7 @@ sign_certificates(
     TU_ASSERT (signCertificatesResult.signed_endpoints_size() == 1);
 
     auto signedEndpoint = signCertificatesResult.signed_endpoints(0);
-    TU_LOG_INFO << "received certificate for " << signedEndpoint.endpoint_uri();
+    TU_LOG_INFO << "received certificate for " << signedEndpoint.endpoint_url();
 
     tempo_utils::TempfileMaker certWriter(chordLocalMachineConfig.runDirectory,
         "signed-cert.XXXXXXXX", signedEndpoint.certificate());
@@ -78,15 +71,15 @@ register_protocols(
 {
     auto expectedPorts = chordLocalMachineConfig.expectedPorts;
 
-    // register the run protocol if socket exists
-    if (chordLocalMachineData.runSocket != nullptr) {
-        auto protocolUrl = chordLocalMachineData.runSocket->getProtocolUri();
-        TU_ASSERT (expectedPorts.contains(protocolUrl));
-        TU_RETURN_IF_NOT_OK (chordLocalMachineData.remotingService->registerProtocolHandler(protocolUrl,
-            chordLocalMachineData.runSocket, /* requiredAtLaunch= */ true));
-        TU_LOG_INFO << "registered expected port " << protocolUrl;
-        expectedPorts.erase(protocolUrl);
-    }
+//    // register the run protocol if socket exists
+//    if (chordLocalMachineData.runSocket != nullptr) {
+//        auto protocolUrl = chordLocalMachineData.runSocket->getProtocolUri();
+//        TU_ASSERT (expectedPorts.contains(protocolUrl));
+//        TU_RETURN_IF_NOT_OK (chordLocalMachineData.remotingService->registerProtocolHandler(protocolUrl,
+//            chordLocalMachineData.runSocket, /* requiredAtLaunch= */ true));
+//        TU_LOG_INFO << "registered expected port " << protocolUrl;
+//        expectedPorts.erase(protocolUrl);
+//    }
 
     // register the remaining expected ports
     auto *multiplexer = chordLocalMachineData.interpreterState->portMultiplexer();
@@ -115,9 +108,9 @@ tempo_utils::Status advertise_endpoints(
     chord_invoke::AdvertiseEndpointsResult advertiseEndpointsResult;
 
     auto machineUrl = chordLocalMachineData.localMachine->getMachineUrl();
-    advertiseEndpointsRequest.set_machine_uri(machineUrl.toString());
+    advertiseEndpointsRequest.set_machine_url(machineUrl.toString());
     auto *boundEndpoint = advertiseEndpointsRequest.add_bound_endpoints();
-    boundEndpoint->set_endpoint_uri(chordLocalMachineConfig.binderEndpoint);
+    boundEndpoint->set_endpoint_url(chordLocalMachineConfig.binderEndpoint);
 
     TU_LOG_INFO << "advertising endpoint for " << machineUrl;
     auto advertiseEndpointsStatus = chordLocalMachineData.invokeStub->AdvertiseEndpoints(&advertiseEndpointsContext,
@@ -138,14 +131,19 @@ run_local_machine(
     const ChordLocalMachineConfig &chordLocalMachineConfig,
     ChordLocalMachineData &chordLocalMachineData)
 {
-    //
+    // create the certificate signing requests and send them to the agent
     TU_RETURN_IF_NOT_OK (sign_certificates(chordLocalMachineConfig, chordLocalMachineData));
 
-    //
+    // register a handler for each requested port
     TU_RETURN_IF_NOT_OK (register_protocols(chordLocalMachineConfig, chordLocalMachineData));
 
-    //
+    // send the endpoint advertisements to the agent
     TU_RETURN_IF_NOT_OK (advertise_endpoints(chordLocalMachineConfig, chordLocalMachineData));
+
+    // if there are no expected ports then signal the local machine that init is complete
+    if (chordLocalMachineConfig.expectedPorts.empty()) {
+        chordLocalMachineData.localMachine->notifyInitComplete();
+    }
 
     // pass control to uv loop and wait for signal or shutdown message from the supervisor
     TU_LOG_V << "uv loop running";

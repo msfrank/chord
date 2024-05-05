@@ -17,13 +17,25 @@ ComponentConstructor::createInterpreterState(
 std::shared_ptr<LocalMachine>
 ComponentConstructor::createLocalMachine(
     const tempo_utils::Url &machineUrl,
+    bool startSuspended,
     std::shared_ptr<lyric_runtime::InterpreterState> &interpreterState,
     AbstractMessageSender<RunnerReply> *processor) const
 {
     TU_ASSERT (machineUrl.isValid());
     TU_ASSERT (interpreterState != nullptr);
     TU_ASSERT (processor != nullptr);
-    return std::make_shared<LocalMachine>(machineUrl, interpreterState, processor);
+    return std::make_shared<LocalMachine>(machineUrl, startSuspended, interpreterState, processor);
+}
+
+std::unique_ptr<RemotingService>
+ComponentConstructor::createRemotingService(
+    bool startSuspended,
+    std::shared_ptr<LocalMachine> localMachine,
+    uv_async_t *initComplete) const
+{
+    TU_ASSERT (localMachine != nullptr);
+    TU_ASSERT (initComplete != nullptr);
+    return std::make_unique<RemotingService>(startSuspended, localMachine, initComplete);
 }
 
 std::shared_ptr<grpc::ChannelInterface>
@@ -42,13 +54,6 @@ ComponentConstructor::createInvokeStub(std::shared_ptr<grpc::ChannelInterface> c
 {
     TU_ASSERT (customChannel != nullptr);
     return chord_invoke::InvokeService::NewStub(customChannel);
-}
-
-std::unique_ptr<RemotingService>
-ComponentConstructor::createRemotingService(uv_async_t *initComplete) const
-{
-    TU_ASSERT (initComplete != nullptr);
-    return std::make_unique<RemotingService>(initComplete);
 }
 
 std::shared_ptr<GrpcBinder>

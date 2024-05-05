@@ -113,6 +113,7 @@ TEST(InitializeUtils, MakeLocalMachine)
     ChordLocalMachineConfig chordLocalMachineConfig;
     chordLocalMachineConfig.mainLocation = lyric_common::AssemblyLocation::fromString(EXAMPLES_DEMO_PACKAGE);
     chordLocalMachineConfig.machineUrl = tempo_utils::Url::fromString("dev.zuri.machine:xxx");
+    chordLocalMachineConfig.startSuspended = true;
 
     ChordLocalMachineData chordLocalMachineData;
     chordLocalMachineData.interpreterState = std::make_shared<MockInterpreterState>();
@@ -121,11 +122,13 @@ TEST(InitializeUtils, MakeLocalMachine)
 
     MockComponentConstructor componentConstructor;
     tempo_utils::Url machineUrl;
+    bool startSuspended;
     std::shared_ptr<lyric_runtime::InterpreterState> interpreterState;
     AbstractMessageSender<RunnerReply> *processorPtr;
-    EXPECT_CALL (componentConstructor, createLocalMachine(_, _, _))
-        .WillOnce([&](const auto &machineUrl_, auto &interpreterState_, auto *processorPtr_) -> auto {
+    EXPECT_CALL (componentConstructor, createLocalMachine(_, _, _, _))
+        .WillOnce([&](const auto &machineUrl_, bool startSuspended_, auto &interpreterState_, auto *processorPtr_) -> auto {
             machineUrl = machineUrl_;
+            startSuspended = startSuspended_;
             interpreterState = interpreterState_;
             processorPtr = processorPtr_;
             return std::shared_ptr<LocalMachine>();
@@ -136,6 +139,7 @@ TEST(InitializeUtils, MakeLocalMachine)
         chordLocalMachineData.interpreterState, &processor).isOk());
 
     ASSERT_EQ (chordLocalMachineConfig.machineUrl, machineUrl);
+    ASSERT_EQ (chordLocalMachineConfig.startSuspended, startSuspended);
     ASSERT_EQ (chordLocalMachineData.interpreterState, interpreterState);
     ASSERT_EQ (&processor, processorPtr);
 }

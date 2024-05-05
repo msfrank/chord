@@ -39,7 +39,7 @@ private:
 
 class DriverMetadataProcessor : public grpc::AuthMetadataProcessor {
 public:
-    DriverMetadataProcessor(GrpcBinder *binder);
+    explicit DriverMetadataProcessor(GrpcBinder *binder);
 
     grpc::Status Process(
         const InputMetadata &auth_metadata,

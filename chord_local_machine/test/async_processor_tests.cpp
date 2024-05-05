@@ -11,7 +11,7 @@ static bool receive_messages_until_shutdown(RunnerRequest *message, void *data)
 {
     auto *context = static_cast<Context *>(data);
     context->messages.emplace_back(message);
-    return message->type != RunnerRequest::MessageType::Shutdown;
+    return message->type != RunnerRequest::MessageType::Terminate;
 }
 
 TEST(AsyncProcessor, SendAndReceiveSingleMessageSynchronously)
@@ -23,19 +23,19 @@ TEST(AsyncProcessor, SendAndReceiveSingleMessageSynchronously)
     AsyncProcessor<RunnerRequest> processor(receive_messages_until_shutdown, &context);
     processor.initialize(&loop);
 
-    processor.sendMessage(new ShutdownRunner());
+    processor.sendMessage(new TerminateRunner());
     processor.runUntilCancelled();
 
     ASSERT_EQ (1, context.messages.size());
     auto *message1 = context.messages.front().get();
-    ASSERT_EQ (RunnerRequest::MessageType::Shutdown, message1->type);
+    ASSERT_EQ (RunnerRequest::MessageType::Terminate, message1->type);
 }
 
 static void single_producer_thread(void *ptr)
 {
     auto *processor = static_cast<AsyncProcessor<RunnerRequest> *>(ptr);
     uv_sleep(250);
-    processor->sendMessage(new ShutdownRunner());
+    processor->sendMessage(new TerminateRunner());
 }
 
 TEST(AsyncProcessor, SendMessageAndReceiveSingleMessageAsync)
@@ -50,12 +50,12 @@ TEST(AsyncProcessor, SendMessageAndReceiveSingleMessageAsync)
     uv_thread_t tid;
     uv_thread_create(&tid, single_producer_thread, &processor);
 
-    processor.sendMessage(new ShutdownRunner());
+    processor.sendMessage(new TerminateRunner());
     processor.runUntilCancelled();
 
     ASSERT_EQ (1, context.messages.size());
     auto *message1 = context.messages.front().get();
-    ASSERT_EQ (RunnerRequest::MessageType::Shutdown, message1->type);
+    ASSERT_EQ (RunnerRequest::MessageType::Terminate, message1->type);
 
     uv_thread_join(&tid);
 }
@@ -64,11 +64,11 @@ static void multi_producer_thread(void *ptr)
 {
     auto *processor = static_cast<AsyncProcessor<RunnerRequest> *>(ptr);
     uv_sleep(100);
-    processor->sendMessage(new StartRunner());
+    processor->sendMessage(new ResumeRunner());
     uv_sleep(100);
-    processor->sendMessage(new InterruptRunner());
+    processor->sendMessage(new SuspendRunner());
     uv_sleep(100);
-    processor->sendMessage(new ShutdownRunner());
+    processor->sendMessage(new TerminateRunner());
 }
 
 TEST(AsyncProcessor, SendMessageAndReceiveMultipleMessagesAsync)
@@ -87,11 +87,11 @@ TEST(AsyncProcessor, SendMessageAndReceiveMultipleMessagesAsync)
 
     ASSERT_EQ (3, context.messages.size());
     auto *message1 = context.messages.at(0).get();
-    ASSERT_EQ (RunnerRequest::MessageType::Start, message1->type);
+    ASSERT_EQ (RunnerRequest::MessageType::Resume, message1->type);
     auto *message2 = context.messages.at(1).get();
-    ASSERT_EQ (RunnerRequest::MessageType::Interrupt, message2->type);
+    ASSERT_EQ (RunnerRequest::MessageType::Suspend, message2->type);
     auto *message3 = context.messages.at(2).get();
-    ASSERT_EQ (RunnerRequest::MessageType::Shutdown, message3->type);
+    ASSERT_EQ (RunnerRequest::MessageType::Terminate, message3->type);
 
     uv_thread_join(&tid);
 }

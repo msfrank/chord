@@ -84,6 +84,11 @@ chord_sandbox::ClientCommunicationStream::~ClientCommunicationStream()
         TU_LOG_WARN << "handler was still attached to ClientCommunicationStream during cleanup";
         m_handler->detach();
     }
+    while (m_head != nullptr) {
+        auto *curr = m_head;
+        m_head = m_head->next;
+        delete curr;
+    }
 }
 
 void
@@ -152,6 +157,7 @@ chord_sandbox::ClientCommunicationStream::write(std::string_view message)
     } else {
         // otherwise just enqueue the pending message
         m_tail->next = pending;
+        m_tail = pending;
     }
 
     return SandboxStatus::ok();

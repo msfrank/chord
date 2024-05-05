@@ -1,24 +1,11 @@
-#include <sys/socket.h>
-#include <sys/un.h>
 
-#include <chord_invoke/invoke_service.grpc.pb.h>
 #include <chord_local_machine/grpc_binder.h>
 #include <chord_local_machine/local_machine.h>
-#include <chord_local_machine/port_socket.h>
 #include <chord_local_machine/run_protocol_socket.h>
-#include <lyric_packaging/directory_loader.h>
-#include <lyric_packaging/package_loader.h>
-#include <lyric_common/common_conversions.h>
-#include <lyric_runtime/chain_loader.h>
-#include <lyric_runtime/interpreter_state.h>
 #include <tempo_command/command_result.h>
-#include <tempo_security/ecc_private_key_generator.h>
-#include <tempo_security/generate_utils.h>
-#include <tempo_utils/file_reader.h>
 #include <tempo_utils/file_utilities.h>
 #include <tempo_utils/log_stream.h>
 #include <tempo_utils/posix_result.h>
-#include <tempo_utils/tempfile_maker.h>
 #include <tempo_utils/url.h>
 
 #include <chord_local_machine/async_processor.h>
@@ -51,43 +38,41 @@ on_init_complete(uv_async_t *handle)
 {
     TU_LOG_INFO << "launch protocols connected";
     auto *chordLocalMachineData = (ChordLocalMachineData *) handle->loop->data;
-    if (chordLocalMachineData->runSocket) {
-        chordLocalMachineData->runSocket->notifyInitComplete();
-    } else {
-        chordLocalMachineData->localMachine->start();
-    }
+    chordLocalMachineData->localMachine->notifyInitComplete();
 }
-
-//static void
-//on_machine_state_changed(uv_async_t *handle)
-//{
-//    TU_LOG_INFO << "detected interpreter state change";
-//    auto *runSocket = static_cast<RunProtocolSocket *>(handle->data);
-//    runSocket->notifyStateChanged();
-//}
 
 static bool
 on_runner_reply(RunnerReply *message, void *data)
 {
     auto *chordLocalMachineData = static_cast<ChordLocalMachineData *>(data);
-    bool stopProcessor;
-
-    if (chordLocalMachineData->runSocket) {
-        chordLocalMachineData->runSocket->notifyStateChanged();
-    }
+    chord_remoting::MachineState newState = chord_remoting::UnknownState;
+    bool stopProcessor = false;
 
     switch (message->type) {
+        case RunnerReply::MessageType::Running:
+            newState = chord_remoting::Running;
+            stopProcessor = false;
+            break;
+        case RunnerReply::MessageType::Suspended:
+            newState = chord_remoting::Suspended;
+            stopProcessor = false;
+            break;
         case RunnerReply::MessageType::Cancelled:
-        case RunnerReply::MessageType::Completed:
-        case RunnerReply::MessageType::Failure:
+            newState = chord_remoting::Cancelled;
             stopProcessor = true;
             break;
-        default:
-            stopProcessor = false;
+        case RunnerReply::MessageType::Completed:
+            newState = chord_remoting::Completed;
+            stopProcessor = true;
+            break;
+        case RunnerReply::MessageType::Failure:
+            newState = chord_remoting::Failure;
+            stopProcessor = true;
             break;
     }
 
     delete message;
+    chordLocalMachineData->remotingService->notifyMachineStateChanged(newState);
     return stopProcessor;
 }
 
@@ -143,9 +128,6 @@ run_chord_local_machine(int argc, const char *argv[])
     AsyncProcessor<RunnerReply> processor(on_runner_reply, &chordLocalMachineData);
     TU_RETURN_IF_NOT_OK (processor.initialize(&chordLocalMachineData.mainLoop));
 
-    // allocate the remoting service
-    chordLocalMachineData.remotingService = std::make_unique<RemotingService>(&initComplete);
-
     // construct the invoke service stub
     TU_RETURN_IF_NOT_OK (make_custom_channel(
         chordLocalMachineData.customChannel, componentConstructor, chordLocalMachineConfig));
@@ -163,10 +145,9 @@ run_chord_local_machine(int argc, const char *argv[])
     TU_RETURN_IF_NOT_OK (make_local_machine(chordLocalMachineData.localMachine,
         componentConstructor, chordLocalMachineConfig, chordLocalMachineData.interpreterState, &processor));
 
-    // allocate the run socket if run protocol is an expected port
-    if (chordLocalMachineConfig.expectedPorts.contains(tempo_utils::Url::fromString(kRunProtocolUri))) {
-        chordLocalMachineData.runSocket = std::make_shared<RunProtocolSocket>(chordLocalMachineData.localMachine);
-    }
+    // allocate the remoting service
+    TU_RETURN_IF_NOT_OK (make_remoting_service(chordLocalMachineData.remotingService,
+        componentConstructor, chordLocalMachineConfig, chordLocalMachineData.localMachine, &initComplete));
 
     // construct the certificate signing request
     TU_RETURN_IF_NOT_OK (make_csr_key_pair(
@@ -178,28 +159,31 @@ run_chord_local_machine(int argc, const char *argv[])
         chordLocalMachineData.csrKeyPair, chordLocalMachineData.invokeStub.get(),
         chordLocalMachineData.remotingService.get()));
 
-
     // run the local machine
     auto runStatus = run_local_machine(chordLocalMachineConfig, chordLocalMachineData);
     TU_LOG_WARN_IF (runStatus.notOk()) << runStatus;
 
     // shut down the local machine
     TU_LOG_V << "shutting down local machine";
-    auto shutdownMachineStatus = chordLocalMachineData.localMachine->shutdown();
-    TU_LOG_WARN_IF (shutdownMachineStatus.notOk()) << "failed to shutdown local machine: " << shutdownMachineStatus;
+    auto shutdownMachineStatus = chordLocalMachineData.localMachine->terminate();
+    TU_LOG_WARN_IF (shutdownMachineStatus.notOk()) << "failed to shut down local machine: " << shutdownMachineStatus;
     chordLocalMachineData.localMachine.reset();
 
+    // flush any remaining RunnerReply messages
+    processor.processAvailableMessages();
+
+    //
     uv_print_all_handles(&chordLocalMachineData.mainLoop, tempo_utils::get_logging_sink());
 
     // shut down the binder
     TU_LOG_V << "shutting down grpc binder";
     auto shutdownBinderStatus = chordLocalMachineData.grpcBinder->shutdown();
-    TU_LOG_WARN_IF (shutdownBinderStatus.notOk()) << "failed to shutdown grpc binder: " << shutdownBinderStatus;
+    TU_LOG_WARN_IF (shutdownBinderStatus.notOk()) << "failed to shut down grpc binder: " << shutdownBinderStatus;
     chordLocalMachineData.grpcBinder.reset();
 
-    // release the run socket
-    TU_LOG_V << "releasing run socket";
-    chordLocalMachineData.runSocket.reset();
+//    // release the run socket
+//    TU_LOG_V << "releasing run socket";
+//    chordLocalMachineData.runSocket.reset();
 
     // release the remoting service
     TU_LOG_V << "releasing remoting service";

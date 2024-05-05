@@ -19,12 +19,12 @@ public:
     virtual ~BaseAsyncProcessor();
 
     tempo_utils::Status initialize(uv_loop_t *loop);
+    void processAvailableMessages();
     void runUntilCancelled();
 
 protected:
     virtual void processAbstractMessage(AbstractMessage *message) = 0;
     void sendAbstractMessage(AbstractMessage *message);
-    void processMessages();
     void cancelProcessing();
 
 private:

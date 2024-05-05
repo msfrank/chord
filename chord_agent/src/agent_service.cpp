@@ -155,12 +155,17 @@ AgentService::CreateMachine(
 
     // append expected port args
     for (const auto &requestedPort : request->requested_ports()) {
-        builder.appendArg("--expected-port", requestedPort.protocol_uri());
+        builder.appendArg("--expected-port", requestedPort.protocol_url());
+    }
+
+    // append start-suspended flag
+    if (request->start_suspended()) {
+        builder.appendArg("--start-suspended");
     }
 
     // append the final required builder args
     builder.appendArg(m_listenEndpoint);
-    builder.appendArg(request->execution_uri());
+    builder.appendArg(request->execution_url());
     builder.appendArg(machineUrl.toString());
 
     // spawn the helper process and move machine to 'spawning' queue
@@ -183,9 +188,9 @@ AgentService::SignCertificates(
     auto *reactor = context->DefaultReactor();
 
     // verify machine url is valid
-    auto machineUrl = tempo_utils::Url::fromString(request->machine_uri());
+    auto machineUrl = tempo_utils::Url::fromString(request->machine_url());
     if (!machineUrl.isValid()) {
-        grpc::Status status(grpc::StatusCode::INVALID_ARGUMENT, "invalid parameter machine_uri");
+        grpc::Status status(grpc::StatusCode::INVALID_ARGUMENT, "invalid parameter machine_url");
         TU_LOG_INFO << "SignCertificates failed: " << status.error_message();
         reactor->Finish(status);
         return reactor;
@@ -194,7 +199,7 @@ AgentService::SignCertificates(
     // verify any duplicate declared ports each have a unique endpoint
     absl::flat_hash_map<tempo_utils::Url, absl::flat_hash_set<tempo_utils::Url>> declaredPorts;
     for (const auto &declaredPort : request->declared_ports()) {
-        auto protocolUrl = tempo_utils::Url::fromString(declaredPort.protocol_uri());
+        auto protocolUrl = tempo_utils::Url::fromString(declaredPort.protocol_url());
         if (request->declared_endpoints_size() <= declaredPort.endpoint_index()) {
             grpc::Status status(grpc::StatusCode::INVALID_ARGUMENT, "invalid endpoint index for declared port");
             TU_LOG_INFO << "SignCertificates failed: " << status.error_message();
@@ -203,7 +208,7 @@ AgentService::SignCertificates(
         }
 
         const auto &declaredEndpoint = request->declared_endpoints(declaredPort.endpoint_index());
-        auto endpointUrl = tempo_utils::Url::fromString(declaredEndpoint.endpoint_uri());
+        auto endpointUrl = tempo_utils::Url::fromString(declaredEndpoint.endpoint_url());
 
         auto declaredPortEndpoints = declaredPorts[protocolUrl];
         if (declaredPortEndpoints.contains(protocolUrl)) {
@@ -239,9 +244,9 @@ AgentService::RunMachine(
     auto *reactor = context->DefaultReactor();
 
     // verify machine url is valid
-    auto machineUrl = tempo_utils::Url::fromString(request->machine_uri());
+    auto machineUrl = tempo_utils::Url::fromString(request->machine_url());
     if (!machineUrl.isValid()) {
-        grpc::Status status(grpc::StatusCode::INVALID_ARGUMENT, "invalid parameter machine_uri");
+        grpc::Status status(grpc::StatusCode::INVALID_ARGUMENT, "invalid parameter machine_url");
         TU_LOG_INFO << "RunMachine failed: " << status.error_message();
         reactor->Finish(status);
         return reactor;
@@ -270,9 +275,9 @@ AgentService::AdvertiseEndpoints(
     auto *reactor = context->DefaultReactor();
 
     // verify machine url is valid
-    auto machineUrl = tempo_utils::Url::fromString(request->machine_uri());
+    auto machineUrl = tempo_utils::Url::fromString(request->machine_url());
     if (!machineUrl.isValid()) {
-        grpc::Status status(grpc::StatusCode::INVALID_ARGUMENT, "invalid parameter machine_uri");
+        grpc::Status status(grpc::StatusCode::INVALID_ARGUMENT, "invalid parameter machine_url");
         TU_LOG_INFO << "AdvertiseEndpoints failed: " << status.error_message();
         reactor->Finish(status);
         return reactor;
@@ -303,9 +308,9 @@ AgentService::DeleteMachine(
     auto *reactor = context->DefaultReactor();
 
     // verify machine url is valid
-    auto machineUrl = tempo_utils::Url::fromString(request->machine_uri());
+    auto machineUrl = tempo_utils::Url::fromString(request->machine_url());
     if (!machineUrl.isValid()) {
-        grpc::Status status(grpc::StatusCode::INVALID_ARGUMENT, "invalid parameter machine_uri");
+        grpc::Status status(grpc::StatusCode::INVALID_ARGUMENT, "invalid parameter machine_url");
         TU_LOG_INFO << "DeleteMachine failed: " << status.error_message();
         reactor->Finish(status);
         return reactor;
@@ -336,12 +341,12 @@ OnAgentSpawn::onComplete(
     MachineHandle handle,
     const chord_invoke::SignCertificatesRequest &signCertificatesRequest)
 {
-    m_result->set_machine_uri(handle.url.toString());
+    m_result->set_machine_url(handle.url.toString());
 
     // forward declared ports
     for (const auto &declaredPort : signCertificatesRequest.declared_ports()) {
         auto *resultPort = m_result->add_declared_ports();
-        resultPort->set_protocol_uri(declaredPort.protocol_uri());
+        resultPort->set_protocol_url(declaredPort.protocol_url());
         resultPort->set_endpoint_index(declaredPort.endpoint_index());
         resultPort->set_port_type(declaredPort.port_type());
         resultPort->set_port_direction(declaredPort.port_direction());
@@ -350,7 +355,7 @@ OnAgentSpawn::onComplete(
     // forward declared endpoints
     for (const auto &declaredEndpoint : signCertificatesRequest.declared_endpoints()) {
         auto *resultEndpoint = m_result->add_declared_endpoints();
-        resultEndpoint->set_endpoint_uri(declaredEndpoint.endpoint_uri());
+        resultEndpoint->set_endpoint_url(declaredEndpoint.endpoint_url());
         resultEndpoint->set_csr(declaredEndpoint.csr());
     }
 
@@ -377,7 +382,7 @@ OnAgentSign::onComplete(MachineHandle handle, const chord_invoke::RunMachineRequ
 {
     for (const auto &signedEndpoint : runMachineRequest.signed_endpoints()) {
         auto *resultEndpoint = m_result->add_signed_endpoints();
-        resultEndpoint->set_endpoint_uri(signedEndpoint.endpoint_uri());
+        resultEndpoint->set_endpoint_url(signedEndpoint.endpoint_url());
         resultEndpoint->set_certificate(signedEndpoint.certificate());
     }
 
@@ -406,7 +411,7 @@ OnAgentReady::onComplete(
 {
     for (const auto &boundEndpoint : advertiseEndpointsRequest.bound_endpoints()) {
         auto *resultEndpoint = m_result->add_bound_endpoints();
-        resultEndpoint->set_endpoint_uri(boundEndpoint.endpoint_uri());
+        resultEndpoint->set_endpoint_url(boundEndpoint.endpoint_url());
     }
 
     m_reactor->Finish(grpc::Status::OK);

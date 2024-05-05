@@ -26,10 +26,7 @@ namespace chord_test {
         absl::flat_hash_map<std::string,std::string> packageMap;
         tempo_config::ConfigMap buildConfig;
         tempo_config::ConfigMap buildVendorConfig;
-        absl::flat_hash_set<chord_protocol::RequestedPort> requestedPorts;
-        absl::flat_hash_map<
-            tempo_utils::Url,
-            std::shared_ptr<chord_protocol::AbstractProtocolHandler>> protocolPlugs;
+        std::vector<chord_sandbox::RequestedPortAndHandler> protocolPlugs;
         chord_sandbox::RunProtocolCallback runProtocolCallback = nullptr;
         void *runProtocolCallbackData = nullptr;
     };

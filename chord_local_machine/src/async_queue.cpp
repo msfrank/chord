@@ -17,7 +17,7 @@ BaseAsyncQueue::~BaseAsyncQueue()
     while (!m_queue.empty()) {
         auto *message = m_queue.front();
         m_queue.pop();
-        TU_LOG_WARN << "dropping unhandled message: " << message;
+        TU_LOG_WARN << "dropping unhandled message: " << message->toString();
         delete message;
     }
 }

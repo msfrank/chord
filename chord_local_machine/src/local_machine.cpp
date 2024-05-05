@@ -15,11 +15,16 @@ static void runner_thread(void *data)
 
 LocalMachine::LocalMachine(
     const tempo_utils::Url &machineUrl,
+    bool startSuspended,
     std::shared_ptr<lyric_runtime::InterpreterState> interpreterState,
     AbstractMessageSender<RunnerReply> *processor)
-    : m_machineUrl(machineUrl)
+    : m_machineUrl(machineUrl),
+      m_startSuspended(startSuspended)
 {
     TU_ASSERT (m_machineUrl.isValid());
+    TU_ASSERT (interpreterState != nullptr);
+    TU_ASSERT (processor != nullptr);
+
     auto interp = std::make_unique<lyric_runtime::BytecodeInterpreter>(interpreterState, nullptr);
     m_runner = std::make_unique<InterpreterRunner>(std::move(interp), processor);
     m_commandQueue = m_runner->getIncomingSender();
@@ -28,7 +33,7 @@ LocalMachine::LocalMachine(
 
 LocalMachine::~LocalMachine()
 {
-    shutdown();
+    terminate();
     uv_thread_join(&m_tid);
 }
 
@@ -45,22 +50,31 @@ LocalMachine::getRunnerState() const
 }
 
 tempo_utils::Status
-LocalMachine::start()
+LocalMachine::notifyInitComplete()
 {
-    m_commandQueue->sendMessage(new StartRunner());
+    if (!m_startSuspended) {
+        resume();
+    }
     return {};
 }
 
 tempo_utils::Status
-LocalMachine::stop()
+LocalMachine::suspend()
 {
-    m_commandQueue->sendMessage(new InterruptRunner());
+    m_commandQueue->sendMessage(new SuspendRunner());
     return {};
 }
 
 tempo_utils::Status
-LocalMachine::shutdown()
+LocalMachine::resume()
 {
-    m_commandQueue->sendMessage(new ShutdownRunner());
+    m_commandQueue->sendMessage(new ResumeRunner());
+    return {};
+}
+
+tempo_utils::Status
+LocalMachine::terminate()
+{
+    m_commandQueue->sendMessage(new TerminateRunner());
     return {};
 }

@@ -16,6 +16,7 @@ struct ChordLocalMachineConfig {
     std::filesystem::path installDirectory;
     std::vector<std::filesystem::path> packageDirectories;
     absl::flat_hash_set<tempo_utils::Url> expectedPorts;
+    bool startSuspended;
     tempo_utils::Url supervisorUrl;
     std::string supervisorNameOverride;
     tempo_utils::Url machineUrl;

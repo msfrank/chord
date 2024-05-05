@@ -252,6 +252,7 @@ public:
         std::shared_ptr<LocalMachine>,
         createLocalMachine, (
             const tempo_utils::Url &machineUrl,
+            bool startSuspended,
             std::shared_ptr<lyric_runtime::InterpreterState> &interpreterState,
             AbstractMessageSender<RunnerReply> *processor),
         (const, override));
@@ -273,6 +274,7 @@ public:
     MOCK_METHOD (
         std::unique_ptr<RemotingService>,
         createRemotingService, (
+            std::shared_ptr<LocalMachine> localMachine,
             uv_async_t *initComplete),
         (const, override));
 

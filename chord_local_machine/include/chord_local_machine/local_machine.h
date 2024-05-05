@@ -14,6 +14,7 @@ class LocalMachine {
 public:
     LocalMachine(
         const tempo_utils::Url &machineUrl,
+        bool startSuspended,
         std::shared_ptr<lyric_runtime::InterpreterState> interpreterState,
         AbstractMessageSender<RunnerReply> *processor);
     virtual ~LocalMachine();
@@ -21,12 +22,14 @@ public:
     tempo_utils::Url getMachineUrl() const;
     InterpreterRunnerState getRunnerState() const;
 
-    tempo_utils::Status start();
-    tempo_utils::Status stop();
-    tempo_utils::Status shutdown();
+    tempo_utils::Status notifyInitComplete();
+    tempo_utils::Status suspend();
+    tempo_utils::Status resume();
+    tempo_utils::Status terminate();
 
 private:
     tempo_utils::Url m_machineUrl;
+    bool m_startSuspended;
     std::unique_ptr<InterpreterRunner> m_runner;
     AbstractMessageSender<RunnerRequest> *m_commandQueue;
     uv_thread_t m_tid;

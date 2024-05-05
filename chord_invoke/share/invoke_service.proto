@@ -6,14 +6,17 @@ service InvokeService {
 
     rpc IdentifyAgent(IdentifyAgentRequest) returns (IdentifyAgentResult);
 
+    // ProvisionMachine
     rpc CreateMachine(CreateMachineRequest) returns (CreateMachineResult);
 
     rpc SignCertificates(SignCertificatesRequest) returns (SignCertificatesResult);
 
     rpc AdvertiseEndpoints(AdvertiseEndpointsRequest) returns (AdvertiseEndpointsResult);
 
+    // InvokeMachine
     rpc RunMachine(RunMachineRequest) returns (RunMachineResult);
 
+    // TerminateMachine
     rpc DeleteMachine(DeleteMachineRequest) returns (DeleteMachineResult);
 }
 
@@ -26,22 +29,26 @@ message IdentifyAgentResult {
 }
 
 message CreateMachineRequest {
-    string execution_uri = 1;
+    string execution_url = 1;
     string name = 2;
     string config_hash = 3;
     repeated RequestedPort requested_ports = 4;
+    bool requested_control = 5;
+    bool start_suspended = 6;
 }
 
 message CreateMachineResult {
-    string machine_uri = 1;
+    string machine_url = 1;
     repeated DeclaredPort declared_ports = 2;
     repeated DeclaredEndpoint declared_endpoints = 3;
+    sint32 control_endpoint_index = 4;
 }
 
 message SignCertificatesRequest {
-    string machine_uri = 1;
+    string machine_url = 1;
     repeated DeclaredPort declared_ports = 2;
     repeated DeclaredEndpoint declared_endpoints = 3;
+    sint32 control_endpoint_index = 4;
 }
 
 message SignCertificatesResult {
@@ -49,7 +56,7 @@ message SignCertificatesResult {
 }
 
 message AdvertiseEndpointsRequest {
-    string machine_uri = 1;
+    string machine_url = 1;
     repeated BoundEndpoint bound_endpoints = 2;
 }
 
@@ -57,7 +64,7 @@ message AdvertiseEndpointsResult {
 }
 
 message RunMachineRequest {
-    string machine_uri = 1;
+    string machine_url = 1;
     repeated SignedEndpoint signed_endpoints = 2;
 }
 
@@ -66,11 +73,12 @@ message RunMachineResult {
 }
 
 message DeleteMachineRequest {
-    string machine_uri = 1;
+    string machine_url = 1;
 }
 
 message DeleteMachineResult {
-    uint32 exit_status = 1;
+    sint32 exit_status = 1;
+    uint64 elapsed_time_ms = 3;
 }
 
 enum PortType {
@@ -87,28 +95,28 @@ enum PortDirection {
 }
 
 message RequestedPort {
-    string protocol_uri = 1;
+    string protocol_url = 1;
     PortType port_type = 2;
     PortDirection port_direction = 3;
 }
 
 message DeclaredPort {
-    string protocol_uri = 1;
+    string protocol_url = 1;
     PortType port_type = 2;
     PortDirection port_direction = 3;
-    uint32 endpoint_index = 4;
+    sint32 endpoint_index = 4;
 }
 
 message DeclaredEndpoint {
-    string endpoint_uri = 1;
+    string endpoint_url = 1;
     bytes csr = 2;
 }
 
 message SignedEndpoint {
-    string endpoint_uri = 1;
+    string endpoint_url = 1;
     bytes certificate = 2;
 }
 
 message BoundEndpoint {
-    string endpoint_uri = 1;
+    string endpoint_url = 1;
 }

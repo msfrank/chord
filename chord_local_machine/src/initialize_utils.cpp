@@ -1,7 +1,6 @@
 
 #include <chord_local_machine/initialize_utils.h>
 #include <chord_local_machine/interpreter_runner.h>
-#include <chord_local_machine/run_protocol_socket.h>
 #include <chord_invoke/invoke_service.grpc.pb.h>
 #include <tempo_command/command_result.h>
 #include <tempo_security/ecc_private_key_generator.h>
@@ -56,7 +55,20 @@ make_local_machine(
     AbstractMessageSender<RunnerReply> *processor)
 {
     localMachine = componentConstructor.createLocalMachine(
-        chordLocalMachineConfig.machineUrl, interpreterState, processor);
+        chordLocalMachineConfig.machineUrl, chordLocalMachineConfig.startSuspended, interpreterState, processor);
+    return {};
+}
+
+tempo_utils::Status
+make_remoting_service(
+    std::unique_ptr<RemotingService> &remotingService,
+    const ComponentConstructor &componentConstructor,
+    const ChordLocalMachineConfig &chordLocalMachineConfig,
+    std::shared_ptr<LocalMachine> localMachine,
+    uv_async_t *initComplete)
+{
+    remotingService = componentConstructor.createRemotingService(
+        chordLocalMachineConfig.startSuspended, localMachine, initComplete);
     return {};
 }
 

@@ -23,11 +23,11 @@ TEST(AsyncQueue, SendMessageAndReceiveSynchronously)
     queue.initialize(&loop);
 
     ASSERT_FALSE (queue.messagesPending());
-    queue.sendMessage(new ShutdownRunner());
+    queue.sendMessage(new TerminateRunner());
     ASSERT_TRUE (queue.messagesPending());
     auto *message = queue.waitForMessage();
     ASSERT_TRUE (message != nullptr);
-    ASSERT_EQ (RunnerRequest::MessageType::Shutdown, message->type);
+    ASSERT_EQ (RunnerRequest::MessageType::Terminate, message->type);
     delete message;
 }
 
@@ -35,7 +35,7 @@ static void producer_thread(void *ptr)
 {
     auto *queue = static_cast<AsyncQueue<RunnerRequest> *>(ptr);
     uv_sleep(250);
-    queue->sendMessage(new ShutdownRunner());
+    queue->sendMessage(new TerminateRunner());
 }
 
 TEST(AsyncQueue, SendMessageAndReceiveAsync)
@@ -52,7 +52,7 @@ TEST(AsyncQueue, SendMessageAndReceiveAsync)
     ASSERT_FALSE (queue.messagesPending());
     auto *message = queue.waitForMessage();
     ASSERT_TRUE (message != nullptr);
-    ASSERT_EQ (RunnerRequest::MessageType::Shutdown, message->type);
+    ASSERT_EQ (RunnerRequest::MessageType::Terminate, message->type);
     delete message;
 
     uv_thread_join(&tid);

@@ -18,7 +18,7 @@ BaseAsyncProcessor::~BaseAsyncProcessor()
     while (!m_queue.empty()) {
         auto *message = m_queue.front();
         m_queue.pop();
-        TU_LOG_WARN << "dropping unhandled message: " << message;
+        TU_LOG_WARN << "dropping unhandled message: " << message->toString();
         delete message;
     }
 }
@@ -27,7 +27,7 @@ void
 on_message_receive(uv_async_t *async)
 {
     auto *queue = static_cast<BaseAsyncProcessor *>(async->data);
-    queue->processMessages();
+    queue->processAvailableMessages();
 }
 
 tempo_utils::Status
@@ -66,7 +66,7 @@ BaseAsyncProcessor::runUntilCancelled()
 }
 
 void
-BaseAsyncProcessor::processMessages()
+BaseAsyncProcessor::processAvailableMessages()
 {
     std::queue<AbstractMessage *> incoming;
 

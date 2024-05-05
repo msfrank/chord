@@ -22,6 +22,7 @@ configure(ChordLocalMachineConfig &chordLocalMachineConfig, int argc, const char
     tempo_config::PathParser logFileParser(
         std::filesystem::path(absl::StrCat("chord-local-machine.", getpid(), ".log")));
     tempo_config::UrlParser expectedPortParser;
+    tempo_config::BooleanParser startSuspendedParser(false);
     tempo_config::SetTParser<tempo_utils::Url> expectedPortsParser(
         &expectedPortParser,
         {});
@@ -35,7 +36,8 @@ configure(ChordLocalMachineConfig &chordLocalMachineConfig, int argc, const char
         {"runDirectory", {}, "run directory", "DIR"},
         {"installDirectory", {}, "install directory", "DIR"},
         {"packageDirectories", {}, "package directory", "DIR"},
-        {"expectedPorts", {}, "expectedPorts", "PROTOCOL-URL"},
+        {"expectedPorts", {}, "expected port", "PROTOCOL-URL"},
+        {"startSuspended", {}, "start machine in suspended state"},
         {"supervisorUrl", {}, "register interpreter using the specified uri", "SUPERVISOR-URL"},
         {"supervisorNameOverride", {}, "the SSL server name of the supervisor", "SERVER-NAME"},
         {"machineUrl", {}, "the machine url used for registration", "MACHINE-URL"},
@@ -50,6 +52,7 @@ configure(ChordLocalMachineConfig &chordLocalMachineConfig, int argc, const char
         {"installDirectory", {"--install-directory"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"packageDirectories", {"--package-directory"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"expectedPorts", {"--expected-port"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
+        {"startSuspended", {"--start-suspended"}, tempo_command::GroupingType::NO_ARGUMENT},
         {"supervisorNameOverride", {"--supervisor-server-name"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"machineNameOverride", {"--machine-server-name"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"pemRootCABundleFile", {"--ca-bundle"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
@@ -63,6 +66,7 @@ configure(ChordLocalMachineConfig &chordLocalMachineConfig, int argc, const char
         {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "installDirectory"},
         {tempo_command::MappingType::ANY_INSTANCES, "packageDirectories"},
         {tempo_command::MappingType::ANY_INSTANCES, "expectedPorts"},
+        {tempo_command::MappingType::TRUE_IF_INSTANCE, "startSuspended"},
         {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "supervisorUrl"},
         {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "machineUrl"},
         {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "supervisorNameOverride"},
@@ -130,6 +134,10 @@ configure(ChordLocalMachineConfig &chordLocalMachineConfig, int argc, const char
     // determine the expected ports
     TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.expectedPorts,
         expectedPortsParser, config, "expectedPorts"));
+
+    // determine start suspended
+    TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.startSuspended,
+        startSuspendedParser, config, "startSuspended"));
 
     // determine the supervisor uri
     TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.supervisorUrl,

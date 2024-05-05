@@ -21,8 +21,14 @@ public:
 
     virtual std::shared_ptr<LocalMachine> createLocalMachine(
         const tempo_utils::Url &machineUrl,
+        bool startSuspended,
         std::shared_ptr<lyric_runtime::InterpreterState> &interpreterState,
         AbstractMessageSender<RunnerReply> *processor) const;
+
+    virtual std::unique_ptr<RemotingService> createRemotingService(
+        bool startSuspended,
+        std::shared_ptr<LocalMachine> localMachine,
+        uv_async_t *initComplete) const;
 
     virtual std::shared_ptr<grpc::ChannelInterface> createCustomChannel(
         std::string_view targetEndpoint,
@@ -31,9 +37,6 @@ public:
 
     virtual std::unique_ptr<chord_invoke::InvokeService::StubInterface> createInvokeStub(
         std::shared_ptr<grpc::ChannelInterface> customChannel) const;
-
-    virtual std::unique_ptr<RemotingService> createRemotingService(
-        uv_async_t *initComplete) const;
 
     virtual std::shared_ptr<GrpcBinder> createGrpcBinder(
         std::string_view binderEndpoint,

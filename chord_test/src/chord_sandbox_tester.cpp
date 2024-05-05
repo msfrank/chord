@@ -104,11 +104,10 @@ chord_test::ChordSandboxTester::runModuleInSandbox(const std::string &code, cons
     options.pemRootCABundleFile = m_caKeyPair.getPemCertificateFile();
     options.agentServerName = agentServerName;
 
-    // initialize the sandbox
     chord_sandbox::ChordIsolate isolate(options);
-    auto sandboxStatus = isolate.initialize();
-    if (sandboxStatus.notOk())
-        return sandboxStatus;
+
+    // initialize the sandbox
+    TU_RETURN_IF_NOT_OK (isolate.initialize());
 
     // construct the machine config
     absl::flat_hash_map<std::string,tempo_config::ConfigNode> config;
@@ -124,20 +123,14 @@ chord_test::ChordSandboxTester::runModuleInSandbox(const std::string &code, cons
     config["pemRootCABundleFile"] = tempo_config::ConfigValue(options.pemRootCABundleFile);
 
     // run the module in the sandbox
-    auto spawnMachineResult = isolate.spawn(sourcePath.string(), moduleLocation,
-        tempo_config::ConfigMap(config), m_options.requestedPorts, m_options.protocolPlugs,
-        m_options.runProtocolCallback, m_options.runProtocolCallbackData);
-    if (spawnMachineResult.isStatus())
-        return spawnMachineResult.getStatus();
+    std::shared_ptr<chord_sandbox::RemoteMachine> remoteMachine;
+    TU_ASSIGN_OR_RETURN (remoteMachine, isolate.spawn(
+        sourcePath.string(), moduleLocation, tempo_config::ConfigMap(config), m_options.protocolPlugs));
 
     TU_LOG_INFO << "spawned remote machine";
 
-    // start the remote machine
-    auto machine = spawnMachineResult.getResult();
-    TU_RETURN_IF_NOT_OK (machine->start());
-
-    // FIXME: get the execution result
-    machine->runUntilFinished();
+    // block until the remote machine is finished
+    TU_RETURN_IF_NOT_OK (remoteMachine->runUntilFinished());
 
     // return the interpreter result
     return lyric_test::RunModule(m_runner, targetComputation,

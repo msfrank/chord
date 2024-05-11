@@ -149,5 +149,6 @@ TEST_F(ClientCommunicationStream, SendAndReceiveMessage)
     ASSERT_TRUE (status.isOk());
     auto message = handler->waitForMessage();
     ASSERT_EQ ("hello world", message);
+    handler->detach();
     stub.reset();
 }

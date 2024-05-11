@@ -274,6 +274,7 @@ public:
     MOCK_METHOD (
         std::unique_ptr<RemotingService>,
         createRemotingService, (
+            bool startSuspended,
             std::shared_ptr<LocalMachine> localMachine,
             uv_async_t *initComplete),
         (const, override));

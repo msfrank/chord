@@ -101,30 +101,28 @@ chord_sandbox::ClientCommunicationStream::OnReadInitialMetadataDone(bool ok)
 void
 chord_sandbox::ClientCommunicationStream::OnReadDone(bool ok)
 {
-    if (ok) {
-        m_handler->handle(m_incoming.data());
-        m_incoming.Clear();
-        StartRead(&m_incoming);
-    } else {
+    if (!ok) {
         TU_LOG_VV << "read failed";
-        //StartWritesDone();
+        return;
     }
+    m_handler->handle(m_incoming.data());
+    m_incoming.Clear();
+    StartRead(&m_incoming);
 }
 
 void
 chord_sandbox::ClientCommunicationStream::OnWriteDone(bool ok)
 {
-    if (ok) {
-        absl::MutexLock locker(&m_lock);
-        auto *pending = m_head->next;
-        delete m_head;
-        m_head = pending;
-        if (pending) {
-            StartWrite(&pending->message);
-        }
-    } else {
+    if (!ok) {
         TU_LOG_VV << "write failed";
-        //StartWritesDone();
+        return;
+    }
+    absl::MutexLock locker(&m_lock);
+    auto *pending = m_head->next;
+    delete m_head;
+    m_head = pending;
+    if (pending) {
+        StartWrite(&pending->message);
     }
 }
 

@@ -27,8 +27,6 @@ namespace chord_test {
         tempo_config::ConfigMap buildConfig;
         tempo_config::ConfigMap buildVendorConfig;
         std::vector<chord_sandbox::RequestedPortAndHandler> protocolPlugs;
-        chord_sandbox::RunProtocolCallback runProtocolCallback = nullptr;
-        void *runProtocolCallbackData = nullptr;
     };
 
     class ChordSandboxTester {

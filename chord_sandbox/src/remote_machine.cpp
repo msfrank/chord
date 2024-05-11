@@ -17,14 +17,30 @@ chord_sandbox::RemoteMachine::RemoteMachine(
     TU_ASSERT (m_connector != nullptr);
 }
 
+/**
+ * Block the current thread until the remote machine is finished. If the given `func` is not null then
+ * it will be called every time there is a state change, and `data` will be passed as the second argument
+ * to `func`.
+ *
+ * @param func Callback function invoked every time there is a state change.
+ * @param data void pointer to data which is passed to `func`.
+ * @return Ok status if the remote machine finished, otherwise non-Ok status containing an error.
+ */
 tempo_utils::Status
-chord_sandbox::RemoteMachine::runUntilFinished()
+chord_sandbox::RemoteMachine::runUntilFinished(RemoteMachineStateChangedFunc func, void *data)
 {
     auto monitor = m_connector->getMonitor();
     auto state = monitor->getState();
-    TU_LOG_INFO << "initial state: " << chord_remoting::MachineState_Name(state);
 
+    // loop until we encounter a terminal state
     for (;;) {
+
+        // if there is a callback func specified then call it
+        if (func != nullptr) {
+            func(state, data);
+        }
+
+        // if state is terminal then break from the loop
         bool done;
         switch (state) {
             case chord_remoting::Completed:
@@ -39,8 +55,8 @@ chord_sandbox::RemoteMachine::runUntilFinished()
         if (done)
             break;
 
+        // otherwise block waiting for a state change
         state = monitor->waitForStateChange(state, -1);
-        TU_LOG_INFO << "state changed: " << chord_remoting::MachineState_Name(state);
     }
 
     return {};
@@ -61,7 +77,5 @@ chord_sandbox::RemoteMachine::resume()
 tempo_utils::Status
 chord_sandbox::RemoteMachine::shutdown()
 {
-    absl::MutexLock locker(&m_lock);
-    return SandboxStatus::forCondition(
-        SandboxCondition::kSandboxInvariant, "shutdown is unimplemented");
+    return m_connector->terminate();
 }

@@ -10,11 +10,6 @@
 #include <tempo_utils/file_utilities.h>
 #include <tempo_utils/tempdir_maker.h>
 
-static void
-run_protocol_callback(chord_sandbox::RunPlugState, void *data)
-{
-}
-
 class ChordIsolate : public ::testing::Test {
 protected:
     chord_test::SandboxTesterOptions options;
@@ -30,7 +25,6 @@ protected:
         options.isTemporary = false;
         options.buildConfig = config->getToolConfig();
         options.buildVendorConfig = config->getVendorConfig();
-        options.runProtocolCallback = run_protocol_callback;
     }
 };
 

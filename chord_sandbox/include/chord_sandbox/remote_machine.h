@@ -7,6 +7,11 @@
 
 namespace chord_sandbox {
 
+    /**
+     *
+     */
+    typedef void (*RemoteMachineStateChangedFunc)(chord_remoting::MachineState, void *);
+
     class RemoteMachine {
 
     public:
@@ -16,7 +21,7 @@ namespace chord_sandbox {
             const tempo_utils::Url &machineUrl,
             std::shared_ptr<GrpcConnector> connector);
 
-        tempo_utils::Status runUntilFinished();
+        tempo_utils::Status runUntilFinished(RemoteMachineStateChangedFunc func = nullptr, void *data = nullptr);
         tempo_utils::Status suspend();
         tempo_utils::Status resume();
         tempo_utils::Status shutdown();
@@ -26,7 +31,6 @@ namespace chord_sandbox {
         lyric_common::AssemblyLocation m_mainLocation;
         tempo_utils::Url m_machineUrl;
         std::shared_ptr<GrpcConnector> m_connector;
-        absl::Mutex m_lock;
     };
 }
 

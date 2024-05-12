@@ -194,16 +194,16 @@ string(REGEX REPLACE "[0-9]+\\.[0-9]+\\.([0-9]+)" "\\1"
 set(FULL_VERSION "${MAJOR_VERSION}.${MINOR_VERSION}.${PATCH_VERSION}")
 message(STATUS "version is ${FULL_VERSION}")
 
-set(CHORD_LOCAL_MACHINE_DIST_PATH           "${CMAKE_BINARY_DIR}/chord_local_machine/chord-local-machine")
-set(CHORD_LOCAL_MACHINE_INSTALL_PATH        "${CMAKE_INSTALL_BINDIR}/chord-local-machine")
-set(CHORD_AGENT_DIST_PATH                   "${CMAKE_BINARY_DIR}/chord_agent/chord-agent")
-set(CHORD_AGENT_INSTALL_PATH                "${CMAKE_INSTALL_BINDIR}/chord-agent")
+set(CHORD_LOCAL_MACHINE_DIST_PATH           "${CMAKE_BINARY_DIR}/bin/chord_local_machine/chord-local-machine")
+set(CHORD_LOCAL_MACHINE_INSTALL_PATH        "${CMAKE_INSTALL_BINDIR}/bin/chord-local-machine")
+set(CHORD_AGENT_DIST_PATH                   "${CMAKE_BINARY_DIR}/bin/chord_agent/chord-agent")
+set(CHORD_AGENT_INSTALL_PATH                "${CMAKE_INSTALL_BINDIR}/bin/chord-agent")
 
 # used by chord_test to initialize sandbox tester
 set(TESTER_CONFIG_PATH                      "${CMAKE_BINARY_DIR}/chord_test/tester.config")
 
 # assembly locations for each example
-set(EXAMPLES_DEMO_PACKAGE       "file://${CMAKE_BINARY_DIR}/examples/demo/examples_demo-${FULL_VERSION}.zpk")
+set(EXAMPLES_DEMO_PACKAGE       "file://${CMAKE_BINARY_DIR}/share/examples/demo/examples_demo-${FULL_VERSION}.zpk")
 
 # empty cpp file is used for targets which don't have any source files
 set(EMPTY_CPP ${CMAKE_CURRENT_BINARY_DIR}/empty.cpp)
@@ -214,16 +214,9 @@ set(EMPTY_CPP ${CMAKE_CURRENT_BINARY_DIR}/empty.cpp)
 #
 #######################################################################
 
-# declare examples first so the artifacts are available to unit tests
-add_subdirectory(examples)
-
-add_subdirectory(chord_agent)
-add_subdirectory(chord_invoke)
-add_subdirectory(chord_local_machine)
-add_subdirectory(chord_protocol)
-add_subdirectory(chord_remoting)
-add_subdirectory(chord_sandbox)
-add_subdirectory(chord_test)
+add_subdirectory(bin)
+add_subdirectory(lib)
+add_subdirectory(share)
 
 #######################################################################
 #

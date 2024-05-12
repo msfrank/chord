@@ -18,15 +18,10 @@ class Chord(ConanFile):
 
     exports_sources = (
         'CMakeLists.txt',
-        'chord_agent/*',
-        'chord_invoke/*',
-        'chord_local_machine/*',
-        'chord_protocol/*',
-        'chord_remoting/*',
-        'chord_sandbox/*',
-        'chord_test/*',
+        'bin/*',
         'cmake/*',
-        'examples/*',
+        'lib/*',
+        'share/*',
         )
 
     requires = (

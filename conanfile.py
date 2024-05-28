@@ -31,6 +31,7 @@ class Chord(ConanFile):
         # requirements from timbre
         'absl/20230802.1@timbre',
         'boost/1.84.0@timbre',
+        'curl/8.5.0@timbre',
         'fmt/9.1.0@timbre',
         'flatbuffers/23.5.26@timbre',
         'grpc/1.62.0@timbre',

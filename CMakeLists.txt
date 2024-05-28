@@ -118,11 +118,14 @@ find_package(zuri REQUIRED)
 # find required Abseil dependency
 find_package(absl REQUIRED)
 
-# find required grpc dependency
+# find required gRPC dependency
 find_package(grpc REQUIRED)
 
-# find required protobuf dependency
+# find required Protobuf dependency
 find_package(protobuf REQUIRED)
+
+# find required Curl dependency
+find_package(CURL REQUIRED)
 
 # find required Boost dependency
 find_package(Boost REQUIRED)
@@ -194,13 +197,43 @@ string(REGEX REPLACE "[0-9]+\\.[0-9]+\\.([0-9]+)" "\\1"
 set(FULL_VERSION "${MAJOR_VERSION}.${MINOR_VERSION}.${PATCH_VERSION}")
 message(STATUS "version is ${FULL_VERSION}")
 
-set(CHORD_LOCAL_MACHINE_DIST_PATH           "${CMAKE_BINARY_DIR}/bin/chord_local_machine/chord-local-machine")
-set(CHORD_LOCAL_MACHINE_INSTALL_PATH        "${CMAKE_INSTALL_BINDIR}/bin/chord-local-machine")
-set(CHORD_AGENT_DIST_PATH                   "${CMAKE_BINARY_DIR}/bin/chord_agent/chord-agent")
-set(CHORD_AGENT_INSTALL_PATH                "${CMAKE_INSTALL_BINDIR}/bin/chord-agent")
+# zuri package group
+set(ZURI_PACKAGE_GROUP                          "dev.zuri")
+
+# zuri net package
+set(ZURI_NET_PACKAGE_NAME                       "net")
+set(ZURI_NET_PACKAGE_VERSION                    "${FULL_VERSION}")
+set(ZURI_NET_PACKAGE_AUTHORITY                  "${ZURI_NET_PACKAGE_NAME}-${ZURI_NET_PACKAGE_VERSION}@zuri.dev")
+set(ZURI_NET_PACKAGE_URL                        "dev.zuri.pkg://${ZURI_NET_PACKAGE_AUTHORITY}")
+
+# alias the zuri prefix path variables
+set(PACKAGES_DIR_PREFIX                         "${ZURI_PACKAGES_DIR_PREFIX}")
+set(DOC_DIR_PREFIX                              "${ZURI_DOC_DIR_PREFIX}")
+set(CONFIG_DIR_PREFIX                           "${ZURI_CONFIG_DIR_PREFIX}")
+set(VENDOR_CONFIG_DIR_PREFIX                    "${ZURI_VENDOR_CONFIG_DIR_PREFIX}")
+
+#
+set(CHORD_LOCAL_MACHINE_PATH_PREFIX             "${CMAKE_INSTALL_BINDIR}/chord-local-machine")
+set(CHORD_AGENT_PATH_PREFIX                     "${CMAKE_INSTALL_BINDIR}/chord-agent")
+
+# build paths
+set(CHORD_BUILD_CHORD_LOCAL_MACHINE_PATH        "${CMAKE_BINARY_DIR}/${CHORD_LOCAL_MACHINE_PATH_PREFIX}")
+set(CHORD_BUILD_CHORD_AGENT_PATH                "${CMAKE_BINARY_DIR}/${CHORD_AGENT_PATH_PREFIX}")
+set(CHORD_BUILD_PACKAGES_DIR                    "${CMAKE_BINARY_DIR}/${PACKAGES_DIR_PREFIX}")
+set(CHORD_BUILD_DOC_DIR                         "${CMAKE_BINARY_DIR}/${DOC_DIR_PREFIX}")
+set(CHORD_BUILD_CONFIG_DIR                      "${CMAKE_BINARY_DIR}/${CONFIG_DIR_PREFIX}")
+set(CHORD_BUILD_VENDOR_CONFIG_DIR               "${CMAKE_BINARY_DIR}/${VENDOR_CONFIG_DIR_PREFIX}")
+
+# runtime paths
+set(CHORD_RUNTIME_DISTRIBUTION_ROOT             "${CMAKE_INSTALL_PREFIX}")
+set(CHORD_RUNTIME_CHORD_LOCAL_MACHINE_PATH      "${CMAKE_INSTALL_PREFIX}/${CHORD_LOCAL_MACHINE_EXE_PREFIX}")
+set(CHORD_RUNTIME_CHORD_AGENT_PATH              "${CMAKE_INSTALL_PREFIX}/${CHORD_AGENT_EXE_PREFIX}")
+set(CHORD_RUNTIME_PACKAGES_DIR                  "${CMAKE_INSTALL_PREFIX}/${PACKAGES_DIR_PREFIX}")
+set(CHORD_RUNTIME_CONFIG_DIR                    "${CMAKE_INSTALL_PREFIX}/${CONFIG_DIR_PREFIX}")
+set(CHORD_RUNTIME_VENDOR_CONFIG_DIR             "${CMAKE_INSTALL_PREFIX}/${VENDOR_CONFIG_DIR_PREFIX}")
 
 # used by chord_test to initialize sandbox tester
-set(TESTER_CONFIG_PATH                      "${CMAKE_BINARY_DIR}/chord_test/tester.config")
+set(TESTER_CONFIG_PATH                          "${CMAKE_BINARY_DIR}/chord_test/tester.config")
 
 # assembly locations for each example
 set(EXAMPLES_DEMO_PACKAGE       "file://${CMAKE_BINARY_DIR}/share/examples/demo/examples_demo-${FULL_VERSION}.zpk")
@@ -216,6 +249,7 @@ set(EMPTY_CPP ${CMAKE_CURRENT_BINARY_DIR}/empty.cpp)
 
 add_subdirectory(bin)
 add_subdirectory(lib)
+add_subdirectory(pkg)
 add_subdirectory(share)
 
 #######################################################################
@@ -246,10 +280,12 @@ configure_package_config_file(
     chord-config.cmake
     INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/chord"
     PATH_VARS
-      CMAKE_INSTALL_BINDIR
-      CMAKE_INSTALL_INCLUDEDIR
-      CMAKE_INSTALL_LIBDIR
-      CMAKE_INSTALL_DATADIR
+        CHORD_LOCAL_MACHINE_PATH_PREFIX
+        CHORD_AGENT_PATH_PREFIX
+        PACKAGES_DIR_PREFIX
+        DOC_DIR_PREFIX
+        CONFIG_DIR_PREFIX
+        VENDOR_CONFIG_DIR_PREFIX
     )
 
 write_basic_package_version_file(chord-config-version.cmake

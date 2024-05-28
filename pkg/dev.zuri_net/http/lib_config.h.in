@@ -1,0 +1,12 @@
+#ifndef ZURI_NET_HTTP_CONFIG_H
+#define ZURI_NET_HTTP_CONFIG_H
+
+#define ZURI_NET_HTTP_PACKAGE_GROUP                "@PACKAGE_GROUP@"
+#define ZURI_NET_HTTP_PACKAGE_NAME                 "@PACKAGE_NAME@"
+#define ZURI_NET_HTTP_PACKAGE_VERSION              "@PACKAGE_VERSION@"
+#define ZURI_NET_HTTP_PACKAGE_ID                   "@PACKAGE_ID@"
+#define ZURI_NET_HTTP_LIB_NAME                     "@LIB_NAME@"
+
+#define ZURI_NET_HTTP_LOCATION                     "@ZURI_NET_HTTP_LOCATION@"
+
+#endif // ZURI_NET_HTTP_CONFIG_H

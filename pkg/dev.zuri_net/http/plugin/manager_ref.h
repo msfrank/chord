@@ -14,7 +14,7 @@
 class ManagerRef : public lyric_runtime::BaseRef {
 
 public:
-    explicit ManagerRef(
+    ManagerRef(
         const lyric_runtime::VirtualTable *vtable,
         lyric_runtime::BytecodeInterpreter *interp,
         lyric_runtime::InterpreterState *state,

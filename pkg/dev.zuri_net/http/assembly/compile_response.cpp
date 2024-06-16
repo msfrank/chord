@@ -2,6 +2,7 @@
 #include <lyric_assembler/call_symbol.h>
 #include <lyric_assembler/fundamental_cache.h>
 #include <lyric_assembler/import_cache.h>
+#include <lyric_assembler/pack_builder.h>
 #include <lyric_assembler/proc_handle.h>
 #include <lyric_assembler/struct_symbol.h>
 #include <lyric_assembler/symbol_cache.h>
@@ -16,8 +17,12 @@ build_net_http_Response(
     lyric_assembler::BlockHandle *block)
 {
     auto *state = moduleEntry.getState();
-    auto *symbolCache = state->symbolCache();
+    auto *fundamentalCache = state->fundamentalCache();
     auto *typeSystem = moduleEntry.getTypeSystem();
+
+    auto IntType = fundamentalCache->getFundamentalType(lyric_assembler::FundamentalSymbol::Int);
+    auto StringType = fundamentalCache->getFundamentalType(lyric_assembler::FundamentalSymbol::String);
+    auto ResponseType = lyric_common::TypeDef::forConcrete(lyric_common::SymbolUrl::fromString("#Response"));
 
     lyric_assembler::StructSymbol *ResponseStruct;
     TU_ASSIGN_OR_RETURN (ResponseStruct, moduleEntry.compileStruct(R"(
@@ -28,45 +33,31 @@ build_net_http_Response(
     )", block));
 
     {
-        auto ResponseSpec = lyric_parser::Assignable::forSingular({"Response"});
-        auto IntSpec = lyric_parser::Assignable::forSingular({"Int"});
-        auto StringSpec = lyric_parser::Assignable::forSingular({"String"});
+        lyric_assembler::CallSymbol *callSymbol;
+        TU_ASSIGN_OR_RETURN (callSymbol, block->declareFunction(
+            "Response.$create", lyric_object::AccessType::Public, {}));
+        lyric_assembler::PackBuilder packBuilder;
+        packBuilder.appendListParameter("code", "", IntType, false);
+        packBuilder.appendListParameter("entity", "", StringType, false);
+        lyric_assembler::ParameterPack parameterPack;
+        TU_ASSIGN_OR_RETURN (parameterPack, packBuilder.toParameterPack());
+        lyric_assembler::ProcHandle *procHandle;
+        TU_ASSIGN_OR_RETURN (procHandle, callSymbol->defineCall(parameterPack, ResponseType));
+        auto *codeBuilder = procHandle->procCode();
+        auto *createBlock = procHandle->procBlock();
 
-        auto declareFunctionResult = block->declareFunction("Response.$create",
-            {
-                {{}, "code", "", StringSpec, lyric_parser::BindingType::VALUE},
-                {{}, "entity", "", IntSpec, lyric_parser::BindingType::VALUE},
-            },
-            {},
-            {},
-            ResponseSpec,
-            lyric_object::AccessType::Public,
-            {});
-        if (declareFunctionResult.isStatus())
-            return declareFunctionResult.getStatus();
-        auto functionUrl = declareFunctionResult.getResult();
-        auto *call = cast_symbol_to_call(symbolCache->getOrImportSymbol(functionUrl).orElseThrow());
-        auto *proc = call->callProc();
-        auto *code = proc->procCode();
-        auto *createBlock = proc->procBlock();
+        lyric_assembler::ConstructableInvoker invoker;
+        TU_RETURN_IF_NOT_OK (ResponseStruct->prepareCtor(invoker));
+        lyric_typing::CallsiteReifier ctorReifier(typeSystem);
+        TU_RETURN_IF_NOT_OK (ctorReifier.initialize(invoker));
 
-        auto resolveCtorResult = ResponseStruct->resolveCtor();
-        if (resolveCtorResult.isStatus())
-            return resolveCtorResult.getStatus();
-        auto ctor = resolveCtorResult.getResult();
-        lyric_typing::CallsiteReifier ctorReifier(ctor.getParameters(), ctor.getRest(),
-            ctor.getTemplateUrl(), ctor.getTemplateParameters(), {}, typeSystem);
-        TU_RETURN_IF_NOT_OK (ctorReifier.initialize());
-
-        TU_RETURN_IF_NOT_OK (code->loadArgument(lyric_assembler::ArgumentOffset(0)));
-        TU_RETURN_IF_NOT_OK (ctorReifier.reifyNextArgument(call->getParameters().at(0).typeDef));
-        TU_RETURN_IF_NOT_OK (code->loadArgument(lyric_assembler::ArgumentOffset(1)));
-        TU_RETURN_IF_NOT_OK (ctorReifier.reifyNextArgument(call->getParameters().at(1).typeDef));
-        auto invokeNewResult = ctor.invokeNew(createBlock, ctorReifier);
-        if (invokeNewResult.isStatus())
-            return invokeNewResult.getStatus();
-        code->writeOpcode(lyric_object::Opcode::OP_RETURN);
+        TU_RETURN_IF_NOT_OK (codeBuilder->loadArgument(lyric_assembler::ArgumentOffset(0)));
+        TU_RETURN_IF_NOT_OK (ctorReifier.reifyNextArgument(IntType));
+        TU_RETURN_IF_NOT_OK (codeBuilder->loadArgument(lyric_assembler::ArgumentOffset(1)));
+        TU_RETURN_IF_NOT_OK (ctorReifier.reifyNextArgument(StringType));
+        TU_RETURN_IF_STATUS (invoker.invokeNew(createBlock, ctorReifier, 0));
+        codeBuilder->writeOpcode(lyric_object::Opcode::OP_RETURN);
     }
 
-    return lyric_assembler::AssemblerStatus::ok();
+    return {};
 }

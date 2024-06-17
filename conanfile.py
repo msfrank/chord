@@ -21,6 +21,7 @@ class Chord(ConanFile):
         'bin/*',
         'cmake/*',
         'lib/*',
+        'pkg/*',
         'share/*',
         )
 

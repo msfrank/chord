@@ -59,6 +59,11 @@ target_include_directories(chord_invoke PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
+set_target_properties(chord_invoke PROPERTIES
+    INSTALL_RPATH_USE_LINK_PATH TRUE
+    INSTALL_RPATH ${LIB_RPATH}
+)
+
 target_link_libraries(chord_invoke PUBLIC gRPC::grpc++)
 
 # install targets

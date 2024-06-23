@@ -38,11 +38,16 @@ target_include_directories(chord_test PUBLIC
 
 if(${IS_DEBUG_BUILD})
     target_compile_definitions(chord_test PRIVATE
-        "CHORD_AGENT_EXECUTABLE=\"${CHORD_AGENT_DIST_PATH}\"")
+        "CHORD_AGENT_EXECUTABLE=\"${CHORD_BUILD_CHORD_AGENT_PATH}\"")
 else()
     target_compile_definitions(chord_test PRIVATE
-        "CHORD_AGENT_EXECUTABLE=\"${CHORD_AGENT_INSTALL_PATH}\"")
+        "CHORD_AGENT_EXECUTABLE=\"${CHORD_RUNTIME_CHORD_AGENT_PATH}\"")
 endif()
+
+set_target_properties(chord_test PROPERTIES
+    INSTALL_RPATH_USE_LINK_PATH TRUE
+    INSTALL_RPATH ${LIB_RPATH}
+)
 
 target_link_libraries(chord_test
     PUBLIC

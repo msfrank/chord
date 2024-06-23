@@ -62,6 +62,11 @@ target_include_directories(chord_remoting PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
+set_target_properties(chord_remoting PROPERTIES
+    INSTALL_RPATH_USE_LINK_PATH TRUE
+    INSTALL_RPATH ${LIB_RPATH}
+)
+
 target_link_libraries(chord_remoting PUBLIC gRPC::grpc++)
 
 # install targets

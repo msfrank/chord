@@ -6,6 +6,7 @@
 #include <absl/container/flat_hash_map.h>
 
 #include <chord_protocol/abstract_protocol_handler.h>
+#include <chord_sandbox/chord_isolate.h>
 #include <chord_sandbox/run_protocol_plug.h>
 #include <chord_test/test_result.h>
 #include <lyric_build/lyric_builder.h>
@@ -40,9 +41,16 @@ namespace chord_test {
 
         const lyric_test::TestRunner *getRunner() const;
 
+        tempo_utils::Result<SpawnMachine> spawnModuleInSandbox(
+            const lyric_common::AssemblyLocation &mainLocation);
+
         tempo_utils::Result<RunMachine> runModuleInSandbox(
             const std::string &code,
             const std::filesystem::path &path = {});
+
+        static tempo_utils::Result<SpawnMachine> spawnSingleModuleInSandbox(
+            const lyric_common::AssemblyLocation &mainLocation,
+            const SandboxTesterOptions &options = {});
 
         static tempo_utils::Result<RunMachine> runSingleModuleInSandbox(
             const std::string &code,

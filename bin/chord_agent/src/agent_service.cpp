@@ -1,5 +1,4 @@
 
-#include <boost/uuid/uuid_io.hpp>
 #include <uv.h>
 
 #include <chord_agent/agent_service.h>

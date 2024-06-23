@@ -50,7 +50,12 @@ add_executable(chord-local-machine src/main.cpp)
 
 target_include_directories(chord-local-machine PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-)
+    )
+
+set_target_properties(chord-local-machine PROPERTIES
+    INSTALL_RPATH_USE_LINK_PATH TRUE
+    INSTALL_RPATH ${BIN_RPATH}
+    )
 
 target_link_libraries(chord-local-machine PUBLIC ChordLocalMachineRuntime)
 

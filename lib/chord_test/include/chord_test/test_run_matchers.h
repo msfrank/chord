@@ -8,6 +8,24 @@
 
 namespace chord_test::matchers {
 
+    class SpawnMachineMatcher {
+
+    public:
+        explicit SpawnMachineMatcher(tempo_utils::StatusCode statusCode);
+
+        bool MatchAndExplain(const chord_test::SpawnMachine &runMachine, std::ostream *os) const;
+        void DescribeTo(std::ostream *os) const;
+        void DescribeNegationTo(std::ostream *os) const;
+
+        using MatchesType = chord_test::SpawnMachine;
+        using is_gtest_matcher = void;
+
+    private:
+        tempo_utils::StatusCode m_statusCode;
+    };
+
+    ::testing::Matcher<SpawnMachine> SpawnMachine(tempo_utils::StatusCode statusCode);
+
     class RunMachineMatcher {
 
     public:

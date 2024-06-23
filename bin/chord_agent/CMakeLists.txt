@@ -19,10 +19,10 @@ target_include_directories(ChordAgentRuntime PUBLIC
 
 if(${IS_DEBUG_BUILD})
     target_compile_definitions(ChordAgentRuntime PRIVATE
-        "CHORD_LOCAL_MACHINE_EXECUTABLE=\"${CHORD_LOCAL_MACHINE_DIST_PATH}\"")
+        "CHORD_LOCAL_MACHINE_EXECUTABLE=\"${CHORD_BUILD_CHORD_LOCAL_MACHINE_PATH}\"")
 else()
     target_compile_definitions(ChordAgentRuntime PRIVATE
-        "CHORD_LOCAL_MACHINE_EXECUTABLE=\"${CHORD_LOCAL_MACHINE_INSTALL_PATH}\"")
+        "CHORD_LOCAL_MACHINE_EXECUTABLE=\"${CHORD_RUNTIME_CHORD_LOCAL_MACHINE_PATH}\"")
 endif()
 
 target_link_libraries(ChordAgentRuntime PUBLIC
@@ -44,6 +44,11 @@ add_dependencies(chord-agent chord-local-machine)
 
 target_include_directories(chord-agent PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    )
+
+set_target_properties(chord-agent PROPERTIES
+    INSTALL_RPATH_USE_LINK_PATH TRUE
+    INSTALL_RPATH ${BIN_RPATH}
     )
 
 target_link_libraries(chord-agent PUBLIC ChordAgentRuntime)

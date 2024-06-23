@@ -10,12 +10,12 @@ set(CHORD_PROTOCOL_INCLUDES
     include/chord_protocol/abstract_protocol_handler.h
     include/chord_protocol/abstract_protocol_writer.h
     include/chord_protocol/protocol_types.h
-)
+    )
 set_target_properties(chord_protocol PROPERTIES PUBLIC_HEADER "${CHORD_PROTOCOL_INCLUDES}")
 
 target_sources(chord_protocol PRIVATE
     src/protocol_types.cpp
-)
+    )
 
 # set the library version
 set_target_properties(chord_protocol PROPERTIES VERSION "${FULL_VERSION}" SOVERSION "${MAJOR_VERSION}")
@@ -29,7 +29,12 @@ endif()
 target_include_directories(chord_protocol PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-)
+    )
+
+set_target_properties(chord_protocol PROPERTIES
+    INSTALL_RPATH_USE_LINK_PATH TRUE
+    INSTALL_RPATH ${LIB_RPATH}
+    )
 
 target_link_libraries(chord_protocol
     PUBLIC
@@ -38,13 +43,13 @@ target_link_libraries(chord_protocol
     absl::flat_hash_map
     gRPC::grpc++
     uv::uv
-)
+    )
 
 # install targets
 install(TARGETS chord_protocol EXPORT chord-targets
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/chord_protocol
-)
+    )
 
 # add testing subdirectory
 #add_subdirectory(test)

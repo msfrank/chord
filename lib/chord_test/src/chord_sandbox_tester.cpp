@@ -52,6 +52,72 @@ chord_test::ChordSandboxTester::getRunner() const
     return m_runner.get();
 }
 
+tempo_utils::Result<chord_test::SpawnMachine>
+chord_test::ChordSandboxTester::spawnModuleInSandbox(const lyric_common::AssemblyLocation &mainLocation)
+{
+    if (!m_runner->isConfigured())
+        return TestStatus::forCondition(TestCondition::kTestInvariant,
+            "tester is unconfigured");
+
+    TU_CONSOLE_OUT << "";
+    TU_CONSOLE_OUT << "======== SPAWN: " << mainLocation.toString() << " ========";
+    TU_CONSOLE_OUT << "";
+
+    auto agentDomain = tempo_utils::generate_name("chord-sandbox-tester-XXXXXXXX");
+    auto agentServerName = absl::StrCat(agentDomain, ".test");
+    auto generateAgentKeyPairResult = tempo_security::generate_key_pair(m_caKeyPair, m_eccKeygen,
+        "Chord sandbox tester", "Chord agent", agentServerName,
+        1, std::chrono::seconds{60},
+        m_runner->getTesterDirectory(), "agent");
+    if (generateAgentKeyPairResult.isStatus())
+        return generateAgentKeyPairResult.getStatus();
+    auto agentKeyPair = generateAgentKeyPairResult.getResult();
+
+    // construct the sandbox
+    chord_sandbox::SandboxOptions options;
+    options.discoveryPolicy = chord_sandbox::AgentDiscoveryPolicy::ALWAYS_SPAWN;
+    options.endpointTransport = chord_protocol::TransportType::Unix;
+    options.agentPath = std::filesystem::path(CHORD_AGENT_EXECUTABLE);
+    options.runDirectory = m_runner->getTesterDirectory();
+    options.caKeyPair = m_caKeyPair;
+    options.agentKeyPair = agentKeyPair;
+    options.pemRootCABundleFile = m_caKeyPair.getPemCertificateFile();
+    options.agentServerName = agentServerName;
+
+    chord_sandbox::ChordIsolate isolate(options);
+
+    // initialize the sandbox
+    TU_RETURN_IF_NOT_OK (isolate.initialize());
+
+    // construct the machine config
+    absl::flat_hash_map<std::string,tempo_config::ConfigNode> config;
+    //auto installDirectory = m_runner->getInstallDirectory() / "compile_module";
+    //config["installDirectory"] = tempo_config::ConfigValue(installDirectory.string());
+    auto *builder = m_runner->getBuilder();
+    auto packageLoader = builder->getPackageLoader();
+    std::vector<tempo_config::ConfigNode> packageDirectories;
+    for (const auto &packageDirectory : packageLoader->getPackagesPathList()) {
+        packageDirectories.push_back(tempo_config::ConfigValue(packageDirectory.string()));
+    }
+    config["packageDirectories"] = tempo_config::ConfigSeq(packageDirectories);
+    config["pemRootCABundleFile"] = tempo_config::ConfigValue(options.pemRootCABundleFile);
+
+    // run the module in the sandbox
+    std::shared_ptr<chord_sandbox::RemoteMachine> remoteMachine;
+    TU_ASSIGN_OR_RETURN (remoteMachine, isolate.spawn(
+        mainLocation.toString(), mainLocation,
+        tempo_config::ConfigMap(config), m_options.protocolPlugs));
+
+    TU_LOG_INFO << "spawned remote machine";
+
+    // block until the remote machine is finished
+    chord_sandbox::MachineExit machineExit;
+    TU_ASSIGN_OR_RETURN (machineExit, remoteMachine->runUntilFinished());
+
+    // return the interpreter result
+    return SpawnMachine(m_runner, mainLocation, machineExit);
+}
+
 tempo_utils::Result<chord_test::RunMachine>
 chord_test::ChordSandboxTester::runModuleInSandbox(const std::string &code, const std::filesystem::path &path)
 {
@@ -135,6 +201,18 @@ chord_test::ChordSandboxTester::runModuleInSandbox(const std::string &code, cons
 
     // return the interpreter result
     return RunMachine(m_runner, targetComputation, targetComputationSet.getDiagnostics(), machineExit);
+}
+
+tempo_utils::Result<chord_test::SpawnMachine>
+chord_test::ChordSandboxTester::spawnSingleModuleInSandbox(
+    const lyric_common::AssemblyLocation &mainLocation,
+    const SandboxTesterOptions &options)
+{
+    chord_test::ChordSandboxTester tester(options);
+    auto status = tester.configure();
+    if (!status.isOk())
+        return status;
+    return tester.spawnModuleInSandbox(mainLocation);
 }
 
 tempo_utils::Result<chord_test::RunMachine>

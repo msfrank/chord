@@ -1,8 +1,6 @@
 #ifndef CHORD_AGENT_AGENT_SERVICE_H
 #define CHORD_AGENT_AGENT_SERVICE_H
 
-#include <boost/uuid/random_generator.hpp>
-
 #include <chord_invoke/invoke_service.grpc.pb.h>
 
 #include "machine_supervisor.h"
@@ -58,7 +56,6 @@ private:
     std::string m_agentName;
     std::filesystem::path m_localMachineExecutable;
     tu_uint64 m_uptime;
-    boost::uuids::random_generator m_uuidgen;
 };
 
 class OnAgentSpawn : public OnSupervisorSpawn {

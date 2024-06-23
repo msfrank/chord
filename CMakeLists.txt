@@ -91,13 +91,15 @@ endif()
 # set the optimization level
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OPTIMIZATION_LEVEL}")
 
-# set rpath for executable targets based on relative path from the executable
+# define the rpath for executable and library targets
 if (APPLE)
-    set(CMAKE_INSTALL_RPATH "@executable_path/../lib")
+    set(BIN_RPATH "@executable_path/../lib")
+    set(LIB_RPATH "@loader_path")
 elseif(WIN32)
     # do nothing
 else()
-    set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
+    set(BIN_RPATH "$ORIGIN/../lib")
+    set(LIB_RPATH "$ORIGIN/")
 endif()
 
 #######################################################################
@@ -217,8 +219,8 @@ set(CHORD_LOCAL_MACHINE_PATH_PREFIX             "${CMAKE_INSTALL_BINDIR}/chord-l
 set(CHORD_AGENT_PATH_PREFIX                     "${CMAKE_INSTALL_BINDIR}/chord-agent")
 
 # build paths
-set(CHORD_BUILD_CHORD_LOCAL_MACHINE_PATH        "${CMAKE_BINARY_DIR}/${CHORD_LOCAL_MACHINE_PATH_PREFIX}")
-set(CHORD_BUILD_CHORD_AGENT_PATH                "${CMAKE_BINARY_DIR}/${CHORD_AGENT_PATH_PREFIX}")
+set(CHORD_BUILD_CHORD_LOCAL_MACHINE_PATH        "${CMAKE_BINARY_DIR}/bin/chord_local_machine/chord-local-machine")
+set(CHORD_BUILD_CHORD_AGENT_PATH                "${CMAKE_BINARY_DIR}/bin/chord_agent/chord-agent")
 set(CHORD_BUILD_PACKAGES_DIR                    "${CMAKE_BINARY_DIR}/${PACKAGES_DIR_PREFIX}")
 set(CHORD_BUILD_DOC_DIR                         "${CMAKE_BINARY_DIR}/${DOC_DIR_PREFIX}")
 set(CHORD_BUILD_CONFIG_DIR                      "${CMAKE_BINARY_DIR}/${CONFIG_DIR_PREFIX}")

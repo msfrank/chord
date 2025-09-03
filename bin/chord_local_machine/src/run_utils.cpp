@@ -152,7 +152,7 @@ run_local_machine(
 
     if (ret != 0) {
         TU_LOG_V << "detected open handles after stopping uv loop:";
-        uv_print_all_handles(&chordLocalMachineData.mainLoop, tempo_utils::get_logging_sink());
+        uv_print_all_handles(&chordLocalMachineData.mainLoop, stderr);
     }
     return {};
 }

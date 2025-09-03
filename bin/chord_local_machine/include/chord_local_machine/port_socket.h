@@ -16,7 +16,7 @@ public:
     tempo_utils::Status handle(std::string_view message) override;
     tempo_utils::Status detach() override;
 
-    tempo_utils::Status write(const lyric_serde::LyricPatchset &patchset) override;
+    tempo_utils::Status write(std::shared_ptr<tempo_utils::ImmutableBytes> payload) override;
 
 private:
     std::shared_ptr<lyric_runtime::DuplexPort> m_port;

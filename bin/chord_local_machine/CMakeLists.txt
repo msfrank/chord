@@ -38,10 +38,11 @@ target_link_libraries(ChordLocalMachineRuntime PUBLIC
     chord::chord_protocol
     chord::chord_remoting
     lyric::lyric_bootstrap
-    lyric::lyric_packaging
     lyric::lyric_runtime
     tempo::tempo_command
     tempo::tempo_utils
+    zuri::zuri_distributor
+    zuri::zuri_packager
     uv::uv
     )
 
@@ -53,6 +54,7 @@ target_include_directories(chord-local-machine PUBLIC
     )
 
 set_target_properties(chord-local-machine PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CHORD_BUILD_BIN_DIR}
     INSTALL_RPATH_USE_LINK_PATH TRUE
     INSTALL_RPATH ${BIN_RPATH}
     )

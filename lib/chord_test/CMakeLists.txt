@@ -45,6 +45,7 @@ else()
 endif()
 
 set_target_properties(chord_test PROPERTIES
+    LIBRARY_OUTPUT_DIRECTORY ${CHORD_BUILD_LIB_DIR}
     INSTALL_RPATH_USE_LINK_PATH TRUE
     INSTALL_RPATH ${LIB_RPATH}
 )

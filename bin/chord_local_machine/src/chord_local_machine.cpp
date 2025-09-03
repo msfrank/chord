@@ -4,6 +4,7 @@
 #include <chord_local_machine/run_protocol_socket.h>
 #include <tempo_command/command_result.h>
 #include <tempo_utils/file_utilities.h>
+#include <tempo_utils/log_sink.h>
 #include <tempo_utils/log_stream.h>
 #include <tempo_utils/posix_result.h>
 #include <tempo_utils/url.h>
@@ -99,15 +100,11 @@ run_chord_local_machine(int argc, const char *argv[])
     loggingConfig.severityFilter = tempo_utils::SeverityFilter::kVeryVerbose;
     loggingConfig.flushEveryMessage = true;
     if (!chordLocalMachineConfig.logFile.empty()) {
-        auto *logFileString = chordLocalMachineConfig.logFile.c_str();
-        auto *logFp = std::fopen(logFileString, "a");
-        if (logFp == nullptr) {
-            return tempo_utils::PosixStatus::last(
-                absl::StrCat("failed to open logfile ", logFileString));
-        }
-        loggingConfig.logFile = logFp;
+        auto logSink = std::make_unique<tempo_utils::LogFileSink>(chordLocalMachineConfig.logFile);
+        tempo_utils::init_logging(loggingConfig, std::move(logSink));
+    } else {
+        tempo_utils::init_logging(loggingConfig);
     }
-    tempo_utils::init_logging(loggingConfig);
 
     //
     ChordLocalMachineData chordLocalMachineData;
@@ -181,7 +178,7 @@ run_chord_local_machine(int argc, const char *argv[])
     processor.processAvailableMessages();
 
     //
-    uv_print_all_handles(&chordLocalMachineData.mainLoop, tempo_utils::get_logging_sink());
+    uv_print_all_handles(&chordLocalMachineData.mainLoop, stderr);
 
     // shut down the binder
     TU_LOG_V << "shutting down grpc binder";

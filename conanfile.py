@@ -30,18 +30,18 @@ class Chord(ConanFile):
         'tempo/0.0.1',
         'zuri/0.0.1',
         # requirements from timbre
-        'absl/20230802.1@timbre',
-        'boost/1.84.0@timbre',
-        'curl/8.5.0@timbre',
+        'absl/20250127.1@timbre',
+        'boost/1.88.0@timbre',
+        'curl/8.15.0@timbre',
         'fmt/9.1.0@timbre',
         'flatbuffers/23.5.26@timbre',
-        'grpc/1.62.0@timbre',
+        'grpc/1.74.1@timbre',
         'gtest/1.14.0@timbre',
-        'icu/74.1@timbre',
-        'openssl/3.2.0@timbre',
-        'protobuf/25.3@timbre',
-        'rocksdb/8.5.3@timbre',
-        'uv/1.44.1@timbre',
+        'openssl/3.5.2@timbre',
+        'protobuf/32.0@timbre',
+        'rocksdb/10.4.2@timbre',
+        'sqlite/3.49.2@timbre',
+        'uv/1.51.0@timbre',
         )
 
     def validate(self):

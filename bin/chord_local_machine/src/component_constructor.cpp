@@ -5,11 +5,15 @@
 
 std::shared_ptr<lyric_runtime::InterpreterState>
 ComponentConstructor::createInterpreterState(
-    const lyric_runtime::InterpreterStateOptions &interpreterOptions,
-    const lyric_common::AssemblyLocation &mainLocation) const
+    std::shared_ptr<lyric_runtime::AbstractLoader> systemLoader,
+    std::shared_ptr<lyric_runtime::AbstractLoader> applicationLoader,
+    const lyric_runtime::InterpreterStateOptions &interpreterOptions) const
 {
-    TU_ASSERT (mainLocation.isValid());
-    auto createInterpreter = lyric_runtime::InterpreterState::create(interpreterOptions, mainLocation);
+    TU_ASSERT (systemLoader != nullptr);
+    TU_ASSERT (applicationLoader != nullptr);
+    TU_ASSERT (interpreterOptions.mainLocation.isValid());
+    auto createInterpreter = lyric_runtime::InterpreterState::create(
+        std::move(systemLoader), std::move(applicationLoader), interpreterOptions);
     TU_ASSERT (createInterpreter.isResult());
     return createInterpreter.getResult();
 }
@@ -35,7 +39,7 @@ ComponentConstructor::createRemotingService(
 {
     TU_ASSERT (localMachine != nullptr);
     TU_ASSERT (initComplete != nullptr);
-    return std::make_unique<RemotingService>(startSuspended, localMachine, initComplete);
+    return std::make_unique<RemotingService>(startSuspended, std::move(localMachine), initComplete);
 }
 
 std::shared_ptr<grpc::ChannelInterface>

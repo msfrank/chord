@@ -29,10 +29,10 @@ target_link_libraries(ChordAgentRuntime PUBLIC
     chord::chord_invoke
     chord::chord_protocol
     chord::chord_remoting
-    lyric::lyric_packaging
     lyric::lyric_runtime
     tempo::tempo_command
     tempo::tempo_utils
+    zuri::zuri_packager
     uv::uv
     )
 
@@ -47,6 +47,7 @@ target_include_directories(chord-agent PUBLIC
     )
 
 set_target_properties(chord-agent PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CHORD_BUILD_BIN_DIR}
     INSTALL_RPATH_USE_LINK_PATH TRUE
     INSTALL_RPATH ${BIN_RPATH}
     )

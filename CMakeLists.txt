@@ -133,7 +133,7 @@ find_package(CURL REQUIRED)
 find_package(Boost REQUIRED)
 
 # find required Openssl dependency
-find_package(openssl REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 # find required Fmt dependency
 find_package(fmt REQUIRED)
@@ -143,6 +143,9 @@ find_package(icu REQUIRED)
 
 # find required RocksDB dependency
 find_package(rocksdb REQUIRED)
+
+# find required Sqlite dependency
+find_package(sqlite REQUIRED)
 
 # find required Libuv dependency
 find_package(uv REQUIRED)
@@ -205,6 +208,7 @@ set(ZURI_PACKAGE_GROUP                          "dev.zuri")
 # zuri net package
 set(ZURI_NET_PACKAGE_NAME                       "net")
 set(ZURI_NET_PACKAGE_VERSION                    "${FULL_VERSION}")
+set(ZURI_NET_PACKAGE_ID                         "${ZURI_PACKAGE_GROUP}_${ZURI_NET_PACKAGE_NAME}-${ZURI_NET_PACKAGE_VERSION}")
 set(ZURI_NET_PACKAGE_AUTHORITY                  "${ZURI_NET_PACKAGE_NAME}-${ZURI_NET_PACKAGE_VERSION}@zuri.dev")
 set(ZURI_NET_PACKAGE_URL                        "dev.zuri.pkg://${ZURI_NET_PACKAGE_AUTHORITY}")
 
@@ -214,25 +218,28 @@ set(DOC_DIR_PREFIX                              "${ZURI_DOC_DIR_PREFIX}")
 set(CONFIG_DIR_PREFIX                           "${ZURI_CONFIG_DIR_PREFIX}")
 set(VENDOR_CONFIG_DIR_PREFIX                    "${ZURI_VENDOR_CONFIG_DIR_PREFIX}")
 
-#
+# install paths
 set(CHORD_LOCAL_MACHINE_PATH_PREFIX             "${CMAKE_INSTALL_BINDIR}/chord-local-machine")
 set(CHORD_AGENT_PATH_PREFIX                     "${CMAKE_INSTALL_BINDIR}/chord-agent")
 
 # build paths
-set(CHORD_BUILD_CHORD_LOCAL_MACHINE_PATH        "${CMAKE_BINARY_DIR}/bin/chord_local_machine/chord-local-machine")
-set(CHORD_BUILD_CHORD_AGENT_PATH                "${CMAKE_BINARY_DIR}/bin/chord_agent/chord-agent")
-set(CHORD_BUILD_PACKAGES_DIR                    "${CMAKE_BINARY_DIR}/${PACKAGES_DIR_PREFIX}")
-set(CHORD_BUILD_DOC_DIR                         "${CMAKE_BINARY_DIR}/${DOC_DIR_PREFIX}")
-set(CHORD_BUILD_CONFIG_DIR                      "${CMAKE_BINARY_DIR}/${CONFIG_DIR_PREFIX}")
-set(CHORD_BUILD_VENDOR_CONFIG_DIR               "${CMAKE_BINARY_DIR}/${VENDOR_CONFIG_DIR_PREFIX}")
+set(CHORD_BUILD_OUTPUT_ROOT                     "${CMAKE_BINARY_DIR}/output")
+set(CHORD_BUILD_BIN_DIR                         "${CHORD_BUILD_OUTPUT_ROOT}/${CMAKE_INSTALL_BINDIR}")
+set(CHORD_BUILD_LIB_DIR                         "${CHORD_BUILD_OUTPUT_ROOT}/${CMAKE_INSTALL_LIBDIR}")
+set(CHORD_BUILD_PACKAGES_DIR                    "${CHORD_BUILD_OUTPUT_ROOT}/${PACKAGES_DIR_PREFIX}")
+set(CHORD_BUILD_DOC_DIR                         "${CHORD_BUILD_OUTPUT_ROOT}/${DOC_DIR_PREFIX}")
+set(CHORD_BUILD_CONFIG_DIR                      "${CHORD_BUILD_OUTPUT_ROOT}/${CONFIG_DIR_PREFIX}")
+set(CHORD_BUILD_VENDOR_CONFIG_DIR               "${CHORD_BUILD_OUTPUT_ROOT}/${VENDOR_CONFIG_DIR_PREFIX}")
+set(CHORD_BUILD_CHORD_LOCAL_MACHINE_PATH        "${CHORD_BUILD_OUTPUT_ROOT}/${CHORD_LOCAL_MACHINE_PATH_PREFIX}")
+set(CHORD_BUILD_CHORD_AGENT_PATH                "${CHORD_BUILD_OUTPUT_ROOT}/${CHORD_AGENT_PATH_PREFIX}")
 
 # runtime paths
 set(CHORD_RUNTIME_DISTRIBUTION_ROOT             "${CMAKE_INSTALL_PREFIX}")
-set(CHORD_RUNTIME_CHORD_LOCAL_MACHINE_PATH      "${CMAKE_INSTALL_PREFIX}/${CHORD_LOCAL_MACHINE_EXE_PREFIX}")
-set(CHORD_RUNTIME_CHORD_AGENT_PATH              "${CMAKE_INSTALL_PREFIX}/${CHORD_AGENT_EXE_PREFIX}")
 set(CHORD_RUNTIME_PACKAGES_DIR                  "${CMAKE_INSTALL_PREFIX}/${PACKAGES_DIR_PREFIX}")
 set(CHORD_RUNTIME_CONFIG_DIR                    "${CMAKE_INSTALL_PREFIX}/${CONFIG_DIR_PREFIX}")
 set(CHORD_RUNTIME_VENDOR_CONFIG_DIR             "${CMAKE_INSTALL_PREFIX}/${VENDOR_CONFIG_DIR_PREFIX}")
+set(CHORD_RUNTIME_CHORD_LOCAL_MACHINE_PATH      "${CMAKE_INSTALL_PREFIX}/${CHORD_LOCAL_MACHINE_EXE_PREFIX}")
+set(CHORD_RUNTIME_CHORD_AGENT_PATH              "${CMAKE_INSTALL_PREFIX}/${CHORD_AGENT_EXE_PREFIX}")
 
 # used by chord_test to initialize sandbox tester
 set(TESTER_CONFIG_PATH                          "${CMAKE_BINARY_DIR}/chord_test/tester.config")

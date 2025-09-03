@@ -109,7 +109,7 @@ parse_config_hash(
         config, "pemRootCABundleFile"));
     builder.appendArg("--ca-bundle", pemRootCABundleFile.string());
 
-    return tempo_config::ConfigStatus::ok();
+    return {};
 }
 
 grpc::ServerUnaryReactor *

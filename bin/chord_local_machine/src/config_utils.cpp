@@ -15,27 +15,23 @@ tempo_utils::Status
 configure(ChordLocalMachineConfig &chordLocalMachineConfig, int argc, const char *argv[])
 {
     tempo_config::PathParser runDirectoryParser(std::filesystem::current_path());
-    tempo_config::PathParser installDirectoryParser(std::filesystem::path{});
-    tempo_config::PathParser packageDirectoryParser;
-    tempo_config::SeqTParser<std::filesystem::path> packageDirectoriesParser(&packageDirectoryParser, {});
+    tempo_config::PathParser packageCacheDirectoryParser;
+    tempo_config::SeqTParser packageCacheDirectoriesParser(&packageCacheDirectoryParser, {});
     tempo_config::PathParser pemRootCABundleFileParser(std::filesystem::path{});
     tempo_config::PathParser logFileParser(
         std::filesystem::path(absl::StrCat("chord-local-machine.", getpid(), ".log")));
     tempo_config::UrlParser expectedPortParser;
     tempo_config::BooleanParser startSuspendedParser(false);
-    tempo_config::SetTParser<tempo_utils::Url> expectedPortsParser(
-        &expectedPortParser,
-        {});
+    tempo_config::SetTParser expectedPortsParser(&expectedPortParser, {});
     tempo_config::UrlParser supervisorUrlParser;
     tempo_config::StringParser supervisorNameOverrideParser(std::string{});
     tempo_config::UrlParser machineUrlParser;
     tempo_config::StringParser machineNameOverrideParser(std::string{});
-    lyric_common::AssemblyLocationParser mainLocationParser;
+    lyric_common::ModuleLocationParser mainLocationParser;
 
     std::vector<tempo_command::Default> defaults = {
         {"runDirectory", {}, "run directory", "DIR"},
-        {"installDirectory", {}, "install directory", "DIR"},
-        {"packageDirectories", {}, "package directory", "DIR"},
+        {"packageCacheDirectories", {}, "package cache", "DIR"},
         {"expectedPorts", {}, "expected port", "PROTOCOL-URL"},
         {"startSuspended", {}, "start machine in suspended state"},
         {"supervisorUrl", {}, "register interpreter using the specified uri", "SUPERVISOR-URL"},
@@ -49,8 +45,7 @@ configure(ChordLocalMachineConfig &chordLocalMachineConfig, int argc, const char
 
     std::vector<tempo_command::Grouping> groupings = {
         {"runDirectory", {"--run-directory"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
-        {"installDirectory", {"--install-directory"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
-        {"packageDirectories", {"--package-directory"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
+        {"packageCacheDirectories", {"--package-cache"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"expectedPorts", {"--expected-port"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"startSuspended", {"--start-suspended"}, tempo_command::GroupingType::NO_ARGUMENT},
         {"supervisorNameOverride", {"--supervisor-server-name"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
@@ -63,8 +58,7 @@ configure(ChordLocalMachineConfig &chordLocalMachineConfig, int argc, const char
 
     std::vector<tempo_command::Mapping> optMappings = {
         {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "runDirectory"},
-        {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "installDirectory"},
-        {tempo_command::MappingType::ANY_INSTANCES, "packageDirectories"},
+        {tempo_command::MappingType::ANY_INSTANCES, "packageCacheDirectories"},
         {tempo_command::MappingType::ANY_INSTANCES, "expectedPorts"},
         {tempo_command::MappingType::TRUE_IF_INSTANCE, "startSuspended"},
         {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "supervisorUrl"},
@@ -84,12 +78,12 @@ configure(ChordLocalMachineConfig &chordLocalMachineConfig, int argc, const char
     tempo_command::OptionsHash options;
     tempo_command::ArgumentVector arguments;
 
-    tempo_command::CommandConfig config = command_config_from_defaults(defaults);
+    tempo_command::CommandConfig commandConfig = command_config_from_defaults(defaults);
 
     // parse argv array into a vector of tokens
     auto tokenizeResult = tempo_command::tokenize_argv(argc - 1, &argv[1]);
     if (tokenizeResult.isStatus())
-        display_status_and_exit(tokenizeResult.getStatus());
+        tempo_command::display_status_and_exit(tokenizeResult.getStatus());
     auto tokens = tokenizeResult.getResult();
 
     // parse remaining options and arguments
@@ -108,65 +102,59 @@ configure(ChordLocalMachineConfig &chordLocalMachineConfig, int argc, const char
     }
 
     // convert options to config
-    status = convert_options(options, optMappings, config);
-    if (!status.isOk())
-        return status;
+    TU_RETURN_IF_NOT_OK (tempo_command::convert_options(options, optMappings, commandConfig));
 
     // convert arguments to config
-    status = convert_arguments(arguments, argMappings, config);
-    if (!status.isOk())
-        return status;
+    TU_RETURN_IF_NOT_OK (tempo_command::convert_arguments(arguments, argMappings, commandConfig));
 
-    TU_LOG_INFO << "config:\n" << tempo_command::command_config_to_string(config);
+    // construct command map
+    tempo_config::ConfigMap commandMap(commandConfig);
+
+    TU_LOG_V << "command config:\n" << tempo_command::command_config_to_string(commandConfig);
 
     // determine the run directory
     TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.runDirectory,
-        runDirectoryParser, config, "runDirectory"));
-
-    // determine the install directory
-    TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.installDirectory,
-        installDirectoryParser, config, "installDirectory"));
+        runDirectoryParser, commandConfig, "runDirectory"));
 
     // determine the package directories
-    TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.packageDirectories,
-        packageDirectoriesParser, config, "packageDirectories"));
+    TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.packageCacheDirectories,
+        packageCacheDirectoriesParser, commandConfig, "packageCacheDirectories"));
 
     // determine the expected ports
     TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.expectedPorts,
-        expectedPortsParser, config, "expectedPorts"));
+        expectedPortsParser, commandConfig, "expectedPorts"));
 
     // determine start suspended
     TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.startSuspended,
-        startSuspendedParser, config, "startSuspended"));
+        startSuspendedParser, commandConfig, "startSuspended"));
 
     // determine the supervisor uri
     TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.supervisorUrl,
-        supervisorUrlParser, config, "supervisorUrl"));
+        supervisorUrlParser, commandConfig, "supervisorUrl"));
 
     // determine the SSL server name of the supervisor
     TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.supervisorNameOverride,
-        supervisorNameOverrideParser, config, "supervisorNameOverride"));
+        supervisorNameOverrideParser, commandConfig, "supervisorNameOverride"));
 
     // determine the machine uri
     TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.machineUrl,
-        machineUrlParser, config, "machineUrl"));
+        machineUrlParser, commandConfig, "machineUrl"));
 
     // determine the SSL server name of the supervisor
     TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.machineNameOverride,
-        machineNameOverrideParser, config, "machineNameOverride"));
+        machineNameOverrideParser, commandConfig, "machineNameOverride"));
 
     // determine the pem root CA bundle file
     TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.pemRootCABundleFile,
-        pemRootCABundleFileParser, config, "pemRootCABundleFile"));
+        pemRootCABundleFileParser, commandConfig, "pemRootCABundleFile"));
 
     // determine the log file
     TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.logFile,
-        logFileParser, config, "logFile"));
+        logFileParser, commandConfig, "logFile"));
 
     // determine the location of the main assembly
     TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.mainLocation,
-        mainLocationParser, config, "mainLocation"));
-
+        mainLocationParser, commandConfig, "mainLocation"));
 
     // set the binder endpoint
     auto binderSocketPath = chordLocalMachineConfig.runDirectory / "cap.sock";

@@ -10,8 +10,7 @@
 
 #include <chord_agent/machine_process.h>
 #include <chord_invoke/invoke_service.pb.h>
-#include <lyric_common/assembly_location.h>
-#include <tempo_utils/process_utils.h>
+#include <tempo_utils/process_builder.h>
 #include <tempo_utils/url.h>
 
 #include "machine_logger.h"

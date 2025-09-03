@@ -42,8 +42,7 @@ PortSocket::handle(std::string_view message)
     auto bytes = tempo_utils::MemoryBytes::copy(message);
     TU_LOG_INFO << "port " << m_port->getUrl() << " received message (" << bytes->getSize() << " bytes)";
     TU_LOG_FATAL << "aborting"; // TODO: FIXME!
-    lyric_serde::LyricPatchset patchset(bytes);
-    m_port->receive(patchset);
+    m_port->receive(bytes);
     return tempo_utils::GenericStatus::ok();
 }
 
@@ -51,24 +50,15 @@ tempo_utils::Status
 PortSocket::detach()
 {
     m_writer = nullptr;
-    auto status = m_port->detach();
-    if (status.notOk())
-        return tempo_utils::GenericStatus::forCondition(
-            tempo_utils::GenericCondition::kInternalViolation, status.getMessage());
-    return tempo_utils::GenericStatus::ok();
+    return m_port->detach();
 }
 
 tempo_utils::Status
-PortSocket::write(const lyric_serde::LyricPatchset &patchset)
+PortSocket::write(std::shared_ptr<tempo_utils::ImmutableBytes> payload)
 {
     if (m_writer == nullptr)
         return tempo_utils::GenericStatus::forCondition(
             tempo_utils::GenericCondition::kInternalViolation, "port is not available");
-    auto bytes = patchset.bytesView();
-    std::string_view message((const char *) bytes.data(), bytes.size());
-    auto status = m_writer->write(message);
-    if (status.notOk())
-        return tempo_utils::GenericStatus::forCondition(
-            tempo_utils::GenericCondition::kInternalViolation, status.getMessage());
-    return tempo_utils::GenericStatus::ok();
+    std::string_view message((const char *) payload->getData(), payload->getSize());
+    return m_writer->write(message);
 }

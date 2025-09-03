@@ -9,12 +9,11 @@
 
 #include <tempo_utils/status.h>
 #include <tempo_utils/url.h>
-#include <lyric_common/assembly_location.h>
+#include <lyric_common/module_location.h>
 
 struct ChordLocalMachineConfig {
     std::filesystem::path runDirectory;
-    std::filesystem::path installDirectory;
-    std::vector<std::filesystem::path> packageDirectories;
+    std::vector<std::filesystem::path> packageCacheDirectories;
     absl::flat_hash_set<tempo_utils::Url> expectedPorts;
     bool startSuspended;
     tempo_utils::Url supervisorUrl;
@@ -23,7 +22,7 @@ struct ChordLocalMachineConfig {
     std::string machineNameOverride;
     std::filesystem::path pemRootCABundleFile;
     std::filesystem::path logFile;
-    lyric_common::AssemblyLocation mainLocation;
+    lyric_common::ModuleLocation mainLocation;
     std::string binderEndpoint;
     std::string binderOrganization;
     std::string binderOrganizationalUnit;

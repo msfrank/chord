@@ -1,1 +1,3 @@
-"Hello, world"
+
+import from "//std/log" ...
+Log("hello world!")

@@ -16,8 +16,9 @@ public:
     virtual ~ComponentConstructor() = default;
 
     virtual std::shared_ptr<lyric_runtime::InterpreterState> createInterpreterState(
-        const lyric_runtime::InterpreterStateOptions &interpreterOptions,
-        const lyric_common::AssemblyLocation &mainLocation) const;
+        std::shared_ptr<lyric_runtime::AbstractLoader> systemLoader,
+        std::shared_ptr<lyric_runtime::AbstractLoader> applicationLoader,
+        const lyric_runtime::InterpreterStateOptions &interpreterOptions) const;
 
     virtual std::shared_ptr<LocalMachine> createLocalMachine(
         const tempo_utils::Url &machineUrl,

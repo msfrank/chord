@@ -1,7 +1,12 @@
 {
     "zuri-build": {
         "global": {
-            "sourceBaseUrl": "file://@SOURCE_DIRECTORY@"
+            "sourceBaseUrl": "file://@SOURCE_DIRECTORY@",
+            "preludeLocation": "@LYRIC_BOOTSTRAP_PRELUDE_LOCATION@",
+            "packageDirectoryPathList": [ "@ZURI_INSTALL_PACKAGES_DIR@", "@CMAKE_CURRENT_BINARY_DIR@" ],
+            "packageMap": {
+                "std": "@ZURI_STD_PACKAGE_AUTHORITY@"
+            }
         },
         "tasks": {
             "package:": {

@@ -8,8 +8,7 @@
 #include <tempo_security/x509_certificate_signing_request.h>
 #include <tempo_utils/file_reader.h>
 #include <tempo_utils/tempfile_maker.h>
-#include <lyric_packaging/directory_loader.h>
-#include <lyric_packaging/package_loader.h>
+#include <zuri_distributor/package_cache_loader.h>
 #include <lyric_runtime/chain_loader.h>
 #include <lyric_bootstrap/bootstrap_loader.h>
 
@@ -20,29 +19,32 @@ make_interpreter_state(
     const ChordLocalMachineConfig &chordLocalMachineConfig)
 {
     lyric_runtime::InterpreterStateOptions interpreterOptions;
+    interpreterOptions.mainLocation = chordLocalMachineConfig.mainLocation;
 
-    // create the list of loaders with the bootstrap loader in front
+    auto systemLoader = std::make_shared<lyric_bootstrap::BootstrapLoader>();
+
+    // create the list of package cache loaders with the run cache loader in front
     std::vector<std::shared_ptr<lyric_runtime::AbstractLoader>> loaderChain;
-    loaderChain.push_back(std::make_shared<lyric_bootstrap::BootstrapLoader>());
 
     // if install directory was specified then append directory loader
-    if (!chordLocalMachineConfig.installDirectory.empty()) {
-        loaderChain.push_back(
-            std::make_shared<lyric_packaging::DirectoryLoader>(chordLocalMachineConfig.installDirectory));
-    }
+    std::shared_ptr<zuri_distributor::PackageCache> runCache;
+    TU_ASSIGN_OR_RETURN (runCache, zuri_distributor::PackageCache::openOrCreate(
+        chordLocalMachineConfig.runDirectory, "cache"));
+    loaderChain.push_back(std::make_shared<zuri_distributor::PackageCacheLoader>(runCache));
 
-    // if package directories are specified then append package loader
-    if (!chordLocalMachineConfig.packageDirectories.empty()) {
-        loaderChain.push_back(
-            std::make_shared<lyric_packaging::PackageLoader>(chordLocalMachineConfig.packageDirectories));
+    // append loader for each package cache directory
+    for (const auto &cacheDirectory : chordLocalMachineConfig.packageCacheDirectories) {
+        std::shared_ptr<zuri_distributor::PackageCache> packageCache;
+        TU_ASSIGN_OR_RETURN (runCache, zuri_distributor::PackageCache::open(cacheDirectory));
+        loaderChain.push_back(std::make_shared<zuri_distributor::PackageCacheLoader>(packageCache));
     }
 
     // construct the loader chain
-    interpreterOptions.loader = std::make_shared<lyric_runtime::ChainLoader>(loaderChain);
+    auto applicationLoader = std::make_shared<lyric_runtime::ChainLoader>(loaderChain);
 
     // construct the interpreter state
     interpreterState = componentConstructor.createInterpreterState(
-        interpreterOptions, chordLocalMachineConfig.mainLocation);
+        systemLoader, applicationLoader, interpreterOptions);
     return {};
 }
 

@@ -22,21 +22,18 @@ on_termination_signal(uv_signal_t *handle, int signal)
     uv_stop(handle->loop);
 }
 
-static std::shared_ptr<grpc::ServerCredentials>
+static tempo_utils::Result<std::shared_ptr<grpc::ServerCredentials>>
 make_ssl_server_credentials(
     const std::filesystem::path &pemCertificateFile,
     const std::filesystem::path &pemPrivateKeyFile,
     const std::filesystem::path &pemRootCABundleFile)
 {
     tempo_utils::FileReader certificateReader(pemCertificateFile);
-    if (!certificateReader.isValid())
-        return {};
+    TU_RETURN_IF_NOT_OK (certificateReader.getStatus());
     tempo_utils::FileReader privateKeyReader(pemPrivateKeyFile);
-    if (!privateKeyReader.isValid())
-        return {};
+    TU_RETURN_IF_NOT_OK (privateKeyReader.getStatus());
     tempo_utils::FileReader rootCABundleReader(pemRootCABundleFile);
-    if (!rootCABundleReader.isValid())
-        return {};
+    TU_RETURN_IF_NOT_OK (rootCABundleReader.getStatus());
 
     grpc::SslServerCredentialsOptions options;
     grpc::SslServerCredentialsOptions::PemKeyCertPair pair;
@@ -75,7 +72,6 @@ run_chord_agent(int argc, const char *argv[])
     tempo_config::BooleanParser temporarySessionParser(false);
     tempo_config::IntegerParser idleTimeoutParser(0);
     tempo_config::IntegerParser registrationTimeoutParser(5);
-    tempo_config::BooleanParser emitEndpointParser(false);
     tempo_config::PathParser logFileParser(std::filesystem::path(absl::StrCat("chord-agent.", getpid(), ".log")));
     tempo_config::PathParser pidFileParser(std::filesystem::path{});
 
@@ -84,7 +80,7 @@ run_chord_agent(int argc, const char *argv[])
         {"listenEndpoint", {}, "listen on the specified endpoint", "ENDPOINT"},
         {"listenTransport", {}, "use the specified listener transport type", "TYPE"},
         {"processRunDirectory", processRunDirectoryParser.getDefault(),
-            "listen on the specified endpoint url", "DIR"},
+            "run the agent in the specified directory", "DIR"},
         {"localMachineExecutable", localMachineExecutableParser.getDefault(),
             "path to the local machine executable", "PATH"},
         {"pemCertificateFile", {}, "the certificate used by gRPC", "FILE"},
@@ -95,7 +91,6 @@ run_chord_agent(int argc, const char *argv[])
         {"idleTimeout", {}, "shutdown the agent after the specified amount of time has elapsed", "SECONDS"},
         {"registrationTimeout", registrationTimeoutParser.getDefault(),
             "abandon the execution if not registered after the specified amount of time has elapsed", "SECONDS"},
-        {"emitEndpoint", {}, "print the endpoint url after initialization has completed", {}},
         {"logFile", {}, "path to log file", "FILE"},
         {"pidFile", {}, "record the agent process id in the specified pid file", "FILE"},
     };
@@ -104,6 +99,7 @@ run_chord_agent(int argc, const char *argv[])
         {"agentName", {"--agent-name"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"listenEndpoint", {"-l", "--listen-endpoint"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"listenTransport", {"-t", "--listen-transport"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
+        {"processRunDirectory", {"-d", "--run-directory"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"pemCertificateFile", {"--certificate"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"pemPrivateKeyFile", {"--private-key"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"pemRootCABundleFile", {"--ca-bundle"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
@@ -111,7 +107,6 @@ run_chord_agent(int argc, const char *argv[])
         {"temporarySession", {"--temporary-session"}, tempo_command::GroupingType::NO_ARGUMENT},
         {"idleTimeout", {"--idle-timeout"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"registrationTimeout", {"--registration-timeout"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
-        {"emitEndpoint", {"--emit-endpoint"}, tempo_command::GroupingType::NO_ARGUMENT},
         {"logFile", {"--log-file"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"pidFile", {"--pid-file"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"help", {"-h", "--help"}, tempo_command::GroupingType::HELP_FLAG},
@@ -122,6 +117,7 @@ run_chord_agent(int argc, const char *argv[])
         {tempo_command::MappingType::ONE_INSTANCE, "agentName"},
         {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "listenEndpoint"},
         {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "listenTransport"},
+        {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "processRunDirectory"},
         {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "pemCertificateFile"},
         {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "pemPrivateKeyFile"},
         {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "pemRootCABundleFile"},
@@ -129,7 +125,6 @@ run_chord_agent(int argc, const char *argv[])
         {tempo_command::MappingType::TRUE_IF_INSTANCE, "temporarySession"},
         {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "idleTimeout"},
         {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "registrationTimeout"},
-        {tempo_command::MappingType::TRUE_IF_INSTANCE, "emitEndpoint"},
         {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "logFile"},
         {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "pidFile"},
     };
@@ -231,11 +226,6 @@ run_chord_agent(int argc, const char *argv[])
     TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(registrationTimeout, registrationTimeoutParser,
         commandConfig, "registrationTimeout"));
 
-    // parse the emit endpoint flag
-    bool emitEndpoint;
-    TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(emitEndpoint, emitEndpointParser,
-        commandConfig, "emitEndpoint"));
-
     // determine the log file
     std::filesystem::path logFile;
     TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(logFile, logFileParser,
@@ -250,9 +240,11 @@ run_chord_agent(int argc, const char *argv[])
     tempo_utils::LoggingConfiguration loggingConfig;
     loggingConfig.severityFilter = tempo_utils::SeverityFilter::kVeryVerbose;
     loggingConfig.flushEveryMessage = true;
+    bool usingDefaultLogSink = true;
     if (!logFile.empty()) {
         auto logSink = std::make_unique<tempo_utils::LogFileSink>(logFile);
         tempo_utils::init_logging(loggingConfig, std::move(logSink));
+        usingDefaultLogSink = false;
     } else {
         tempo_utils::init_logging(loggingConfig);
     }
@@ -262,7 +254,7 @@ run_chord_agent(int argc, const char *argv[])
     switch (listenTransport) {
         case chord_protocol::TransportType::Unix: {
             if (listenEndpoint.empty()) {
-                auto path = absolute(std::filesystem::current_path().append("agent.sock"));
+                auto path = std::filesystem::absolute(processRunDirectory / "agent.sock");
                 listenerUrl = absl::StrCat("unix:", path.string());
             } else {
                 listenerUrl = absl::StrCat("unix:", listenEndpoint);
@@ -282,20 +274,27 @@ run_chord_agent(int argc, const char *argv[])
                 "unknown transport type");
     }
 
-    // print the agent endpoint if requested
-    if (emitEndpoint) {
-        TU_CONSOLE_OUT << listenerUrl;
-    }
-
     // if agent should run in the background, then fork and continue in the child
     if (runInBackground) {
+
+        //
+        if (usingDefaultLogSink) {
+            tempo_utils::cleanup_logging();
+        }
+
+        if (fclose(stdout) < 0)
+            return tempo_utils::PosixStatus::last("failed to close stdout");
+        if (fclose(stderr) < 0)
+            return tempo_utils::PosixStatus::last("failed to close stderr");
+
+        //
         auto pid = fork();
         if (pid < 0)
             return tempo_command::CommandStatus::forCondition(tempo_command::CommandCondition::kCommandError,
                 "failed to fork into the background");
         if (pid > 0) {
             TU_LOG_INFO << "forked agent into the background with pid " << pid;
-            _exit(0);
+            return {};
         }
         auto sid = setsid();
         if (sid < 0)
@@ -310,20 +309,18 @@ run_chord_agent(int argc, const char *argv[])
     uv_loop_t loop;
     uv_loop_init(&loop);
 
-    //
+    // construct and initialize the supervisor
     MachineSupervisor supervisor(&loop, processRunDirectory, idleTimeout, registrationTimeout);
-    auto supervisorInitStatus = supervisor.initialize();
-    if (supervisorInitStatus.notOk())
-        return tempo_command::CommandStatus::forCondition(tempo_command::CommandCondition::kCommandError,
-            "failed to initialize process supervisor");
+    TU_RETURN_IF_NOT_OK (supervisor.initialize());
 
     // construct the agent service
     AgentService service(listenerUrl, &supervisor, agentName, localMachineExecutable);
 
     // construct the server and start it up
     grpc::ServerBuilder builder;
-    auto credentials = make_ssl_server_credentials(pemCertificateFile,
-        pemPrivateKeyFile, pemRootCABundleFile);
+    std::shared_ptr<grpc::ServerCredentials> credentials;
+    TU_ASSIGN_OR_RETURN (credentials, make_ssl_server_credentials(pemCertificateFile,
+        pemPrivateKeyFile, pemRootCABundleFile));
     builder.AddListeningPort(listenerUrl, credentials);
     builder.RegisterService(&service);
     std::unique_ptr<grpc::Server> server(builder.BuildAndStart());

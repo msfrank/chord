@@ -53,6 +53,7 @@ TEST_F(ChordIsolate, InitializeAndShutdown)
     options.endpointTransport = chord_protocol::TransportType::Unix;
     options.agentPath = std::filesystem::path(CHORD_AGENT_EXECUTABLE);
     options.runDirectory = testerDirectory;
+    options.idleTimeout = absl::Seconds(15);
     options.caKeyPair = caKeyPair;
     options.agentKeyPair = agentKeyPair;
     options.pemRootCABundleFile = caKeyPair.getPemCertificateFile();

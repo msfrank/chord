@@ -73,9 +73,9 @@ chord_sandbox::ChordIsolate::initialize()
             TU_RETURN_IF_NOT_OK (internal::spawn_temporary_agent(
                 params,
                 m_options.agentPath,
-                m_options.endpointTransport,
                 m_options.agentServerName,
                 m_options.runDirectory,
+                m_options.idleTimeout,
                 m_options.agentKeyPair.getPemCertificateFile(),
                 m_options.agentKeyPair.getPemPrivateKeyFile(),
                 m_options.pemRootCABundleFile));
@@ -95,8 +95,9 @@ chord_sandbox::ChordIsolate::initialize()
 
     // construct the client
     grpc::ChannelArguments channelArguments;
-    if (!params.agentServerName.empty())
+    if (!params.agentServerName.empty()) {
         channelArguments.SetSslTargetNameOverride(params.agentServerName);
+    }
     m_channel = grpc::CreateCustomChannel(params.agentEndpoint, credentials, channelArguments);
     m_priv = std::make_unique<SandboxPriv>();
     m_priv->stub = chord_invoke::InvokeService::NewStub(m_channel);

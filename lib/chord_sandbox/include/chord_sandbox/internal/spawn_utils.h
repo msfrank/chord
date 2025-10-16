@@ -26,9 +26,9 @@ namespace chord_sandbox::internal {
     tempo_utils::Status spawn_temporary_agent(
         AgentParams &params,
         const std::filesystem::path &agentPath,
-        chord_protocol::TransportType transport,
         const std::string &agentServerName,
         const std::filesystem::path &runDirectory,
+        absl::Duration idleTimeout,
         const std::filesystem::path &pemCertificateFile,
         const std::filesystem::path &pemPrivateKeyFile,
         const std::filesystem::path &pemRootCABundleFile);

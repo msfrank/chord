@@ -16,7 +16,7 @@ set(TEST_CASES
 
 add_executable(chord_sandbox_testsuite ${TEST_CASES})
 target_compile_definitions(chord_sandbox_testsuite PRIVATE
-    "CHORD_AGENT_EXECUTABLE=\"${CHORD_AGENT_DIST_PATH}\""
+    "CHORD_AGENT_EXECUTABLE=\"${CHORD_BUILD_CHORD_AGENT_PATH}\""
     "ZURI_INSTALL_CONFIG_DIR=\"${ZURI_INSTALL_CONFIG_DIR}\""
     "ZURI_INSTALL_VENDOR_CONFIG_DIR=\"${ZURI_INSTALL_VENDOR_CONFIG_DIR}\""
     )
@@ -31,7 +31,7 @@ gtest_discover_tests(chord_sandbox_testsuite)
 
 add_library(ChordSandboxTestSuite OBJECT ${TEST_CASES})
 target_compile_definitions(ChordSandboxTestSuite PRIVATE
-    "CHORD_AGENT_EXECUTABLE=\"${CHORD_AGENT_DIST_PATH}\""
+    "CHORD_AGENT_EXECUTABLE=\"${CHORD_BUILD_CHORD_AGENT_PATH}\""
     "ZURI_INSTALL_CONFIG_DIR=\"${ZURI_INSTALL_CONFIG_DIR}\""
     "ZURI_INSTALL_VENDOR_CONFIG_DIR=\"${ZURI_INSTALL_VENDOR_CONFIG_DIR}\""
     )

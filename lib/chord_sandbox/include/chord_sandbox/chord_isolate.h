@@ -33,6 +33,7 @@ namespace chord_sandbox {
         std::string agentServerName;
         std::filesystem::path agentPath;
         std::filesystem::path runDirectory;
+        absl::Duration idleTimeout;
         tempo_security::CertificateKeyPair caKeyPair;
         tempo_security::CertificateKeyPair agentKeyPair;
         std::filesystem::path pemRootCABundleFile;

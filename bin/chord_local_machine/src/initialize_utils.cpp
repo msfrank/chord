@@ -36,7 +36,7 @@ make_interpreter_state(
     // append loader for each package cache directory
     for (const auto &cacheDirectory : chordLocalMachineConfig.packageCacheDirectories) {
         std::shared_ptr<zuri_distributor::PackageCache> packageCache;
-        TU_ASSIGN_OR_RETURN (runCache, zuri_distributor::PackageCache::open(cacheDirectory));
+        TU_ASSIGN_OR_RETURN (packageCache, zuri_distributor::PackageCache::open(cacheDirectory));
         loaderChain.push_back(std::make_shared<zuri_distributor::PackageCacheLoader>(packageCache));
     }
 

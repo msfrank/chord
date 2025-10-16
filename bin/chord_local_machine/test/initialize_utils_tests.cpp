@@ -7,6 +7,7 @@
 #include <lyric_common/module_location.h>
 #include <lyric_runtime/chain_loader.h>
 #include <tempo_test/status_matchers.h>
+#include <tempo_utils/tempdir_maker.h>
 #include <zuri_distributor/package_cache_loader.h>
 
 #include "test_mocks.h"
@@ -18,17 +19,29 @@ using ::testing::Return;
 using ::testing::SaveArg;
 using ::testing::SaveArgPointee;
 
-TEST(InitializeUtils, MakeInterpreterStateWithNoPackageDirectories)
+class InitializeUtilsTests : public ::testing::Test {
+protected:
+    std::unique_ptr<tempo_utils::TempdirMaker> testDirectory;
+    void SetUp() override {
+        testDirectory = std::make_unique<tempo_utils::TempdirMaker>(
+            std::filesystem::current_path(), "tester.XXXXXXXX");
+    }
+    void TearDown() override {
+    }
+};
+
+TEST_F(InitializeUtilsTests, MakeInterpreterStateWithNoPackageDirectories)
 {
     ChordLocalMachineConfig chordLocalMachineConfig;
-    chordLocalMachineConfig.mainLocation = tempo_utils::Url::fromFilesystemPath(CHORD_DEMO_PACKAGE_PATH);
+    chordLocalMachineConfig.mainLocation = zuri_packager::PackageSpecifier::fromString(TEST1_ZPK).toUrl();
+    chordLocalMachineConfig.runDirectory = testDirectory->getTempdir();
 
     MockComponentConstructor componentConstructor;
     std::shared_ptr<lyric_runtime::AbstractLoader> systemLoader;
     std::shared_ptr<lyric_runtime::AbstractLoader> applicationLoader;
     lyric_runtime::InterpreterStateOptions options;
     EXPECT_CALL (componentConstructor, createInterpreterState(_, _, _))
-        .WillOnce(Invoke([&](const auto &sys_, const auto &app_, const auto &opts_) -> auto {
+        .WillOnce(Invoke([&](auto sys_, auto app_, const auto &opts_) -> auto {
             systemLoader = sys_;
             applicationLoader = app_;
             options = opts_;
@@ -36,24 +49,27 @@ TEST(InitializeUtils, MakeInterpreterStateWithNoPackageDirectories)
         }));
 
     std::shared_ptr<lyric_runtime::InterpreterState> interpreterState;
-    ASSERT_TRUE (make_interpreter_state(interpreterState, componentConstructor, chordLocalMachineConfig).isOk());
+    ASSERT_THAT (make_interpreter_state(interpreterState, componentConstructor, chordLocalMachineConfig),
+        tempo_test::IsOk());
 
     ASSERT_TRUE (systemLoader != nullptr);
 
     auto *chainLoader = dynamic_cast<lyric_runtime::ChainLoader *>(applicationLoader.get());
     ASSERT_TRUE (chainLoader != nullptr);
     ASSERT_EQ (1, chainLoader->numLoaders());
-    auto appLoader1 = std::static_pointer_cast<zuri_distributor::PackageCacheLoader>(chainLoader->getLoader(0));
-    ASSERT_EQ (std::filesystem::current_path(), appLoader1->getPackageCache()->getCacheDirectory());
+    auto appLoader0 = std::static_pointer_cast<zuri_distributor::PackageCacheLoader>(chainLoader->getLoader(0));
+    ASSERT_EQ (testDirectory->getTempdir() / "cache", appLoader0->getPackageCache()->getCacheDirectory());
 
     ASSERT_EQ (chordLocalMachineConfig.mainLocation, options.mainLocation.toUrl());
 }
 
-TEST(InitializeUtils, MakeInterpreterStateWithPackageDirectory)
+TEST_F(InitializeUtilsTests, MakeInterpreterStateWithPackageDirectory)
 {
     ChordLocalMachineConfig chordLocalMachineConfig;
-    chordLocalMachineConfig.mainLocation = tempo_utils::Url::fromFilesystemPath(CHORD_DEMO_PACKAGE_PATH);
-    std::filesystem::path packageCacheDirectory{ "/path/to/cache"};
+    chordLocalMachineConfig.mainLocation = zuri_packager::PackageSpecifier::fromString(TEST1_ZPK).toUrl();
+    chordLocalMachineConfig.runDirectory = testDirectory->getTempdir();
+    auto packageCacheDirectory = testDirectory->getTempdir() / "cache2";
+    ASSERT_TRUE (std::filesystem::create_directory(packageCacheDirectory));
     chordLocalMachineConfig.packageCacheDirectories = { packageCacheDirectory };
 
     MockComponentConstructor componentConstructor;
@@ -69,7 +85,8 @@ TEST(InitializeUtils, MakeInterpreterStateWithPackageDirectory)
         }));
 
     std::shared_ptr<lyric_runtime::InterpreterState> interpreterState;
-    ASSERT_TRUE (make_interpreter_state(interpreterState, componentConstructor, chordLocalMachineConfig).isOk());
+    ASSERT_THAT (make_interpreter_state(interpreterState, componentConstructor, chordLocalMachineConfig),
+        tempo_test::IsOk());
 
     ASSERT_TRUE (systemLoader != nullptr);
 
@@ -77,17 +94,18 @@ TEST(InitializeUtils, MakeInterpreterStateWithPackageDirectory)
     ASSERT_TRUE (chainLoader != nullptr);
     ASSERT_EQ (2, chainLoader->numLoaders());
     auto appLoader0 = std::static_pointer_cast<zuri_distributor::PackageCacheLoader>(chainLoader->getLoader(0));
-    ASSERT_EQ (std::filesystem::current_path(), appLoader0->getPackageCache()->getCacheDirectory());
+    ASSERT_EQ (testDirectory->getTempdir() / "cache", appLoader0->getPackageCache()->getCacheDirectory());
     auto appLoader1 = std::static_pointer_cast<zuri_distributor::PackageCacheLoader>(chainLoader->getLoader(1));
     ASSERT_EQ (packageCacheDirectory, appLoader1->getPackageCache()->getCacheDirectory());
 
     ASSERT_EQ (chordLocalMachineConfig.mainLocation, options.mainLocation.toUrl());
 }
 
-TEST(InitializeUtils, MakeLocalMachine)
+TEST_F(InitializeUtilsTests, MakeLocalMachine)
 {
     ChordLocalMachineConfig chordLocalMachineConfig;
-    chordLocalMachineConfig.mainLocation = tempo_utils::Url::fromFilesystemPath(CHORD_DEMO_PACKAGE_PATH);
+    chordLocalMachineConfig.mainLocation = zuri_packager::PackageSpecifier::fromString(TEST1_ZPK).toUrl();
+    chordLocalMachineConfig.runDirectory = testDirectory->getTempdir();
     chordLocalMachineConfig.machineUrl = tempo_utils::Url::fromString("dev.zuri.machine:xxx");
     chordLocalMachineConfig.startSuspended = true;
 
@@ -111,8 +129,9 @@ TEST(InitializeUtils, MakeLocalMachine)
         });
 
     std::shared_ptr<LocalMachine> localMachine;
-    ASSERT_TRUE (make_local_machine(localMachine, componentConstructor, chordLocalMachineConfig,
-        chordLocalMachineData.interpreterState, &processor).isOk());
+    ASSERT_THAT (make_local_machine(localMachine, componentConstructor, chordLocalMachineConfig,
+        chordLocalMachineData.interpreterState, &processor),
+        tempo_test::IsOk());
 
     ASSERT_EQ (chordLocalMachineConfig.machineUrl, machineUrl);
     ASSERT_EQ (chordLocalMachineConfig.startSuspended, startSuspended);
@@ -120,9 +139,10 @@ TEST(InitializeUtils, MakeLocalMachine)
     ASSERT_EQ (&processor, processorPtr);
 }
 
-TEST(InitializeUtils, MakeInvokeServiceStub)
+TEST_F(InitializeUtilsTests, MakeInvokeServiceStub)
 {
     ChordLocalMachineConfig chordLocalMachineConfig;
+    chordLocalMachineConfig.runDirectory = testDirectory->getTempdir();
     chordLocalMachineConfig.machineUrl = tempo_utils::Url::fromString("dev.zuri.machine:xxx");
 
     ChordLocalMachineData chordLocalMachineData;
@@ -137,15 +157,17 @@ TEST(InitializeUtils, MakeInvokeServiceStub)
         });
 
     std::unique_ptr<chord_invoke::InvokeService::StubInterface> stub;
-    ASSERT_TRUE (make_invoke_service_stub(stub, componentConstructor, chordLocalMachineConfig,
-        chordLocalMachineData.customChannel).isOk());
+    ASSERT_THAT (make_invoke_service_stub(stub, componentConstructor, chordLocalMachineConfig,
+        chordLocalMachineData.customChannel),
+        tempo_test::IsOk());
 
     ASSERT_EQ (chordLocalMachineData.customChannel, customChannel);
 }
 
-TEST(InitializeUtils, MakeGrpcBinder)
+TEST_F(InitializeUtilsTests, MakeGrpcBinder)
 {
     ChordLocalMachineConfig chordLocalMachineConfig;
+    chordLocalMachineConfig.runDirectory = testDirectory->getTempdir();
     chordLocalMachineConfig.machineUrl = tempo_utils::Url::fromString("dev.zuri.machine:xxx");
 
     ChordLocalMachineData chordLocalMachineData;
@@ -175,7 +197,8 @@ TEST(InitializeUtils, MakeGrpcBinder)
         });
 
     std::shared_ptr<GrpcBinder> grpcBinder;
-    ASSERT_TRUE (make_grpc_binder(
+    ASSERT_THAT (make_grpc_binder(
         grpcBinder, componentConstructor, chordLocalMachineConfig, chordLocalMachineData.csrKeyPair,
-        chordLocalMachineData.invokeStub.get(), chordLocalMachineData.remotingService.get()).isOk());
+        chordLocalMachineData.invokeStub.get(), chordLocalMachineData.remotingService.get()),
+        tempo_test::IsOk());
 }

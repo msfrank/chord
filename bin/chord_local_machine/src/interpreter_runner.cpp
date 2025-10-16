@@ -129,7 +129,7 @@ InterpreterRunner::runInterpreter()
 
     if (runInterpResult.isStatus()) {
         m_status = runInterpResult.getStatus();
-        if (!m_status.matchesCondition(lyric_runtime::InterpreterCondition::kInterrupted)) {
+        if (m_status.matchesCondition(lyric_runtime::InterpreterCondition::kInterrupted)) {
             TU_LOG_V << "interpreter suspended";
             m_outgoing->sendMessage(new RunnerSuspended());
             m_state = InterpreterRunnerState::STOPPED;

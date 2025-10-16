@@ -3,8 +3,6 @@
 
 #include <chord_sandbox/chord_isolate.h>
 #include <tempo_security/certificate_key_pair.h>
-#include <tempo_utils/daemon_process.h>
-#include <tempo_utils/status.h>
 
 namespace chord_sandbox::internal {
 

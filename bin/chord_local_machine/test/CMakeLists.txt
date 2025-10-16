@@ -18,7 +18,7 @@ add_executable(chord_local_machine_testsuite ${TEST_CASES} test_mocks.h)
 add_dependencies(chord_local_machine_testsuite examples-demo)
 target_compile_definitions(chord_local_machine_testsuite PRIVATE
     "CHORD_LOCAL_MACHINE_EXECUTABLE=\"${CHORD_LOCAL_MACHINE_DIST_PATH}\""
-    "EXAMPLES_DEMO_PACKAGE=\"${EXAMPLES_DEMO_PACKAGE}\""
+    "CHORD_DEMO_PACKAGE_PATH=\"${CHORD_DEMO_PACKAGE_PATH}\""
 )
 target_link_libraries(chord_local_machine_testsuite PUBLIC
     ChordLocalMachineRuntime
@@ -35,7 +35,7 @@ add_library(ChordLocalMachineTestSuite OBJECT ${TEST_CASES} test_mocks.h)
 add_dependencies(chord_local_machine_testsuite examples-demo)
 target_compile_definitions(ChordLocalMachineTestSuite PRIVATE
     "CHORD_LOCAL_MACHINE_EXECUTABLE=\"${CHORD_LOCAL_MACHINE_DIST_PATH}\""
-    "EXAMPLES_DEMO_PACKAGE=\"${EXAMPLES_DEMO_PACKAGE}\""
+    "CHORD_DEMO_PACKAGE_PATH=\"${CHORD_DEMO_PACKAGE_PATH}\""
 )
 target_link_libraries(ChordLocalMachineTestSuite PUBLIC
     ChordLocalMachineRuntime

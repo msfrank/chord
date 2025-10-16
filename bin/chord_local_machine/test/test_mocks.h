@@ -7,9 +7,8 @@
 #include <chord_local_machine/initialize_utils.h>
 #include <chord_local_machine/run_utils.h>
 #include <lyric_runtime/chain_loader.h>
-#include <lyric_packaging/package_loader.h>
+#include <lyric_runtime/abstract_loader.h>
 #include <lyric_bootstrap/bootstrap_loader.h>
-#include <lyric_packaging/directory_loader.h>
 #include <tempo_test/status_matchers.h>
 
 class MockInterpreterState : public lyric_runtime::InterpreterState {
@@ -244,8 +243,9 @@ public:
     MOCK_METHOD (
         std::shared_ptr<lyric_runtime::InterpreterState>,
         createInterpreterState, (
-            const lyric_runtime::InterpreterStateOptions &interpreterOptions,
-            const lyric_common::AssemblyLocation &mainLocation),
+            std::shared_ptr<lyric_runtime::AbstractLoader> systemLoader,
+            std::shared_ptr<lyric_runtime::AbstractLoader> applicationLoader,
+            const lyric_runtime::InterpreterStateOptions &options),
         (const, override));
 
     MOCK_METHOD (

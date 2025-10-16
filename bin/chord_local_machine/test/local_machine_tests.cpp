@@ -2,8 +2,8 @@
 
 #include <chord_local_machine/local_machine.h>
 #include <lyric_bootstrap/bootstrap_loader.h>
-#include <lyric_packaging/package_loader.h>
-#include <lyric_runtime/chain_loader.h>
+#include <lyric_runtime/static_loader.h>
+#include <zuri_distributor/package_cache_loader.h>
 
 TEST(LocalMachine, Construct)
 {
@@ -15,15 +15,14 @@ TEST(LocalMachine, Construct)
     uv_loop_init(&loop);
 
     lyric_runtime::InterpreterStateOptions options;
+    options.mainLocation = lyric_common::ModuleLocation::fromString(CHORD_DEMO_PACKAGE_PATH);
 
-    std::vector<std::shared_ptr<lyric_runtime::AbstractLoader>> loaderChain;
-    loaderChain.push_back(std::make_shared<lyric_bootstrap::BootstrapLoader>());
-    loaderChain.push_back(std::make_shared<lyric_packaging::PackageLoader>());
-    options.loader = std::make_shared<lyric_runtime::ChainLoader>(loaderChain);
+    auto systemLoader = std::make_shared<lyric_bootstrap::BootstrapLoader>();
+    auto applicationLoader = std::make_shared<lyric_runtime::StaticLoader>();
 
-    auto location = lyric_common::AssemblyLocation::fromString(EXAMPLES_DEMO_PACKAGE);
     std::shared_ptr<lyric_runtime::InterpreterState> state;
-    TU_ASSIGN_OR_RAISE(state, lyric_runtime::InterpreterState::create(options, location));
+    TU_ASSIGN_OR_RAISE(state, lyric_runtime::InterpreterState::create(
+        systemLoader, applicationLoader, options));
 
     AsyncQueue<RunnerReply> processor;
     ASSERT_TRUE (processor.initialize(&loop).isOk());
@@ -50,15 +49,14 @@ TEST(LocalMachine, Start)
     uv_loop_init(&loop);
 
     lyric_runtime::InterpreterStateOptions options;
+    options.mainLocation = lyric_common::ModuleLocation::fromString(CHORD_DEMO_PACKAGE_PATH);
 
-    std::vector<std::shared_ptr<lyric_runtime::AbstractLoader>> loaderChain;
-    loaderChain.push_back(std::make_shared<lyric_bootstrap::BootstrapLoader>());
-    loaderChain.push_back(std::make_shared<lyric_packaging::PackageLoader>());
-    options.loader = std::make_shared<lyric_runtime::ChainLoader>(loaderChain);
+    auto systemLoader = std::make_shared<lyric_bootstrap::BootstrapLoader>();
+    auto applicationLoader = std::make_shared<lyric_runtime::StaticLoader>();
 
-    auto location = lyric_common::AssemblyLocation::fromString(EXAMPLES_DEMO_PACKAGE);
     std::shared_ptr<lyric_runtime::InterpreterState> state;
-    TU_ASSIGN_OR_RAISE(state, lyric_runtime::InterpreterState::create(options, location));
+    TU_ASSIGN_OR_RAISE(state, lyric_runtime::InterpreterState::create(
+        systemLoader, applicationLoader, options));
 
     AsyncQueue<RunnerReply> processor;
     ASSERT_TRUE (processor.initialize(&loop).isOk());

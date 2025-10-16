@@ -13,11 +13,11 @@ namespace chord_test::matchers {
     public:
         explicit SpawnMachineMatcher(tempo_utils::StatusCode statusCode);
 
-        bool MatchAndExplain(const chord_test::SpawnMachine &runMachine, std::ostream *os) const;
+        bool MatchAndExplain(const SpawnMachine &runMachine, std::ostream *os) const;
         void DescribeTo(std::ostream *os) const;
         void DescribeNegationTo(std::ostream *os) const;
 
-        using MatchesType = chord_test::SpawnMachine;
+        using MatchesType = SpawnMachine;
         using is_gtest_matcher = void;
 
     private:
@@ -31,11 +31,11 @@ namespace chord_test::matchers {
     public:
         explicit RunMachineMatcher(tempo_utils::StatusCode statusCode);
 
-        bool MatchAndExplain(const chord_test::RunMachine &runMachine, std::ostream *os) const;
+        bool MatchAndExplain(const RunMachine &runMachine, std::ostream *os) const;
         void DescribeTo(std::ostream *os) const;
         void DescribeNegationTo(std::ostream *os) const;
 
-        using MatchesType = chord_test::RunMachine;
+        using MatchesType = RunMachine;
         using is_gtest_matcher = void;
 
     private:

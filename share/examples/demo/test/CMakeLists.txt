@@ -14,10 +14,7 @@ target_include_directories(examples_demo_testsuite PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/../include
 )
 target_compile_definitions(examples_demo_testsuite PRIVATE
-    "WORKSPACE_CONFIG_FILE=\"${WORKSPACE_CONFIG_FILE}\""
-    "HELLOWORLD_PACKAGE_URL=\"${HELLOWORLD_PACKAGE_URL}\""
-    "ZURI_INSTALL_CONFIG_DIR=\"${ZURI_INSTALL_CONFIG_DIR}\""
-    "ZURI_INSTALL_VENDOR_CONFIG_DIR=\"${ZURI_INSTALL_VENDOR_CONFIG_DIR}\""
+    "CHORD_DEMO_PACKAGE_PATH=\"${CHORD_DEMO_PACKAGE_PATH}\""
 )
 target_link_libraries(examples_demo_testsuite PUBLIC
     chord::chord_test
@@ -35,10 +32,7 @@ target_include_directories(ExamplesDemoTestSuite PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/../include
 )
 target_compile_definitions(ExamplesDemoTestSuite PRIVATE
-    "WORKSPACE_CONFIG_FILE=\"${WORKSPACE_CONFIG_FILE}\""
-    "HELLOWORLD_PACKAGE_URL=\"${HELLOWORLD_PACKAGE_URL}\""
-    "ZURI_INSTALL_CONFIG_DIR=\"${ZURI_INSTALL_CONFIG_DIR}\""
-    "ZURI_INSTALL_VENDOR_CONFIG_DIR=\"${ZURI_INSTALL_VENDOR_CONFIG_DIR}\""
+    "CHORD_DEMO_PACKAGE_PATH=\"${CHORD_DEMO_PACKAGE_PATH}\""
 )
 target_link_libraries(ExamplesDemoTestSuite PUBLIC
     chord::chord_test

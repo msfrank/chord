@@ -2,7 +2,6 @@
 #define CHORD_SANDBOX_REMOTE_MACHINE_H
 
 #include <chord_sandbox/grpc_connector.h>
-#include <lyric_common/assembly_location.h>
 #include <tempo_utils/result.h>
 #include <tempo_utils/url.h>
 
@@ -28,7 +27,7 @@ namespace chord_sandbox {
     public:
         RemoteMachine(
             std::string_view name,
-            const lyric_common::AssemblyLocation &mainLocation,
+            const tempo_utils::Url &mainLocation,
             const tempo_utils::Url &machineUrl,
             std::shared_ptr<GrpcConnector> connector);
 
@@ -42,7 +41,7 @@ namespace chord_sandbox {
 
     private:
         std::string m_name;
-        lyric_common::AssemblyLocation m_mainLocation;
+        tempo_utils::Url m_mainLocation;
         tempo_utils::Url m_machineUrl;
         std::shared_ptr<GrpcConnector> m_connector;
     };

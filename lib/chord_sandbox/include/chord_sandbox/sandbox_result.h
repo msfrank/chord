@@ -11,7 +11,7 @@
 
 namespace chord_sandbox {
 
-    constexpr tempo_utils::SchemaNs kLyricSandboxStatusNs("dev.zuri.ns:lyric-sandbox-status-1");
+    constexpr const char *kChordSandboxStatusNs("dev.zuri.ns:chord-sandbox-status-1");
 
     enum class SandboxCondition {
         kAgentError,
@@ -27,13 +27,24 @@ namespace chord_sandbox {
     class SandboxStatus : public tempo_utils::TypedStatus<SandboxCondition> {
     public:
         using TypedStatus::TypedStatus;
-        static SandboxStatus ok();
         static bool convert(SandboxStatus &dstStatus, const tempo_utils::Status &srcStatus);
 
     private:
         SandboxStatus(tempo_utils::StatusCode statusCode, std::shared_ptr<const tempo_utils::Detail> detail);
 
     public:
+        /**
+         *
+         * @param condition
+         * @param message
+         * @return
+         */
+        static SandboxStatus forCondition(
+            SandboxCondition condition,
+            std::string_view message)
+        {
+            return SandboxStatus(condition, message);
+        }
         /**
          *
          * @tparam Args
@@ -71,16 +82,6 @@ namespace chord_sandbox {
             return SandboxStatus(condition, message, traceId, spanId);
         }
     };
-
-    class SandboxException : public std::exception {
-    public:
-        SandboxException(const SandboxStatus &status) noexcept;
-        SandboxStatus getStatus() const;
-        const char* what() const noexcept override;
-
-    private:
-        SandboxStatus m_status;
-    };
 }
 
 namespace tempo_utils {
@@ -97,7 +98,7 @@ namespace tempo_utils {
     template<>
     struct ConditionTraits<chord_sandbox::SandboxCondition> {
         using StatusType = chord_sandbox::SandboxStatus;
-        static constexpr const char *condition_namespace() { return chord_sandbox::kLyricSandboxStatusNs.getNs(); }
+        static constexpr const char *condition_namespace() { return chord_sandbox::kChordSandboxStatusNs; }
         static constexpr StatusCode make_status_code(chord_sandbox::SandboxCondition condition)
         {
             switch (condition) {

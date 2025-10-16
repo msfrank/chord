@@ -55,7 +55,7 @@ chord_sandbox::GrpcConnector::registerProtocolHandler(
     priv->client = std::make_unique<RemotingClient>(endpointUrl, protocolUrl,
         handler, credentials, endpointServerName);
     m_clients[protocolUrl] = priv;
-    return SandboxStatus::ok();
+    return {};
 }
 
 tempo_utils::Status

@@ -22,7 +22,7 @@ struct ChordLocalMachineConfig {
     std::string machineNameOverride;
     std::filesystem::path pemRootCABundleFile;
     std::filesystem::path logFile;
-    lyric_common::ModuleLocation mainLocation;
+    tempo_utils::Url mainLocation;
     std::string binderEndpoint;
     std::string binderOrganization;
     std::string binderOrganizationalUnit;

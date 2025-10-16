@@ -10,7 +10,7 @@
 #include <chord_sandbox/remote_machine.h>
 #include <chord_sandbox/sandbox_result.h>
 #include <chord_sandbox/sandbox_types.h>
-#include <lyric_common/assembly_location.h>
+#include <lyric_common/module_location.h>
 #include <tempo_config/config_types.h>
 #include <tempo_security/certificate_key_pair.h>
 #include <tempo_utils/url.h>
@@ -57,7 +57,7 @@ namespace chord_sandbox {
 
         tempo_utils::Result<std::shared_ptr<RemoteMachine>> spawn(
             std::string_view name,
-            const lyric_common::AssemblyLocation &mainLocation,
+            const tempo_utils::Url &mainLocation,
             const tempo_config::ConfigMap &configMap,
             const std::vector<RequestedPortAndHandler> &plugs = {},
             bool startSuspended = false);

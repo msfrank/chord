@@ -43,7 +43,7 @@ chord_sandbox::RemotingClient::connect()
     new ClientCommunicationStream(m_stub.get(), m_protocolUrl, m_handler, true);
     TU_LOG_INFO << "starting communication with " << m_protocolUrl << " on endpoint " << m_endpointUrl;
 
-    return SandboxStatus::ok();
+    return {};
 }
 
 tempo_utils::Status
@@ -54,7 +54,7 @@ chord_sandbox::RemotingClient::shutdown()
         TU_LOG_INFO << "shutting down communication with " << m_protocolUrl;
         m_stub.reset();
     }
-    return SandboxStatus::ok();
+    return {};
 }
 
 chord_sandbox::ClientCommunicationStream::ClientCommunicationStream(
@@ -158,5 +158,5 @@ chord_sandbox::ClientCommunicationStream::write(std::string_view message)
         m_tail = pending;
     }
 
-    return SandboxStatus::ok();
+    return {};
 }

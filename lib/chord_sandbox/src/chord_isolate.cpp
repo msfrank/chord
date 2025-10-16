@@ -8,13 +8,12 @@
 #include <chord_sandbox/internal/spawn_utils.h>
 #include <chord_sandbox/run_protocol_plug.h>
 #include <grpcpp/create_channel.h>
-#include <tempo_config/config_serde.h>
 #include <tempo_security/certificate_key_pair.h>
 #include <tempo_security/x509_certificate_signing_request.h>
-#include <tempo_utils/daemon_process.h>
 #include <tempo_utils/file_reader.h>
 #include <tempo_utils/log_stream.h>
-#include <tempo_utils/process_utils.h>
+#include <tempo_utils/process_builder.h>
+#include <tempo_utils/process_runner.h>
 #include <tempo_utils/url.h>
 
 namespace chord_sandbox {
@@ -39,12 +38,6 @@ chord_sandbox::ChordIsolate::~ChordIsolate()
 {
 }
 
-static std::shared_ptr<tempo_utils::DaemonProcess>
-spawn_func(const tempo_utils::ProcessInvoker &invoker, const std::filesystem::path &runDirectory)
-{
-    return tempo_utils::DaemonProcess::spawn(invoker, runDirectory);
-}
-
 tempo_utils::Status
 chord_sandbox::ChordIsolate::initialize()
 {
@@ -56,18 +49,15 @@ chord_sandbox::ChordIsolate::initialize()
     chord_sandbox::internal::AgentParams params;
     switch (m_options.discoveryPolicy) {
         case AgentDiscoveryPolicy::USE_SPECIFIED_ENDPOINT: {
-            auto status = chord_sandbox::internal::connect_to_specified_endpoint(
+            TU_RETURN_IF_NOT_OK (internal::connect_to_specified_endpoint(
                 params,
                 m_options.agentEndpoint,
                 m_options.agentServerName,
-                m_options.pemRootCABundleFile,
-                spawn_func);
-            if (status.notOk())
-                return status;
+                m_options.pemRootCABundleFile));
             break;
         }
         case AgentDiscoveryPolicy::SPAWN_IF_MISSING: {
-            auto status = chord_sandbox::internal::spawn_temporary_agent_if_missing(
+            TU_RETURN_IF_NOT_OK (internal::spawn_temporary_agent_if_missing(
                 params,
                 m_options.agentEndpoint,
                 m_options.agentPath,
@@ -76,14 +66,11 @@ chord_sandbox::ChordIsolate::initialize()
                 m_options.runDirectory,
                 m_options.agentKeyPair.getPemCertificateFile(),
                 m_options.agentKeyPair.getPemPrivateKeyFile(),
-                m_options.pemRootCABundleFile,
-                spawn_func);
-            if (status.notOk())
-                return status;
+                m_options.pemRootCABundleFile));
             break;
         }
         case AgentDiscoveryPolicy::ALWAYS_SPAWN: {
-            auto status = chord_sandbox::internal::spawn_temporary_agent(
+            TU_RETURN_IF_NOT_OK (internal::spawn_temporary_agent(
                 params,
                 m_options.agentPath,
                 m_options.endpointTransport,
@@ -91,10 +78,7 @@ chord_sandbox::ChordIsolate::initialize()
                 m_options.runDirectory,
                 m_options.agentKeyPair.getPemCertificateFile(),
                 m_options.agentKeyPair.getPemPrivateKeyFile(),
-                m_options.pemRootCABundleFile,
-                spawn_func);
-            if (status.notOk())
-                return status;
+                m_options.pemRootCABundleFile));
             break;
         }
     }
@@ -128,13 +112,13 @@ chord_sandbox::ChordIsolate::initialize()
 
     TU_LOG_INFO << "connected to agent " << identifyResult.agent_name();
 
-    return SandboxStatus::ok();
+    return {};
 }
 
 tempo_utils::Result<std::shared_ptr<chord_sandbox::RemoteMachine>>
 chord_sandbox::ChordIsolate::spawn(
     std::string_view name,
-    const lyric_common::AssemblyLocation &mainLocation,
+    const tempo_utils::Url &mainLocation,
     const tempo_config::ConfigMap &configMap,
     const std::vector<RequestedPortAndHandler> &plugs,
     bool startSuspended)
@@ -162,7 +146,7 @@ chord_sandbox::ChordIsolate::spawn(
     // call CreateMachine on the agent endpoint
     internal::CreateMachineResult createMachineResult;
     TU_ASSIGN_OR_RETURN (createMachineResult, internal::create_machine(m_priv->stub.get(),
-        name, mainLocation.toUrl(), configMap, requestedPortsSet, /* startSuspended= */ true));
+        name, mainLocation, configMap, requestedPortsSet, /* startSuspended= */ true));
 
     // call RunMachine on the agent endpoint
     internal::RunMachineResult runMachineResult;
@@ -209,8 +193,7 @@ chord_sandbox::ChordIsolate::spawn(
 
     // create the remote machine
     auto &machineUrl = createMachineResult.machineUrl;
-    auto machine = std::make_shared<RemoteMachine>(
-        name, mainLocation, machineUrl, connector);
+    auto machine = std::make_shared<RemoteMachine>(name, mainLocation, machineUrl, connector);
     m_machines[machineUrl] = machine;
 
     // the remote machine is suspended, so if startSuspended is false then resume the machine
@@ -229,5 +212,5 @@ chord_sandbox::ChordIsolate::shutdown()
             SandboxCondition::kSandboxInvariant, "sandbox is not initialized");
     m_priv.reset();
     m_channel.reset();
-    return SandboxStatus::ok();
+    return {};
 }

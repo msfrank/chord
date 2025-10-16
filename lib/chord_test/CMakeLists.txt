@@ -56,6 +56,9 @@ target_link_libraries(chord_test
     lyric::lyric_build
     lyric::lyric_test
     tempo::tempo_utils
+    zuri::zuri_distributor
+    zuri::zuri_packager
+    zuri::zuri_test
     gtest::gtest
     )
 

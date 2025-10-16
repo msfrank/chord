@@ -15,6 +15,7 @@
 #include <chord_sandbox/chord_isolate.h>
 #include <chord_sandbox/remoting_client.h>
 #include <grpcpp/security/server_credentials.h>
+#include <tempo_test/tempo_test.h>
 #include <tempo_utils/file_utilities.h>
 
 
@@ -143,12 +144,10 @@ TEST_F(ClientCommunicationStream, SendAndReceiveMessage)
     auto protocolUrl = tempo_utils::Url::fromString("dev.zuri.proto:null");
     auto handler = std::make_shared<EchoHandler>();
     chord_sandbox::ClientCommunicationStream stream(stub.get(), protocolUrl, handler, false);
-    tempo_utils::Status status;
 
-    status = handler->send("hello world");
-    ASSERT_TRUE (status.isOk());
+    ASSERT_THAT (handler->send("hello world"), tempo_test::IsOk());
     auto message = handler->waitForMessage();
     ASSERT_EQ ("hello world", message);
-    handler->detach();
+    ASSERT_THAT (handler->detach(), tempo_test::IsOk());
     stub.reset();
 }

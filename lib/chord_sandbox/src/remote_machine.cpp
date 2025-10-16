@@ -3,7 +3,7 @@
 
 chord_sandbox::RemoteMachine::RemoteMachine(
     std::string_view name,
-    const lyric_common::AssemblyLocation &mainLocation,
+    const tempo_utils::Url &mainLocation,
     const tempo_utils::Url &machineUrl,
     std::shared_ptr<GrpcConnector> connector)
     : m_name(name),

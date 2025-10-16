@@ -15,16 +15,7 @@ protected:
     chord_test::SandboxTesterOptions options;
 
     void SetUp() override {
-        tempo_config::ProgramConfigOptions zuriOptions;
-        zuriOptions.distConfigDirectoryPath = ZURI_INSTALL_CONFIG_DIR;
-        zuriOptions.distVendorConfigDirectoryPath = ZURI_INSTALL_VENDOR_CONFIG_DIR;
-        zuriOptions.toolLocator = {"zuri-build"};
-        auto loadProgramResult = tempo_config::ProgramConfig::load(zuriOptions);
-        ASSERT_TRUE (loadProgramResult.isResult());
-        auto config = loadProgramResult.getResult();
         options.isTemporary = false;
-        options.buildConfig = config->getToolConfig();
-        options.buildVendorConfig = config->getVendorConfig();
     }
 };
 
@@ -69,19 +60,18 @@ TEST_F(ChordIsolate, InitializeAndShutdown)
 
     // initialize the sandbox
     chord_sandbox::ChordIsolate isolate(options);
-    auto status = isolate.initialize();
-    ASSERT_TRUE (status.isOk());
+    ASSERT_THAT (isolate.initialize(), tempo_test::IsOk());
 
     // shut down the sandbox
-    status = isolate.shutdown();
-    ASSERT_TRUE (status.isOk());
+    ASSERT_THAT (isolate.shutdown(), tempo_test::IsOk());
 }
 
 TEST_F(ChordIsolate, SpawnRemoteMachine)
 {
     auto result = chord_test::ChordSandboxTester::runSingleModuleInSandbox(R"(
-        return 42
+        42
     )", options);
 
-    ASSERT_THAT (result, tempo_test::ContainsResult(RunMachine(tempo_utils::StatusCode::kOk)));
+    ASSERT_THAT (result, tempo_test::ContainsResult(
+        RunMachine(tempo_utils::StatusCode::kOk)));
 }

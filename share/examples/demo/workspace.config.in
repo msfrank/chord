@@ -1,21 +1,23 @@
 {
-    "zuri-build": {
-        "global": {
-            "sourceBaseUrl": "file://@SOURCE_DIRECTORY@",
-            "preludeLocation": "@LYRIC_BOOTSTRAP_PRELUDE_LOCATION@",
-            "packageDirectoryPathList": [ "@ZURI_INSTALL_PACKAGES_DIR@", "@CMAKE_CURRENT_BINARY_DIR@" ],
-            "packageMap": {
-                "std": "@ZURI_STD_PACKAGE_AUTHORITY@"
+    "zuri": {
+        "build": {
+            "settings": {
+                "global": {
+                    "sourceBasePath": "src"
+                }
             }
         },
-        "tasks": {
-            "package:": {
-                "packageDomain": "examples",
-                "packageName": "demo",
-                "majorVersion": @MAJOR_VERSION@,
-                "minorVersion": @MINOR_VERSION@,
-                "patchVersion": @PATCH_VERSION@,
-                "mainLocation": "/helloworld"
+        "imports": {
+            "std@zuri.dev": {
+                "type": "Path",
+                "path": "@ZURI_INSTALL_PACKAGES_DIR@/@ZURI_STD_PACKAGE_ZPK@"
+            }
+        },
+        "targets": {
+            "demo": {
+                "type": "Program",
+                "specifier": "@CHORD_DEMO_PACKAGE_NAME@-@CHORD_DEMO_PACKAGE_VERSION@@@CHORD_EXAMPLES_PACKAGE_GROUP@",
+                "programMain": "/helloworld"
             }
         }
     }

@@ -27,7 +27,7 @@ configure(ChordLocalMachineConfig &chordLocalMachineConfig, int argc, const char
     tempo_config::StringParser supervisorNameOverrideParser(std::string{});
     tempo_config::UrlParser machineUrlParser;
     tempo_config::StringParser machineNameOverrideParser(std::string{});
-    lyric_common::ModuleLocationParser mainLocationParser;
+    tempo_config::UrlParser mainLocationParser;
 
     std::vector<tempo_command::Default> defaults = {
         {"runDirectory", {}, "run directory", "DIR"},

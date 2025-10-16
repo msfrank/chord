@@ -3,11 +3,11 @@
 
 #include <chord_local_machine/initialize_utils.h>
 #include <chord_local_machine/run_utils.h>
-#include <lyric_runtime/chain_loader.h>
-#include <lyric_packaging/package_loader.h>
 #include <lyric_bootstrap/bootstrap_loader.h>
-#include <lyric_packaging/directory_loader.h>
+#include <lyric_common/module_location.h>
+#include <lyric_runtime/chain_loader.h>
 #include <tempo_test/status_matchers.h>
+#include <zuri_distributor/package_cache_loader.h>
 
 #include "test_mocks.h"
 
@@ -18,100 +18,76 @@ using ::testing::Return;
 using ::testing::SaveArg;
 using ::testing::SaveArgPointee;
 
-TEST(InitializeUtils, MakeInterpreterStateWithNoInstallOrPackageDirectories)
+TEST(InitializeUtils, MakeInterpreterStateWithNoPackageDirectories)
 {
     ChordLocalMachineConfig chordLocalMachineConfig;
-    chordLocalMachineConfig.mainLocation = lyric_common::AssemblyLocation::fromString(EXAMPLES_DEMO_PACKAGE);
+    chordLocalMachineConfig.mainLocation = tempo_utils::Url::fromFilesystemPath(CHORD_DEMO_PACKAGE_PATH);
 
     MockComponentConstructor componentConstructor;
+    std::shared_ptr<lyric_runtime::AbstractLoader> systemLoader;
+    std::shared_ptr<lyric_runtime::AbstractLoader> applicationLoader;
     lyric_runtime::InterpreterStateOptions options;
-    lyric_common::AssemblyLocation location;
-    EXPECT_CALL (componentConstructor, createInterpreterState(_, _))
-        .WillOnce(Invoke([&](const auto& options_, const auto &location_) -> auto {
-            options = options_;
-            location = location_;
+    EXPECT_CALL (componentConstructor, createInterpreterState(_, _, _))
+        .WillOnce(Invoke([&](const auto &sys_, const auto &app_, const auto &opts_) -> auto {
+            systemLoader = sys_;
+            applicationLoader = app_;
+            options = opts_;
             return std::shared_ptr<lyric_runtime::InterpreterState>();
         }));
 
     std::shared_ptr<lyric_runtime::InterpreterState> interpreterState;
     ASSERT_TRUE (make_interpreter_state(interpreterState, componentConstructor, chordLocalMachineConfig).isOk());
 
-    auto *chainLoader = dynamic_cast<lyric_runtime::ChainLoader *>(options.loader.get());
+    ASSERT_TRUE (systemLoader != nullptr);
+
+    auto *chainLoader = dynamic_cast<lyric_runtime::ChainLoader *>(applicationLoader.get());
     ASSERT_TRUE (chainLoader != nullptr);
     ASSERT_EQ (1, chainLoader->numLoaders());
-    auto *bootstrapLoader = dynamic_cast<lyric_bootstrap::BootstrapLoader *>(chainLoader->getLoader(0).get());
-    ASSERT_TRUE (bootstrapLoader != nullptr);
+    auto appLoader1 = std::static_pointer_cast<zuri_distributor::PackageCacheLoader>(chainLoader->getLoader(0));
+    ASSERT_EQ (std::filesystem::current_path(), appLoader1->getPackageCache()->getCacheDirectory());
 
-    ASSERT_EQ (chordLocalMachineConfig.mainLocation, location);
+    ASSERT_EQ (chordLocalMachineConfig.mainLocation, options.mainLocation.toUrl());
 }
 
-TEST(InitializeUtils, MakeInterpreterStateWithInstallDirectory)
+TEST(InitializeUtils, MakeInterpreterStateWithPackageDirectory)
 {
     ChordLocalMachineConfig chordLocalMachineConfig;
-    chordLocalMachineConfig.mainLocation = lyric_common::AssemblyLocation::fromString(EXAMPLES_DEMO_PACKAGE);
-    chordLocalMachineConfig.installDirectory = "/";
+    chordLocalMachineConfig.mainLocation = tempo_utils::Url::fromFilesystemPath(CHORD_DEMO_PACKAGE_PATH);
+    std::filesystem::path packageCacheDirectory{ "/path/to/cache"};
+    chordLocalMachineConfig.packageCacheDirectories = { packageCacheDirectory };
 
     MockComponentConstructor componentConstructor;
+    std::shared_ptr<lyric_runtime::AbstractLoader> systemLoader;
+    std::shared_ptr<lyric_runtime::AbstractLoader> applicationLoader;
     lyric_runtime::InterpreterStateOptions options;
-    lyric_common::AssemblyLocation location;
-    EXPECT_CALL (componentConstructor, createInterpreterState(_, _))
-        .WillOnce(Invoke([&](const auto& options_, const auto &location_) -> auto {
-            options = options_;
-            location = location_;
+    EXPECT_CALL (componentConstructor, createInterpreterState(_, _, _))
+        .WillOnce(Invoke([&](const auto& sys_, const auto &app_, const auto &opts_) -> auto {
+            systemLoader = sys_;
+            applicationLoader = app_;
+            options = opts_;
             return std::shared_ptr<lyric_runtime::InterpreterState>();
         }));
 
     std::shared_ptr<lyric_runtime::InterpreterState> interpreterState;
     ASSERT_TRUE (make_interpreter_state(interpreterState, componentConstructor, chordLocalMachineConfig).isOk());
 
-    auto *chainLoader = dynamic_cast<lyric_runtime::ChainLoader *>(options.loader.get());
+    ASSERT_TRUE (systemLoader != nullptr);
+
+    auto *chainLoader = dynamic_cast<lyric_runtime::ChainLoader *>(applicationLoader.get());
     ASSERT_TRUE (chainLoader != nullptr);
     ASSERT_EQ (2, chainLoader->numLoaders());
-    auto *bootstrapLoader = dynamic_cast<lyric_bootstrap::BootstrapLoader *>(chainLoader->getLoader(0).get());
-    ASSERT_TRUE (bootstrapLoader != nullptr);
-    auto *directoryLoader = dynamic_cast<lyric_packaging::DirectoryLoader *>(chainLoader->getLoader(1).get());
-    ASSERT_TRUE (directoryLoader != nullptr);
+    auto appLoader0 = std::static_pointer_cast<zuri_distributor::PackageCacheLoader>(chainLoader->getLoader(0));
+    ASSERT_EQ (std::filesystem::current_path(), appLoader0->getPackageCache()->getCacheDirectory());
+    auto appLoader1 = std::static_pointer_cast<zuri_distributor::PackageCacheLoader>(chainLoader->getLoader(1));
+    ASSERT_EQ (packageCacheDirectory, appLoader1->getPackageCache()->getCacheDirectory());
 
-    ASSERT_EQ (chordLocalMachineConfig.mainLocation, location);
-}
-
-TEST(InitializeUtils, MakeInterpreterStateWithInstallAndPackageDirectories)
-{
-    ChordLocalMachineConfig chordLocalMachineConfig;
-    chordLocalMachineConfig.mainLocation = lyric_common::AssemblyLocation::fromString(EXAMPLES_DEMO_PACKAGE);
-    chordLocalMachineConfig.installDirectory = "/";
-    chordLocalMachineConfig.packageDirectories = {"/", "/usr/local"};
-
-    MockComponentConstructor componentConstructor;
-    lyric_runtime::InterpreterStateOptions options;
-    lyric_common::AssemblyLocation location;
-    EXPECT_CALL (componentConstructor, createInterpreterState(_, _))
-        .WillOnce(Invoke([&](const auto& options_, const auto &location_) -> auto {
-            options = options_;
-            location = location_;
-            return std::shared_ptr<lyric_runtime::InterpreterState>();
-        }));
-
-    std::shared_ptr<lyric_runtime::InterpreterState> interpreterState;
-    ASSERT_TRUE (make_interpreter_state(interpreterState, componentConstructor, chordLocalMachineConfig).isOk());
-
-    auto *chainLoader = dynamic_cast<lyric_runtime::ChainLoader *>(options.loader.get());
-    ASSERT_TRUE (chainLoader != nullptr);
-    ASSERT_EQ (3, chainLoader->numLoaders());
-    auto *bootstrapLoader = dynamic_cast<lyric_bootstrap::BootstrapLoader *>(chainLoader->getLoader(0).get());
-    ASSERT_TRUE (bootstrapLoader != nullptr);
-    auto *directoryLoader = dynamic_cast<lyric_packaging::DirectoryLoader *>(chainLoader->getLoader(1).get());
-    ASSERT_TRUE (directoryLoader != nullptr);
-    auto *packageLoader = dynamic_cast<lyric_packaging::PackageLoader *>(chainLoader->getLoader(2).get());
-    ASSERT_TRUE (packageLoader != nullptr);
-
-    ASSERT_EQ (chordLocalMachineConfig.mainLocation, location);
+    ASSERT_EQ (chordLocalMachineConfig.mainLocation, options.mainLocation.toUrl());
 }
 
 TEST(InitializeUtils, MakeLocalMachine)
 {
     ChordLocalMachineConfig chordLocalMachineConfig;
-    chordLocalMachineConfig.mainLocation = lyric_common::AssemblyLocation::fromString(EXAMPLES_DEMO_PACKAGE);
+    chordLocalMachineConfig.mainLocation = tempo_utils::Url::fromFilesystemPath(CHORD_DEMO_PACKAGE_PATH);
     chordLocalMachineConfig.machineUrl = tempo_utils::Url::fromString("dev.zuri.machine:xxx");
     chordLocalMachineConfig.startSuspended = true;
 

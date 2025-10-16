@@ -34,7 +34,7 @@ chord_test::SpawnMachine::SpawnMachine()
 
 chord_test::SpawnMachine::SpawnMachine(
     std::shared_ptr<lyric_test::AbstractTester> tester,
-    const lyric_common::AssemblyLocation &mainLocation,
+    const tempo_utils::Url &mainLocation,
     const chord_sandbox::MachineExit &machineExit)
     : m_tester(tester),
       m_location(mainLocation),
@@ -55,7 +55,7 @@ chord_test::SpawnMachine::getTester() const
     return m_tester;
 }
 
-lyric_common::AssemblyLocation
+tempo_utils::Url
 chord_test::SpawnMachine::getMainLocation() const
 {
     return m_location;

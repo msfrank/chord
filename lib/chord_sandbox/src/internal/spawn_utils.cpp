@@ -2,7 +2,7 @@
 #include <absl/strings/ascii.h>
 
 #include <chord_sandbox/internal/spawn_utils.h>
-#include <tempo_config/config_serde.h>
+#include <tempo_utils/process_builder.h>
 
 tempo_utils::Status
 chord_sandbox::internal::spawn_temporary_agent(
@@ -13,11 +13,8 @@ chord_sandbox::internal::spawn_temporary_agent(
     const std::filesystem::path &runDirectory,
     const std::filesystem::path &pemCertificateFile,
     const std::filesystem::path &pemPrivateKeyFile,
-    const std::filesystem::path &pemRootCABundleFile,
-    SpawnFunc spawnFunc)
+    const std::filesystem::path &pemRootCABundleFile)
 {
-    TU_ASSERT (spawnFunc != nullptr);
-
     std::string transportType;
     switch (transport) {
         case chord_protocol::TransportType::Unix:
@@ -43,10 +40,8 @@ chord_sandbox::internal::spawn_temporary_agent(
     builder.appendArg("--ca-bundle", pemRootCABundleFile.string());
     auto invoker = builder.toInvoker();
 
-    auto agentProcess = spawnFunc(invoker, runDirectory);
-    if (agentProcess == nullptr)
-        return SandboxStatus::forCondition(
-            SandboxCondition::kAgentError, "failed to spawn agent");
+    auto agentProcess = std::make_shared<tempo_utils::ProcessRunner>(invoker, runDirectory);
+    TU_RETURN_IF_NOT_OK (agentProcess->getStatus());
 
     auto agentEndpoint = agentProcess->getChildOutput();
     absl::StripAsciiWhitespace(&agentEndpoint);
@@ -62,7 +57,7 @@ chord_sandbox::internal::spawn_temporary_agent(
     params.agentServerName = agentServerName;
     params.pemRootCABundleFile = pemRootCABundleFile;
 
-    return SandboxStatus::ok();
+    return {};
 }
 
 tempo_utils::Status
@@ -70,8 +65,7 @@ chord_sandbox::internal::connect_to_specified_endpoint(
     AgentParams &params,
     const tempo_utils::Url &agentEndpoint,
     const std::string &agentServerName,
-    const std::filesystem::path &pemRootCABundleFile,
-    SpawnFunc spawnFunc)
+    const std::filesystem::path &pemRootCABundleFile)
 {
     return tempo_utils::GenericStatus::forCondition(
         tempo_utils::GenericCondition::kUnimplemented, "connect_to_specified_endpoint");
@@ -87,8 +81,7 @@ chord_sandbox::internal::spawn_temporary_agent_if_missing(
     const std::filesystem::path &runDirectory,
     const std::filesystem::path &pemCertificateFile,
     const std::filesystem::path &pemPrivateKeyFile,
-    const std::filesystem::path &pemRootCABundleFile,
-    SpawnFunc spawnFunc)
+    const std::filesystem::path &pemRootCABundleFile)
 {
     return tempo_utils::GenericStatus::forCondition(
         tempo_utils::GenericCondition::kUnimplemented, "spawn_temporary_agent_if_missing");

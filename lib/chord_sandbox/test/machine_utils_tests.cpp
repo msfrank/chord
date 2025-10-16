@@ -3,11 +3,11 @@
 
 #include <chord_invoke/invoke_service_mock.grpc.pb.h>
 #include <chord_sandbox/internal/machine_utils.h>
-#include <tempo_config/config_serde.h>
+#include <tempo_config/config_utils.h>
 #include <tempo_security/ecc_private_key_generator.h>
 #include <tempo_security/generate_utils.h>
-#include <tempo_security/x509_certificate_signing_request.h>
 #include <tempo_security/x509_store.h>
+#include <tempo_test/tempo_test.h>
 #include <tempo_utils/file_utilities.h>
 #include <tempo_utils/file_writer.h>
 #include <tempo_utils/tempdir_maker.h>
@@ -148,6 +148,5 @@ TEST(MachineUtils, RunMachineSucceeds)
     TU_ASSIGN_OR_RAISE(x509Store, tempo_security::X509Store::loadLocations(
         options, {}, caKeyPair.getPemCertificateFile()));
 
-    auto status = x509Store->verifyCertificate(certificate);
-    ASSERT_TRUE (status.isOk());
+    ASSERT_THAT (x509Store->verifyCertificate(certificate), tempo_test::IsOk());
 }

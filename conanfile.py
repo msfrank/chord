@@ -3,24 +3,33 @@ from os.path import join
 from conan import ConanFile
 from conan.tools.build import check_min_cppstd
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
-from conan.tools.files import copy
+from conan.tools.files import copy, load
 
 class Chord(ConanFile):
     name = 'chord'
-    version = '0.0.1'
-    license = 'BSD-3-Clause, AGPL-3.0-or-later'
-    url = 'https://github.com/msfrank/chord'
-    description = ''
 
     settings = 'os', 'compiler', 'build_type', 'arch'
-    options = {'shared': [True, False], 'compiler.cppstd': ['17', '20'], 'build_type': ['Debug', 'Release']}
-    default_options = {'shared': True, 'compiler.cppstd': '20', 'build_type': 'Debug'}
+    options = {
+        'runtime_distribution_root': ['ANY', None],
+        'enable_sanitizer': [True, False, None],
+        'sanitizer': ['address', 'thread', 'memory', 'ub', 'leak', None],
+        'enable_profiler': [True, False, None],
+        }
+    default_options = {
+        'runtime_distribution_root': None,
+        'enable_sanitizer': None,
+        'sanitizer': None,
+        'enable_profiler': None,
+        }
+
+    exports = ('meta/*',)
 
     exports_sources = (
         'CMakeLists.txt',
         'bin/*',
         'cmake/*',
         'lib/*',
+        'meta/*',
         'pkg/*',
         'share/*',
         )
@@ -33,16 +42,25 @@ class Chord(ConanFile):
         'absl/20250127.1@timbre',
         'boost/1.88.0@timbre',
         'curl/8.15.0@timbre',
-        'fmt/9.1.0@timbre',
-        'flatbuffers/23.5.26@timbre',
+        'fmt/12.0.0@timbre',
+        'flatbuffers/25.2.10@timbre',
         'grpc/1.74.1@timbre',
-        'gtest/1.14.0@timbre',
+        'gtest/1.17.0@timbre',
         'openssl/3.5.2@timbre',
         'protobuf/32.0@timbre',
         'rocksdb/10.4.2@timbre',
         'sqlite/3.49.2@timbre',
         'uv/1.51.0@timbre',
         )
+
+    def _get_meta(self, key):
+        return load(self, join(self.recipe_folder, "meta", key))
+
+    def set_version(self):
+        self.version = self._get_meta('version')
+        self.license = self._get_meta('license')
+        self.url = self._get_meta('url')
+        self.description = self._get_meta('description')
 
     def validate(self):
         check_min_cppstd(self, "20")
@@ -55,14 +73,21 @@ class Chord(ConanFile):
         grpc = self.dependencies['grpc'].buildenv_info.vars(self)
 
         tc = CMakeToolchain(self)
-        tc.variables['CHORD_PACKAGE_VERSION'] = self.version
-        tc.variables['PROTOBUF_PROTOC'] = protobuf.get('PROTOBUF_PROTOC')
-        tc.variables['GRPC_CPP_PLUGIN'] = grpc.get('GRPC_CPP_PLUGIN')
-        tc.generate()
+        tc.cache_variables['CHORD_PACKAGE_VERSION'] = self.version
+        tc.cache_variables['PROTOBUF_PROTOC'] = protobuf.get('PROTOBUF_PROTOC')
+        tc.cache_variables['GRPC_CPP_PLUGIN'] = grpc.get('GRPC_CPP_PLUGIN')
 
+        if self.options.runtime_distribution_root:
+            tc.cache_variables['RUNTIME_DISTRIBUTION_ROOT'] = self.options.runtime_distribution_root
+        if self.options.enable_sanitizer:
+            tc.cache_variables['ENABLE_SANITIZER'] = self.options.enable_sanitizer
+        if self.options.sanitizer:
+            tc.cache_variables['SANITIZER'] = self.options.sanitizer
+        if self.options.enable_profiler:
+            tc.cache_variables['ENABLE_PROFILER'] = self.options.enable_profiler
+
+        tc.generate()
         deps = CMakeDeps(self)
-        deps.set_property("openssl::crypto", "cmake_target_name", "OpenSSL::Crypto")
-        deps.set_property("openssl::ssl", "cmake_target_name", "OpenSSL::SSL")
         deps.generate()
 
     def build(self):

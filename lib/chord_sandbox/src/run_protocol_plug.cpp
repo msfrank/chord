@@ -52,11 +52,9 @@ chord_sandbox::RunProtocolPlug::handle(std::string_view message)
         switch (m_state) {
             case RunPlugState::STARTING:
                 m_state = RunPlugState::RUNNING;
-                status = SandboxStatus::ok();
                 break;
             case RunPlugState::STOPPING:
                 m_state = RunPlugState::STOPPED;
-                status = SandboxStatus::ok();
                 break;
             default:
                 m_state = RunPlugState::INVALID;
@@ -68,7 +66,6 @@ chord_sandbox::RunProtocolPlug::handle(std::string_view message)
     }
     else if (message == "FINISHED") {
         m_state = RunPlugState::FINISHED;
-        status = SandboxStatus::ok();
         m_cond.Signal();
     } else {
         status = SandboxStatus::forCondition(
@@ -100,7 +97,7 @@ chord_sandbox::RunProtocolPlug::detach()
         m_cb(RunPlugState::STARTING, m_data);
     }
 
-    return SandboxStatus::ok();
+    return {};
 }
 
 chord_sandbox::RunPlugState

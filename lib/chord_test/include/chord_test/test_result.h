@@ -10,7 +10,7 @@
 
 namespace chord_test {
 
-    constexpr tempo_utils::SchemaNs kChordTestStatusNs("dev.zuri.ns:chord-test-status-1");
+    constexpr const char *kChordTestStatusNs("dev.zuri.ns:chord-test-status-1");
 
     enum class TestCondition {
         kInvalidConfiguration,
@@ -21,13 +21,24 @@ namespace chord_test {
     class TestStatus : public tempo_utils::TypedStatus<TestCondition> {
     public:
         using TypedStatus::TypedStatus;
-        static TestStatus ok();
         static bool convert(TestStatus &dstStatus, const tempo_utils::Status &srcStatus);
 
     private:
         TestStatus(tempo_utils::StatusCode statusCode, std::shared_ptr<const tempo_utils::Detail> detail);
 
     public:
+        /**
+         *
+         * @param condition
+         * @param message
+         * @return
+         */
+        static TestStatus forCondition(
+            TestCondition condition,
+            std::string_view message)
+        {
+            return TestStatus(condition, message);
+        }
         /**
          *
          * @tparam Args
@@ -65,16 +76,6 @@ namespace chord_test {
             return TestStatus(condition, message, traceId, spanId);
         }
     };
-
-    class TestException : public std::exception {
-    public:
-        TestException(const TestStatus &status) noexcept;
-        TestStatus getStatus() const;
-        const char* what() const noexcept override;
-
-    private:
-        TestStatus m_status;
-    };
 }
 
 namespace tempo_utils {
@@ -91,7 +92,7 @@ namespace tempo_utils {
     template<>
     struct ConditionTraits<chord_test::TestCondition> {
         using StatusType = chord_test::TestStatus;
-        static constexpr const char *condition_namespace() { return chord_test::kChordTestStatusNs.getNs(); }
+        static constexpr const char *condition_namespace() { return chord_test::kChordTestStatusNs; }
         static constexpr StatusCode make_status_code(chord_test::TestCondition condition)
         {
             switch (condition) {

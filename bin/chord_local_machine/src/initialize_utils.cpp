@@ -19,7 +19,8 @@ make_interpreter_state(
     const ChordLocalMachineConfig &chordLocalMachineConfig)
 {
     lyric_runtime::InterpreterStateOptions interpreterOptions;
-    interpreterOptions.mainLocation = chordLocalMachineConfig.mainLocation;
+
+    interpreterOptions.mainLocation = lyric_common::ModuleLocation::fromUrl(chordLocalMachineConfig.mainLocation);
 
     auto systemLoader = std::make_shared<lyric_bootstrap::BootstrapLoader>();
 

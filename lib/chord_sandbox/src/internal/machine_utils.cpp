@@ -3,7 +3,7 @@
 
 #include <chord_invoke/invoke_service.grpc.pb.h>
 #include <chord_sandbox/internal/machine_utils.h>
-#include <tempo_config/config_serde.h>
+#include <tempo_config/config_utils.h>
 #include <tempo_security/certificate_key_pair.h>
 #include <tempo_security/x509_certificate_signing_request.h>
 

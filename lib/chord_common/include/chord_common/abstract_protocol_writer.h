@@ -1,5 +1,5 @@
-#ifndef chord_common_ABSTRACT_PROTOCOL_WRITER_H
-#define chord_common_ABSTRACT_PROTOCOL_WRITER_H
+#ifndef CHORD_COMMON_ABSTRACT_PROTOCOL_WRITER_H
+#define CHORD_COMMON_ABSTRACT_PROTOCOL_WRITER_H
 
 #include <absl/strings/string_view.h>
 
@@ -15,4 +15,4 @@ namespace chord_common {
     };
 }
 
-#endif // chord_common_ABSTRACT_PROTOCOL_WRITER_H
+#endif // CHORD_COMMON_ABSTRACT_PROTOCOL_WRITER_H

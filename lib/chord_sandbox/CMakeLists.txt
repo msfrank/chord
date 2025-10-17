@@ -65,6 +65,7 @@ target_link_libraries(chord_sandbox
     chord::chord_invoke
     chord::chord_common
     chord::chord_remoting
+    chord::chord_tooling
     lyric::lyric_common
     tempo::tempo_security
     tempo::tempo_utils

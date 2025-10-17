@@ -5,7 +5,7 @@
 
 #include <chord_agent/agent_service.h>
 #include <chord_agent/machine_supervisor.h>
-#include <chord_common/protocol_types.h>
+#include <chord_common/transport_location.h>
 #include <tempo_command/command_help.h>
 #include <tempo_command/command_parser.h>
 #include <tempo_config/base_conversions.h>
@@ -61,7 +61,7 @@ run_chord_agent(int argc, const char *argv[])
     tempo_config::StringParser listenEndpointParser(std::string{});
     tempo_config::EnumTParser<chord_common::TransportType> listenTransportParser({
         {"unix", chord_common::TransportType::Unix},
-        {"tcp", chord_common::TransportType::Tcp},
+        {"tcp", chord_common::TransportType::Tcp4},
     }, chord_common::TransportType::Unix);
     tempo_config::PathParser processRunDirectoryParser(std::filesystem::current_path());
     tempo_config::PathParser localMachineExecutableParser(std::filesystem::path(CHORD_LOCAL_MACHINE_EXECUTABLE));
@@ -261,7 +261,7 @@ run_chord_agent(int argc, const char *argv[])
             }
             break;
         }
-        case chord_common::TransportType::Tcp: {
+        case chord_common::TransportType::Tcp4: {
             if (listenEndpoint.empty()) {
                 listenerUrl = "dns:localhost";
             } else {

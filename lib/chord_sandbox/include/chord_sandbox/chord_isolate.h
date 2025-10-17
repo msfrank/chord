@@ -7,6 +7,7 @@
 #include <grpcpp/channel.h>
 
 #include <chord_common/protocol_types.h>
+#include <chord_common/transport_location.h>
 #include <chord_sandbox/remote_machine.h>
 #include <chord_sandbox/sandbox_result.h>
 #include <chord_sandbox/sandbox_types.h>

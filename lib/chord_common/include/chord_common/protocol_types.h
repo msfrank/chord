@@ -1,14 +1,9 @@
-#ifndef chord_common_PROTOCOL_TYPES_H
-#define chord_common_PROTOCOL_TYPES_H
+#ifndef CHORD_COMMON_PROTOCOL_TYPES_H
+#define CHORD_COMMON_PROTOCOL_TYPES_H
 
 #include <tempo_utils/url.h>
 
 namespace chord_common {
-
-    enum class TransportType {
-        Unix,
-        Tcp,
-    };
 
     enum class PortType {
         Invalid,
@@ -53,4 +48,4 @@ namespace chord_common {
     };
 }
 
-#endif // chord_common_PROTOCOL_TYPES_H
+#endif // CHORD_COMMON_PROTOCOL_TYPES_H

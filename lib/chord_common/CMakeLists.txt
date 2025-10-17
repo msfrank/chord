@@ -6,15 +6,17 @@ set(CMAKE_AUTOMOC OFF)
 add_library(chord_common SHARED)
 add_library(chord::chord_common ALIAS chord_common)
 
-set(chord_common_INCLUDES
+set(CHORD_COMMON_INCLUDES
     include/chord_common/abstract_protocol_handler.h
     include/chord_common/abstract_protocol_writer.h
     include/chord_common/protocol_types.h
+    include/chord_common/transport_location.h
     )
-set_target_properties(chord_common PROPERTIES PUBLIC_HEADER "${chord_common_INCLUDES}")
+set_target_properties(chord_common PROPERTIES PUBLIC_HEADER "${CHORD_COMMON_INCLUDES}")
 
 target_sources(chord_common PRIVATE
     src/protocol_types.cpp
+    src/transport_location.cpp
     )
 
 # set the library version

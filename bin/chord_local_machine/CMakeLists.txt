@@ -35,7 +35,7 @@ target_include_directories(ChordLocalMachineRuntime PUBLIC
 
 target_link_libraries(ChordLocalMachineRuntime PUBLIC
     chord::chord_invoke
-    chord::chord_protocol
+    chord::chord_common
     chord::chord_remoting
     lyric::lyric_bootstrap
     lyric::lyric_runtime

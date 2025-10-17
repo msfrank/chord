@@ -16,7 +16,7 @@ PortSocket::isAttached()
 }
 
 tempo_utils::Status
-PortSocket::attach(chord_protocol::AbstractProtocolWriter *writer)
+PortSocket::attach(chord_common::AbstractProtocolWriter *writer)
 {
     m_writer = writer;
     auto status = m_port->attach(this);

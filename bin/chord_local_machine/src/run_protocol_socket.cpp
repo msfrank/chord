@@ -24,7 +24,7 @@
 //}
 //
 //tempo_utils::Status
-//RunProtocolSocket::attach(chord_protocol::AbstractProtocolWriter *writer)
+//RunProtocolSocket::attach(chord_common::AbstractProtocolWriter *writer)
 //{
 //    m_writer = writer;
 //    m_state = RunSocketState::READY;

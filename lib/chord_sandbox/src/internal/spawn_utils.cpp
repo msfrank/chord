@@ -69,7 +69,7 @@ chord_sandbox::internal::spawn_temporary_agent_if_missing(
     AgentParams &params,
     const tempo_utils::Url &agentEndpoint,
     const std::filesystem::path &agentPath,
-    chord_protocol::TransportType transport,
+    chord_common::TransportType transport,
     const std::string &agentServerName,
     const std::filesystem::path &runDirectory,
     const std::filesystem::path &pemCertificateFile,

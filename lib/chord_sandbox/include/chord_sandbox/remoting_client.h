@@ -1,8 +1,8 @@
 #ifndef CHORD_SANDBOX_REMOTING_CLIENT_H
 #define CHORD_SANDBOX_REMOTING_CLIENT_H
 
-#include <chord_protocol/abstract_protocol_handler.h>
-#include <chord_protocol/abstract_protocol_writer.h>
+#include <chord_common/abstract_protocol_handler.h>
+#include <chord_common/abstract_protocol_writer.h>
 #include <chord_remoting/remoting_service.grpc.pb.h>
 #include <tempo_utils/url.h>
 
@@ -14,13 +14,13 @@ namespace chord_sandbox {
         : public grpc::ClientBidiReactor<
             chord_remoting::Message,
             chord_remoting::Message>,
-          public chord_protocol::AbstractProtocolWriter
+          public chord_common::AbstractProtocolWriter
     {
     public:
         ClientCommunicationStream(
             chord_remoting::RemotingService::StubInterface *stub,
             const tempo_utils::Url &protocolUrl,
-            std::shared_ptr<chord_protocol::AbstractProtocolHandler> handler,
+            std::shared_ptr<chord_common::AbstractProtocolHandler> handler,
             bool freeWhenDone);
         ~ClientCommunicationStream() override;
 
@@ -37,7 +37,7 @@ namespace chord_sandbox {
 
     private:
         tempo_utils::Url m_protocolUrl;
-        std::shared_ptr<chord_protocol::AbstractProtocolHandler> m_handler;
+        std::shared_ptr<chord_common::AbstractProtocolHandler> m_handler;
         bool m_freeWhenDone;
         grpc::ClientContext m_context;
         chord_remoting::Message m_incoming;
@@ -53,7 +53,7 @@ namespace chord_sandbox {
         RemotingClient(
             const tempo_utils::Url &endpointUrl,
             const tempo_utils::Url &protocolUrl,
-            std::shared_ptr<chord_protocol::AbstractProtocolHandler> handler,
+            std::shared_ptr<chord_common::AbstractProtocolHandler> handler,
             std::shared_ptr<grpc::ChannelCredentials> credentials,
             const std::string &endpointServerName);
 
@@ -63,7 +63,7 @@ namespace chord_sandbox {
     private:
         tempo_utils::Url m_endpointUrl;
         tempo_utils::Url m_protocolUrl;
-        std::shared_ptr<chord_protocol::AbstractProtocolHandler> m_handler;
+        std::shared_ptr<chord_common::AbstractProtocolHandler> m_handler;
         std::shared_ptr<grpc::ChannelCredentials> m_credentials;
         std::string m_endpointServerName;
         std::shared_ptr<grpc::Channel> m_channel;

@@ -19,7 +19,7 @@ chord_sandbox::RunProtocolPlug::isAttached()
 }
 
 tempo_utils::Status
-chord_sandbox::RunProtocolPlug::attach(chord_protocol::AbstractProtocolWriter *writer)
+chord_sandbox::RunProtocolPlug::attach(chord_common::AbstractProtocolWriter *writer)
 {
     m_lock.Lock();
     m_writer = writer;

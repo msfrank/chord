@@ -221,7 +221,7 @@ public:
         tempo_utils::Status,
         registerProtocolHandler, (
             const tempo_utils::Url &protocolUrl,
-            std::shared_ptr<chord_protocol::AbstractProtocolHandler> handler,
+            std::shared_ptr<chord_common::AbstractProtocolHandler> handler,
             bool requiredAtLaunch),
         (override));
 
@@ -232,7 +232,7 @@ public:
         (override));
 
     MOCK_METHOD (
-        std::shared_ptr<chord_protocol::AbstractProtocolHandler>,
+        std::shared_ptr<chord_common::AbstractProtocolHandler>,
         getProtocolHandler, (
             const tempo_utils::Url &protocolUrl),
         (override));

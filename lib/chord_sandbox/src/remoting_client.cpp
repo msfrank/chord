@@ -6,7 +6,7 @@
 chord_sandbox::RemotingClient::RemotingClient(
     const tempo_utils::Url &endpointUrl,
     const tempo_utils::Url &protocolUrl,
-    std::shared_ptr<chord_protocol::AbstractProtocolHandler> handler,
+    std::shared_ptr<chord_common::AbstractProtocolHandler> handler,
     std::shared_ptr<grpc::ChannelCredentials> credentials,
     const std::string &endpointServerName)
     : m_endpointUrl(endpointUrl),
@@ -60,7 +60,7 @@ chord_sandbox::RemotingClient::shutdown()
 chord_sandbox::ClientCommunicationStream::ClientCommunicationStream(
     chord_remoting::RemotingService::StubInterface *stub,
     const tempo_utils::Url &protocolUrl,
-    std::shared_ptr<chord_protocol::AbstractProtocolHandler> handler,
+    std::shared_ptr<chord_common::AbstractProtocolHandler> handler,
     bool freeWhenDone)
     : m_protocolUrl(protocolUrl),
       m_handler(handler),

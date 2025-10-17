@@ -34,7 +34,7 @@ namespace chord_sandbox::internal {
         std::string_view name,
         const tempo_utils::Url &executionUrl,
         const tempo_config::ConfigMap &configMap,
-        const absl::flat_hash_set<chord_protocol::RequestedPort> &requestedPorts,
+        const absl::flat_hash_set<chord_common::RequestedPort> &requestedPorts,
         bool startSuspended);
 
     tempo_utils::Result<RunMachineResult> run_machine(

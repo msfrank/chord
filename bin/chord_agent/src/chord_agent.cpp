@@ -5,7 +5,7 @@
 
 #include <chord_agent/agent_service.h>
 #include <chord_agent/machine_supervisor.h>
-#include <chord_protocol/protocol_types.h>
+#include <chord_common/protocol_types.h>
 #include <tempo_command/command_help.h>
 #include <tempo_command/command_parser.h>
 #include <tempo_config/base_conversions.h>
@@ -59,10 +59,10 @@ run_chord_agent(int argc, const char *argv[])
 
     tempo_config::StringParser agentNameParser;
     tempo_config::StringParser listenEndpointParser(std::string{});
-    tempo_config::EnumTParser<chord_protocol::TransportType> listenTransportParser({
-        {"unix", chord_protocol::TransportType::Unix},
-        {"tcp", chord_protocol::TransportType::Tcp},
-    }, chord_protocol::TransportType::Unix);
+    tempo_config::EnumTParser<chord_common::TransportType> listenTransportParser({
+        {"unix", chord_common::TransportType::Unix},
+        {"tcp", chord_common::TransportType::Tcp},
+    }, chord_common::TransportType::Unix);
     tempo_config::PathParser processRunDirectoryParser(std::filesystem::current_path());
     tempo_config::PathParser localMachineExecutableParser(std::filesystem::path(CHORD_LOCAL_MACHINE_EXECUTABLE));
     tempo_config::PathParser pemCertificateFileParser(std::filesystem::path{});
@@ -177,7 +177,7 @@ run_chord_agent(int argc, const char *argv[])
         commandConfig, "listenEndpoint"));
 
     // determin the listen transport
-    chord_protocol::TransportType listenTransport;
+    chord_common::TransportType listenTransport;
     TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(listenTransport, listenTransportParser,
         commandConfig, "listenTransport"));
 
@@ -252,7 +252,7 @@ run_chord_agent(int argc, const char *argv[])
     // construct the listener url
     std::string listenerUrl;
     switch (listenTransport) {
-        case chord_protocol::TransportType::Unix: {
+        case chord_common::TransportType::Unix: {
             if (listenEndpoint.empty()) {
                 auto path = std::filesystem::absolute(processRunDirectory / "agent.sock");
                 listenerUrl = absl::StrCat("unix:", path.string());
@@ -261,7 +261,7 @@ run_chord_agent(int argc, const char *argv[])
             }
             break;
         }
-        case chord_protocol::TransportType::Tcp: {
+        case chord_common::TransportType::Tcp: {
             if (listenEndpoint.empty()) {
                 listenerUrl = "dns:localhost";
             } else {

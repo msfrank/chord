@@ -1,9 +1,9 @@
-#ifndef CHORD_PROTOCOL_ABSTRACT_PROTOCOL_HANDLER_H
-#define CHORD_PROTOCOL_ABSTRACT_PROTOCOL_HANDLER_H
+#ifndef chord_common_ABSTRACT_PROTOCOL_HANDLER_H
+#define chord_common_ABSTRACT_PROTOCOL_HANDLER_H
 
 #include "abstract_protocol_writer.h"
 
-namespace chord_protocol {
+namespace chord_common {
 
     class AbstractProtocolHandler {
 
@@ -18,4 +18,4 @@ namespace chord_protocol {
     };
 }
 
-#endif // CHORD_PROTOCOL_ABSTRACT_PROTOCOL_HANDLER_H
+#endif // chord_common_ABSTRACT_PROTOCOL_HANDLER_H

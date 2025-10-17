@@ -30,7 +30,7 @@ chord_sandbox::GrpcConnector::getMonitor() const
 tempo_utils::Status
 chord_sandbox::GrpcConnector::registerProtocolHandler(
     const tempo_utils::Url &protocolUrl,
-    std::shared_ptr<chord_protocol::AbstractProtocolHandler> handler,
+    std::shared_ptr<chord_common::AbstractProtocolHandler> handler,
     const tempo_utils::Url &endpointUrl,
     const std::filesystem::path &pemRootCABundleFile,
     const std::string &endpointServerName)

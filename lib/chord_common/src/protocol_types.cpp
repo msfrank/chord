@@ -1,13 +1,13 @@
 
-#include <chord_protocol/protocol_types.h>
+#include <chord_common/protocol_types.h>
 
-chord_protocol::RequestedPort::RequestedPort()
+chord_common::RequestedPort::RequestedPort()
     : m_type(PortType::Invalid),
       m_direction(PortDirection::Invalid)
 {
 }
 
-chord_protocol::RequestedPort::RequestedPort(
+chord_common::RequestedPort::RequestedPort(
     const tempo_utils::Url &portUrl,
     PortType portType,
     PortDirection portDirection)
@@ -20,7 +20,7 @@ chord_protocol::RequestedPort::RequestedPort(
     TU_ASSERT (m_direction != PortDirection::Invalid);
 }
 
-chord_protocol::RequestedPort::RequestedPort(const RequestedPort &other)
+chord_common::RequestedPort::RequestedPort(const RequestedPort &other)
     : m_url(other.m_url),
       m_type(other.m_type),
       m_direction(other.m_direction)
@@ -28,31 +28,31 @@ chord_protocol::RequestedPort::RequestedPort(const RequestedPort &other)
 }
 
 tempo_utils::Url
-chord_protocol::RequestedPort::getUrl() const
+chord_common::RequestedPort::getUrl() const
 {
     return m_url;
 }
 
-chord_protocol::PortType
-chord_protocol::RequestedPort::getType() const
+chord_common::PortType
+chord_common::RequestedPort::getType() const
 {
     return m_type;
 }
 
-chord_protocol::PortDirection
-chord_protocol::RequestedPort::getDirection() const
+chord_common::PortDirection
+chord_common::RequestedPort::getDirection() const
 {
     return m_direction;
 }
 
 bool
-chord_protocol::RequestedPort::operator==(const RequestedPort &other) const
+chord_common::RequestedPort::operator==(const RequestedPort &other) const
 {
     return m_url == other.m_url && m_type == other.m_type && m_direction == other.m_direction;
 }
 
 bool
-chord_protocol::RequestedPort::operator!=(const RequestedPort &other) const
+chord_common::RequestedPort::operator!=(const RequestedPort &other) const
 {
     return !(*this == other);
 }

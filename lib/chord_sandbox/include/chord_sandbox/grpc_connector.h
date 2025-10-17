@@ -6,7 +6,7 @@
 #include <google/protobuf/message.h>
 #include <grpcpp/security/credentials.h>
 
-#include <chord_protocol/abstract_protocol_handler.h>
+#include <chord_common/abstract_protocol_handler.h>
 #include <chord_sandbox/sandbox_result.h>
 #include <lyric_common/runtime_policy.h>
 #include <tempo_utils/url.h>
@@ -33,7 +33,7 @@ namespace chord_sandbox {
 
         tempo_utils::Status registerProtocolHandler(
             const tempo_utils::Url &protocolUrl,
-            std::shared_ptr<chord_protocol::AbstractProtocolHandler> handler,
+            std::shared_ptr<chord_common::AbstractProtocolHandler> handler,
             const tempo_utils::Url &endpointUrl,
             const std::filesystem::path &pemRootCABundleFile,
             const std::string &endpointServerName);

@@ -120,7 +120,7 @@ RemotingService::Monitor(
 tempo_utils::Status
 RemotingService::registerProtocolHandler(
     const tempo_utils::Url &protocolUrl,
-    std::shared_ptr<chord_protocol::AbstractProtocolHandler> handler,
+    std::shared_ptr<chord_common::AbstractProtocolHandler> handler,
     bool requiredAtLaunch)
 {
     absl::MutexLock locker(&m_lock);
@@ -145,7 +145,7 @@ RemotingService::hasProtocolHandler(const tempo_utils::Url &protocolUrl)
     return m_handlers.contains(protocolUrl);
 }
 
-std::shared_ptr<chord_protocol::AbstractProtocolHandler>
+std::shared_ptr<chord_common::AbstractProtocolHandler>
 RemotingService::getProtocolHandler(const tempo_utils::Url &protocolUrl)
 {
     absl::MutexLock locker(&m_lock);
@@ -354,7 +354,7 @@ CommunicateStream::write(std::string_view message)
 }
 
 tempo_utils::Status
-CommunicateStream::attachHandler(std::shared_ptr<chord_protocol::AbstractProtocolHandler> handler)
+CommunicateStream::attachHandler(std::shared_ptr<chord_common::AbstractProtocolHandler> handler)
 {
     TU_ASSERT (!m_handler);
     m_handler = handler;

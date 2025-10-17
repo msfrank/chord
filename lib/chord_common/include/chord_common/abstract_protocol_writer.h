@@ -1,11 +1,11 @@
-#ifndef CHORD_PROTOCOL_ABSTRACT_PROTOCOL_WRITER_H
-#define CHORD_PROTOCOL_ABSTRACT_PROTOCOL_WRITER_H
+#ifndef chord_common_ABSTRACT_PROTOCOL_WRITER_H
+#define chord_common_ABSTRACT_PROTOCOL_WRITER_H
 
 #include <absl/strings/string_view.h>
 
 #include <tempo_utils/status.h>
 
-namespace chord_protocol {
+namespace chord_common {
 
     class AbstractProtocolWriter {
     public:
@@ -15,4 +15,4 @@ namespace chord_protocol {
     };
 }
 
-#endif // CHORD_PROTOCOL_ABSTRACT_PROTOCOL_WRITER_H
+#endif // chord_common_ABSTRACT_PROTOCOL_WRITER_H

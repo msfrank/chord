@@ -28,9 +28,9 @@ TEST(MachineUtils, CreateMachineSucceeds)
     });
 
     auto portUrl = tempo_utils::Url::fromString("dev.zuri.proto:null");
-    chord_protocol::RequestedPort port(portUrl, chord_protocol::PortType::Streaming,
-        chord_protocol::PortDirection::BiDirectional);
-    absl::flat_hash_set<chord_protocol::RequestedPort> requestedPorts = {port};
+    chord_common::RequestedPort port(portUrl, chord_common::PortType::Streaming,
+        chord_common::PortDirection::BiDirectional);
+    absl::flat_hash_set<chord_common::RequestedPort> requestedPorts = {port};
 
     chord_invoke::MockInvokeServiceStub stub;
     chord_invoke::CreateMachineRequest createMachineRequest;

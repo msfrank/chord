@@ -6,7 +6,7 @@
 #include <grpcpp/grpcpp.h>
 #include <uv.h>
 
-#include <chord_protocol/abstract_protocol_handler.h>
+#include <chord_common/abstract_protocol_handler.h>
 #include <lyric_common/runtime_policy.h>
 #include <tempo_security/certificate_key_pair.h>
 #include <tempo_utils/url.h>

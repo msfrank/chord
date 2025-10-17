@@ -108,7 +108,7 @@ chord_test::ChordSandboxTester::spawnProgramInSandbox(const tempo_utils::Url &ma
     // construct the sandbox
     chord_sandbox::SandboxOptions options;
     options.discoveryPolicy = chord_sandbox::AgentDiscoveryPolicy::ALWAYS_SPAWN;
-    options.endpointTransport = chord_protocol::TransportType::Unix;
+    options.endpointTransport = chord_common::TransportType::Unix;
     options.agentPath = std::filesystem::path(CHORD_AGENT_EXECUTABLE);
     options.runDirectory = m_runner->getTesterDirectory();
     options.caKeyPair = m_caKeyPair;
@@ -255,7 +255,7 @@ chord_test::ChordSandboxTester::runModuleInSandbox(
     // construct the sandbox
     chord_sandbox::SandboxOptions options;
     options.discoveryPolicy = chord_sandbox::AgentDiscoveryPolicy::ALWAYS_SPAWN;
-    options.endpointTransport = chord_protocol::TransportType::Unix;
+    options.endpointTransport = chord_common::TransportType::Unix;
     options.agentPath = std::filesystem::path(CHORD_AGENT_EXECUTABLE);
     options.runDirectory = m_runner->getTesterDirectory();
     options.caKeyPair = m_caKeyPair;

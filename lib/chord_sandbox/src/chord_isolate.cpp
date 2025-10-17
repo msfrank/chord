@@ -127,8 +127,8 @@ chord_sandbox::ChordIsolate::spawn(
     TU_ASSERT (!name.empty());
     TU_ASSERT (mainLocation.isValid());
 
-    absl::flat_hash_set<chord_protocol::RequestedPort> requestedPortsSet;
-    absl::flat_hash_map<tempo_utils::Url,std::shared_ptr<chord_protocol::AbstractProtocolHandler>> plugHandlersMap;
+    absl::flat_hash_set<chord_common::RequestedPort> requestedPortsSet;
+    absl::flat_hash_map<tempo_utils::Url,std::shared_ptr<chord_common::AbstractProtocolHandler>> plugHandlersMap;
 
     // extract requested port and plug handler from plugs list
     for (const auto &plug : plugs) {

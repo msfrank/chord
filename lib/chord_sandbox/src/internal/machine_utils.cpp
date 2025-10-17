@@ -13,7 +13,7 @@ chord_sandbox::internal::create_machine(
     std::string_view name,
     const tempo_utils::Url &executionUrl,
     const tempo_config::ConfigMap &configMap,
-    const absl::flat_hash_set<chord_protocol::RequestedPort> &requestedPorts,
+    const absl::flat_hash_set<chord_common::RequestedPort> &requestedPorts,
     bool startSuspended)
 {
     grpc::ClientContext createMachineContext;
@@ -36,10 +36,10 @@ chord_sandbox::internal::create_machine(
         auto *requestedPortPtr = createMachineRequest.add_requested_ports();
         requestedPortPtr->set_protocol_url(protocolUrl.toString());
         switch (requestedPort.getType()) {
-            case chord_protocol::PortType::OneShot:
+            case chord_common::PortType::OneShot:
                 requestedPortPtr->set_port_type(chord_invoke::OneShot);
                 break;
-            case chord_protocol::PortType::Streaming:
+            case chord_common::PortType::Streaming:
                 requestedPortPtr->set_port_type(chord_invoke::Streaming);
                 break;
             default:
@@ -47,13 +47,13 @@ chord_sandbox::internal::create_machine(
                     SandboxCondition::kInvalidConfiguration, "invalid port type");
         }
         switch (requestedPort.getDirection()) {
-            case chord_protocol::PortDirection::Client:
+            case chord_common::PortDirection::Client:
                 requestedPortPtr->set_port_direction(chord_invoke::Client);
                 break;
-            case chord_protocol::PortDirection::Server:
+            case chord_common::PortDirection::Server:
                 requestedPortPtr->set_port_direction(chord_invoke::Server);
                 break;
-            case chord_protocol::PortDirection::BiDirectional:
+            case chord_common::PortDirection::BiDirectional:
                 requestedPortPtr->set_port_direction(chord_invoke::BiDirectional);
                 break;
             default:

@@ -5,7 +5,7 @@
 
 #include <absl/container/flat_hash_map.h>
 
-#include <chord_protocol/abstract_protocol_handler.h>
+#include <chord_common/abstract_protocol_handler.h>
 #include <chord_sandbox/chord_isolate.h>
 #include <chord_sandbox/run_protocol_plug.h>
 #include <lyric_build/lyric_builder.h>

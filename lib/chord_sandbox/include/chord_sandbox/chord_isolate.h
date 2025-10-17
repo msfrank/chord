@@ -6,7 +6,7 @@
 
 #include <grpcpp/channel.h>
 
-#include <chord_protocol/protocol_types.h>
+#include <chord_common/protocol_types.h>
 #include <chord_sandbox/remote_machine.h>
 #include <chord_sandbox/sandbox_result.h>
 #include <chord_sandbox/sandbox_types.h>
@@ -29,7 +29,7 @@ namespace chord_sandbox {
     struct SandboxOptions {
         AgentDiscoveryPolicy discoveryPolicy;
         tempo_utils::Url agentEndpoint;
-        chord_protocol::TransportType endpointTransport;
+        chord_common::TransportType endpointTransport;
         std::string agentServerName;
         std::filesystem::path agentPath;
         std::filesystem::path runDirectory;
@@ -40,8 +40,8 @@ namespace chord_sandbox {
     };
 
     struct RequestedPortAndHandler {
-        chord_protocol::RequestedPort requestedPort;
-        std::shared_ptr<chord_protocol::AbstractProtocolHandler> handler;
+        chord_common::RequestedPort requestedPort;
+        std::shared_ptr<chord_common::AbstractProtocolHandler> handler;
     };
 
     /**

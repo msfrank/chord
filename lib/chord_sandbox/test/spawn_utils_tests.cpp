@@ -8,7 +8,7 @@ TEST(SpawnUtils, SpawnTemporaryAgent)
     // chord_sandbox::internal::AgentParams agentParams;
     //
     // std::filesystem::path agentPath("agentPath");
-    // chord_protocol::TransportType transport = chord_protocol::TransportType::Unix;
+    // chord_common::TransportType transport = chord_common::TransportType::Unix;
     // std::string agentServerName("servername");
     // std::filesystem::path runDirectory("runDirectory");
     // std::filesystem::path pemCertificateFile("pemCertificateFile");

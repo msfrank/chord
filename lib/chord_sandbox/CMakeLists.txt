@@ -63,7 +63,7 @@ set_target_properties(chord_sandbox PROPERTIES
 target_link_libraries(chord_sandbox
     PUBLIC
     chord::chord_invoke
-    chord::chord_protocol
+    chord::chord_common
     chord::chord_remoting
     lyric::lyric_common
     tempo::tempo_security

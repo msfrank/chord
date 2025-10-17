@@ -7,8 +7,8 @@
 #include <absl/container/flat_hash_set.h>
 #include <uv.h>
 
-#include <chord_protocol/abstract_protocol_handler.h>
-#include <chord_protocol/abstract_protocol_writer.h>
+#include <chord_common/abstract_protocol_handler.h>
+#include <chord_common/abstract_protocol_writer.h>
 #include <chord_remoting/remoting_service.grpc.pb.h>
 #include <tempo_utils/url.h>
 
@@ -55,10 +55,10 @@ public:
 
     virtual tempo_utils::Status registerProtocolHandler(
         const tempo_utils::Url &protocolUrl,
-        std::shared_ptr<chord_protocol::AbstractProtocolHandler> handler,
+        std::shared_ptr<chord_common::AbstractProtocolHandler> handler,
         bool requiredAtLaunch);
     virtual bool hasProtocolHandler(const tempo_utils::Url &protocolUrl);
-    virtual std::shared_ptr<chord_protocol::AbstractProtocolHandler> getProtocolHandler(
+    virtual std::shared_ptr<chord_common::AbstractProtocolHandler> getProtocolHandler(
         const tempo_utils::Url &protocolUrl);
 
     virtual void notifyMachineStateChanged(chord_remoting::MachineState currState);
@@ -70,7 +70,7 @@ private:
     absl::Mutex m_lock;
     absl::flat_hash_map<
         tempo_utils::Url,
-        std::shared_ptr<chord_protocol::AbstractProtocolHandler>> m_handlers ABSL_GUARDED_BY(m_lock);
+        std::shared_ptr<chord_common::AbstractProtocolHandler>> m_handlers ABSL_GUARDED_BY(m_lock);
     absl::flat_hash_set<tempo_utils::Url> m_requiredAtLaunch ABSL_GUARDED_BY(m_lock);
     absl::flat_hash_map<tempo_utils::Url,CommunicateStream *> m_communicateStreams ABSL_GUARDED_BY(m_lock);
     absl::flat_hash_set<MonitorStream *> m_monitorStreams ABSL_GUARDED_BY(m_lock);
@@ -92,7 +92,7 @@ class CommunicateStream
     : public grpc::ServerBidiReactor<
         chord_remoting::Message,
         chord_remoting::Message>,
-      public chord_protocol::AbstractProtocolWriter
+      public chord_common::AbstractProtocolWriter
 {
 public:
     CommunicateStream(const tempo_utils::Url &protocolUrl, RemotingService *remotingService);
@@ -104,7 +104,7 @@ public:
     void OnDone() override;
     tempo_utils::Status write(std::string_view message) override;
 
-    tempo_utils::Status attachHandler(std::shared_ptr<chord_protocol::AbstractProtocolHandler> handler);
+    tempo_utils::Status attachHandler(std::shared_ptr<chord_common::AbstractProtocolHandler> handler);
 
     struct PendingWrite {
         chord_remoting::Message message;
@@ -113,7 +113,7 @@ public:
 
 private:
     tempo_utils::Url m_protcolUrl;
-    std::shared_ptr<chord_protocol::AbstractProtocolHandler> m_handler;
+    std::shared_ptr<chord_common::AbstractProtocolHandler> m_handler;
     chord_remoting::Message m_incoming;
     absl::Mutex m_lock;
     RemotingService *m_remotingService;

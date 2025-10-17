@@ -19,18 +19,18 @@
 #include <tempo_utils/file_utilities.h>
 
 
-class EchoHandler : public chord_protocol::AbstractProtocolHandler {
+class EchoHandler : public chord_common::AbstractProtocolHandler {
 public:
     EchoHandler() = default;
     bool isAttached() override;
-    tempo_utils::Status attach(chord_protocol::AbstractProtocolWriter *writer) override;
+    tempo_utils::Status attach(chord_common::AbstractProtocolWriter *writer) override;
     tempo_utils::Status send(std::string_view message) override;
     tempo_utils::Status handle(std::string_view message) override;
     tempo_utils::Status detach() override;
     std::string waitForMessage();
 
 private:
-    chord_protocol::AbstractProtocolWriter *m_writer = nullptr;
+    chord_common::AbstractProtocolWriter *m_writer = nullptr;
     std::string m_incoming;
     absl::Notification m_notification;
 };
@@ -42,7 +42,7 @@ EchoHandler::isAttached()
 }
 
 tempo_utils::Status
-EchoHandler::attach(chord_protocol::AbstractProtocolWriter *writer)
+EchoHandler::attach(chord_common::AbstractProtocolWriter *writer)
 {
     TU_ASSERT (m_writer == nullptr);
     m_writer = writer;

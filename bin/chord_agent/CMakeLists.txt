@@ -27,7 +27,7 @@ endif()
 
 target_link_libraries(ChordAgentRuntime PUBLIC
     chord::chord_invoke
-    chord::chord_protocol
+    chord::chord_common
     chord::chord_remoting
     lyric::lyric_runtime
     tempo::tempo_command

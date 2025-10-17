@@ -16,7 +16,7 @@ target_include_directories(ChordHttpServerRuntime PUBLIC
     )
 
 target_link_libraries(ChordHttpServerRuntime PUBLIC
-    chord::chord_protocol
+    chord::chord_common
     tempo::tempo_command
     tempo::tempo_utils
     zuri::zuri_packager

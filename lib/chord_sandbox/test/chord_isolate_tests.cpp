@@ -50,7 +50,7 @@ TEST_F(ChordIsolate, InitializeAndShutdown)
     // construct the sandbox
     chord_sandbox::SandboxOptions options;
     options.discoveryPolicy = chord_sandbox::AgentDiscoveryPolicy::ALWAYS_SPAWN;
-    options.endpointTransport = chord_protocol::TransportType::Unix;
+    options.endpointTransport = chord_common::TransportType::Unix;
     options.agentPath = std::filesystem::path(CHORD_AGENT_EXECUTABLE);
     options.runDirectory = testerDirectory;
     options.idleTimeout = absl::Seconds(15);

@@ -6,8 +6,9 @@
 
 namespace chord_run {
     tempo_utils::Status run_package_command(
-        const tempo_utils::Url &agentEndpoint,
-        const std::string &agentServerName,
+        std::shared_ptr<chord_tooling::ChordConfig> chordConfig,
+        const std::string &sessionIsolate,
+        const std::string &sessionName,
         const std::filesystem::path &pemRootCABundleFile,
         const zuri_packager::PackageSpecifier &packageSpecifier,
         const std::vector<std::string> &mainArgs);

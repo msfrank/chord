@@ -17,13 +17,9 @@ target_include_directories(ChordAgentRuntime PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     )
 
-if(${IS_DEBUG_BUILD})
-    target_compile_definitions(ChordAgentRuntime PRIVATE
-        "CHORD_LOCAL_MACHINE_EXECUTABLE=\"${CHORD_BUILD_CHORD_LOCAL_MACHINE_PATH}\"")
-else()
-    target_compile_definitions(ChordAgentRuntime PRIVATE
-        "CHORD_LOCAL_MACHINE_EXECUTABLE=\"${CHORD_RUNTIME_CHORD_LOCAL_MACHINE_PATH}\"")
-endif()
+target_compile_definitions(ChordAgentRuntime PRIVATE
+    "CHORD_LOCAL_MACHINE_EXECUTABLE=\"${CHORD_RUNTIME_CHORD_LOCAL_MACHINE_PATH}\""
+    )
 
 target_link_libraries(ChordAgentRuntime PUBLIC
     chord::chord_invoke

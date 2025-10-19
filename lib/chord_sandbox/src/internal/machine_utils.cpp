@@ -112,8 +112,8 @@ chord_sandbox::internal::run_machine(
         const tempo_utils::Url &machineUrl,
         const absl::flat_hash_map<tempo_utils::Url, tempo_utils::Url> &protocolEndpoints,
         const absl::flat_hash_map<tempo_utils::Url,std::string> &endpointCsrs,
-        const tempo_security::CertificateKeyPair &caKeyPair,
-        std::chrono::seconds certificateValidity)
+        std::shared_ptr<AbstractEndpointSigner> endpointSigner,
+        absl::Duration requestedValidityPeriod)
 {
     grpc::ClientContext runMachineContext;
     chord_invoke::RunMachineRequest runMachineRequest;
@@ -125,16 +125,13 @@ chord_sandbox::internal::run_machine(
 
     // sign the csr for each endpoint
     for (const auto &entry : endpointCsrs) {
-        auto *signedEndpoint = runMachineRequest.add_signed_endpoints();
 
+        auto *signedEndpoint = runMachineRequest.add_signed_endpoints();
         signedEndpoint->set_endpoint_url(entry.first.toString());
 
-        const auto &pemRequestBytes = entry.second;
-        auto generateCertificateResult = tempo_security::generate_certificate_from_csr(
-            pemRequestBytes, caKeyPair, 1, certificateValidity);
-        if (generateCertificateResult.isStatus())
-            return generateCertificateResult.getStatus();
-        auto pemCertificateBytes = generateCertificateResult.getResult();
+        std::string pemCertificateBytes;
+        TU_ASSIGN_OR_RETURN (pemCertificateBytes, endpointSigner->signEndpoint(
+            entry.first, entry.second, requestedValidityPeriod));
         signedEndpoint->set_certificate(pemCertificateBytes);
 
         std::shared_ptr<tempo_security::X509Certificate> cert;

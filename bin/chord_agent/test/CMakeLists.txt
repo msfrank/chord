@@ -19,7 +19,7 @@ add_executable(chord_agent_testsuite ${TEST_CASES} test_mocks.h)
 #add_dependencies(chord_agent_testsuite chord-local-machine examples-demo mock-process)
 target_compile_definitions(chord_agent_testsuite PRIVATE
     "MOCK_PROCESS_EXECUTABLE=\"${CMAKE_CURRENT_BINARY_DIR}/mock-process\""
-    "CHORD_LOCAL_MACHINE_EXECUTABLE=\"${CHORD_LOCAL_MACHINE_DIST_PATH}\""
+    "CHORD_LOCAL_MACHINE_EXECUTABLE=\"${CHORD_BUILD_CHORD_LOCAL_MACHINE_PATH}\""
     "EXAMPLES_DEMO_PACKAGE=\"${EXAMPLES_DEMO_PACKAGE}\""
 )
 target_link_libraries(chord_agent_testsuite PUBLIC
@@ -36,7 +36,7 @@ add_library(ChordAgentTestSuite OBJECT ${TEST_CASES} test_mocks.h)
 #add_dependencies(chord_agent_testsuite chord-local-machine examples-demo mock-process)
 target_compile_definitions(ChordAgentTestSuite PRIVATE
     "MOCK_PROCESS_EXECUTABLE=\"${CMAKE_CURRENT_BINARY_DIR}/mock-process\""
-    "CHORD_LOCAL_MACHINE_EXECUTABLE=\"${CHORD_LOCAL_MACHINE_DIST_PATH}\""
+    "CHORD_LOCAL_MACHINE_EXECUTABLE=\"${CHORD_BUILD_CHORD_LOCAL_MACHINE_PATH}\""
     "EXAMPLES_DEMO_PACKAGE=\"${EXAMPLES_DEMO_PACKAGE}\""
 )
 target_link_libraries(ChordAgentTestSuite PUBLIC

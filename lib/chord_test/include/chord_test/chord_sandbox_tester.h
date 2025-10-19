@@ -72,6 +72,7 @@ namespace chord_test {
         SandboxTesterOptions m_options;
         std::shared_ptr<zuri_distributor::PackageCache> m_packageCache;
         std::shared_ptr<zuri_distributor::PackageCacheLoader> m_packageCacheLoader;
+        std::shared_ptr<chord_sandbox::ChordIsolate> m_isolate;
         std::shared_ptr<lyric_test::TestRunner> m_runner;
         std::string m_domain;
         tempo_security::ECCPrivateKeyGenerator m_eccKeygen;

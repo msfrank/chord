@@ -7,12 +7,17 @@
 
 tempo_utils::Status
 chord_run::run_package_command(
-    const tempo_utils::Url &agentEndpoint,
-    const std::string &agentServerName,
+    std::shared_ptr<chord_tooling::ChordConfig> chordConfig,
+    const std::string &sessionIsolate,
+    const std::string &sessionName,
     const std::filesystem::path &pemRootCABundleFile,
     const zuri_packager::PackageSpecifier &packageSpecifier,
     const std::vector<std::string> &mainArgs)
 {
+    TU_ASSERT (sessionIsolate)
+
+    std::shared_ptr<chord_sandbox::ChordIsolate> isolate;
+    chord_sandbox::ChordIsolate::connect(agentServerName, agentEndpoint,)
     chord_sandbox::SandboxOptions options;
     options.agentEndpoint = agentEndpoint;
     options.agentServerName = agentServerName;

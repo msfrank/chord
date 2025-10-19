@@ -44,6 +44,11 @@ chord_test::ChordSandboxTester::configure()
     // configure the test runner
     TU_RETURN_IF_NOT_OK (runner->configureBaseTester());
 
+    auto testerDirectory = m_runner->getTesterDirectory();
+
+    auto agentDomain = tempo_utils::generate_name("chord-sandbox-tester-XXXXXXXX");
+    auto agentServerName = absl::StrCat(agentDomain, ".test");
+
     m_domain = absl::StrCat(tempo_utils::generate_name("XXXXXXXX"), ".test");
 
     TU_ASSIGN_OR_RETURN (m_caKeyPair, tempo_security::generate_self_signed_ca_key_pair(
@@ -51,6 +56,11 @@ chord_test::ChordSandboxTester::configure()
         absl::StrCat("ca.", m_domain),
         1, std::chrono::minutes {60}, -1,
         runner->getTesterDirectory(), "ca"));
+
+    tempo_security::CertificateKeyPair agentKeyPair;
+    TU_ASSIGN_OR_RETURN (agentKeyPair, tempo_security::generate_key_pair(
+        m_caKeyPair, m_eccKeygen, "Chord sandbox tester", "Chord agent",
+        agentServerName, 1, std::chrono::seconds{60}, testerDirectory, "agent"));
 
     // open the existing package cache if specified, otherwise create a new one
     std::shared_ptr<zuri_distributor::PackageCache> packageCache;
@@ -71,6 +81,29 @@ chord_test::ChordSandboxTester::configure()
     auto packageCacheLoader = std::make_shared<zuri_distributor::PackageCacheLoader>(packageCache);
     TU_RETURN_IF_NOT_OK (placeholderLoader->resolve(packageCacheLoader));
 
+    chord_tooling::SecurityConfig securityConfig;
+    securityConfig.pemRootCABundleFile = m_caKeyPair.getPemCertificateFile();
+    securityConfig.pemSigningCertificateFile = m_caKeyPair.getPemCertificateFile();
+    securityConfig.pemSigningPrivateKeyFile = m_caKeyPair.getPemPrivateKeyFile();
+
+    chord_tooling::AgentEntry agentEntry;
+    agentEntry.pemCertificateFile = agentKeyPair.getPemCertificateFile();
+    agentEntry.pemPrivateKeyFile = agentKeyPair.getPemPrivateKeyFile();
+    agentEntry.agentLocation = chord_common::TransportLocation::forUnix(testerDirectory / "agent.sock");
+
+    chord_sandbox::IsolateOptions options;
+    options.runDirectory = testerDirectory;
+    options.agentPath = std::filesystem::path(CHORD_AGENT_EXECUTABLE);
+    options.agentServerNameOverride = agentServerName;
+
+    std::shared_ptr<chord_sandbox::ChordIsolate> isolate;
+    TU_ASSIGN_OR_RETURN (isolate, chord_sandbox::ChordIsolate::spawn(
+        agentServerName,
+        std::make_shared<const chord_tooling::SecurityConfig>(std::move(securityConfig)),
+        std::make_shared<chord_tooling::AgentEntry>(std::move(agentEntry)),
+        options));
+
+    m_isolate = isolate;
     m_packageCacheLoader = packageCacheLoader;
     m_packageCache = std::move(packageCache);
     m_runner = std::move(runner);
@@ -92,34 +125,10 @@ chord_test::ChordSandboxTester::spawnProgramInSandbox(const tempo_utils::Url &ma
             "tester is unconfigured");
 
     TU_CONSOLE_OUT << "";
-    TU_CONSOLE_OUT << "======== SPAWN: " << mainLocation.toString() << " ========";
+    TU_CONSOLE_OUT << "======== LAUNCH: " << mainLocation.toString() << " ========";
     TU_CONSOLE_OUT << "";
 
-    auto agentDomain = tempo_utils::generate_name("chord-sandbox-tester-XXXXXXXX");
-    auto agentServerName = absl::StrCat(agentDomain, ".test");
-    auto generateAgentKeyPairResult = tempo_security::generate_key_pair(m_caKeyPair, m_eccKeygen,
-        "Chord sandbox tester", "Chord agent", agentServerName,
-        1, std::chrono::seconds{60},
-        m_runner->getTesterDirectory(), "agent");
-    if (generateAgentKeyPairResult.isStatus())
-        return generateAgentKeyPairResult.getStatus();
-    auto agentKeyPair = generateAgentKeyPairResult.getResult();
-
-    // construct the sandbox
-    chord_sandbox::SandboxOptions options;
-    options.discoveryPolicy = chord_sandbox::AgentDiscoveryPolicy::ALWAYS_SPAWN;
-    options.endpointTransport = chord_common::TransportType::Unix;
-    options.agentPath = std::filesystem::path(CHORD_AGENT_EXECUTABLE);
-    options.runDirectory = m_runner->getTesterDirectory();
-    options.caKeyPair = m_caKeyPair;
-    options.agentKeyPair = agentKeyPair;
-    options.pemRootCABundleFile = m_caKeyPair.getPemCertificateFile();
-    options.agentServerName = agentServerName;
-
-    chord_sandbox::ChordIsolate isolate(options);
-
-    // initialize the sandbox
-    TU_RETURN_IF_NOT_OK (isolate.initialize());
+    auto programName = tempo_utils::generate_name("program-XXXXXXXX");
 
     // construct the machine config
     absl::flat_hash_map<std::string,tempo_config::ConfigNode> config;
@@ -127,13 +136,11 @@ chord_test::ChordSandboxTester::spawnProgramInSandbox(const tempo_utils::Url &ma
     config["packageDirectories"] = tempo_config::startSeq()
         .append(tempo_config::valueNode(m_packageCache->getCacheDirectory().string()))
         .buildNode();
-    config["pemRootCABundleFile"] = tempo_config::valueNode(options.pemRootCABundleFile.string());
-
-    auto programName = tempo_utils::generate_name("program-XXXXXXXX");
+    config["pemRootCABundleFile"] = tempo_config::valueNode(m_caKeyPair.getPemCertificateFile().string());
 
     // run the module in the sandbox
     std::shared_ptr<chord_sandbox::RemoteMachine> remoteMachine;
-    TU_ASSIGN_OR_RETURN (remoteMachine, isolate.spawn(
+    TU_ASSIGN_OR_RETURN (remoteMachine, m_isolate->launch(
         programName, mainLocation, tempo_config::ConfigMap(config), m_options.protocolPlugs));
 
     TU_LOG_INFO << "spawned remote machine";
@@ -239,47 +246,21 @@ chord_test::ChordSandboxTester::runModuleInSandbox(
     TU_ASSIGN_OR_RETURN (specifier, makePackage(targetComputation));
 
     TU_CONSOLE_OUT << "";
-    TU_CONSOLE_OUT << "======== RUN: " << specifier.toString() << " ========";
+    TU_CONSOLE_OUT << "======== LAUNCH: " << specifier.toString() << " ========";
     TU_CONSOLE_OUT << "";
-
-    auto agentDomain = tempo_utils::generate_name("chord-sandbox-tester-XXXXXXXX");
-    auto agentServerName = absl::StrCat(agentDomain, ".test");
-    auto generateAgentKeyPairResult = tempo_security::generate_key_pair(m_caKeyPair, m_eccKeygen,
-        "Chord sandbox tester", "Chord agent", agentServerName,
-        1, std::chrono::seconds{60},
-        m_runner->getTesterDirectory(), "agent");
-    if (generateAgentKeyPairResult.isStatus())
-        return generateAgentKeyPairResult.getStatus();
-    auto agentKeyPair = generateAgentKeyPairResult.getResult();
-
-    // construct the sandbox
-    chord_sandbox::SandboxOptions options;
-    options.discoveryPolicy = chord_sandbox::AgentDiscoveryPolicy::ALWAYS_SPAWN;
-    options.endpointTransport = chord_common::TransportType::Unix;
-    options.agentPath = std::filesystem::path(CHORD_AGENT_EXECUTABLE);
-    options.runDirectory = m_runner->getTesterDirectory();
-    options.caKeyPair = m_caKeyPair;
-    options.agentKeyPair = agentKeyPair;
-    options.pemRootCABundleFile = m_caKeyPair.getPemCertificateFile();
-    options.agentServerName = agentServerName;
-
-    chord_sandbox::ChordIsolate isolate(options);
-
-    // initialize the sandbox
-    TU_RETURN_IF_NOT_OK (isolate.initialize());
 
     // construct the machine config
     absl::flat_hash_map<std::string,tempo_config::ConfigNode> config;
     config["packageDirectories"] = tempo_config::startSeq()
         .append(tempo_config::valueNode(m_packageCache->getCacheDirectory().string()))
         .buildNode();
-    config["pemRootCABundleFile"] = tempo_config::ConfigValue(options.pemRootCABundleFile);
+    config["pemRootCABundleFile"] = tempo_config::ConfigValue(m_caKeyPair.getPemCertificateFile().string());
 
     auto programName = tempo_utils::generate_name("program-XXXXXXXX");
 
     // run the module in the sandbox
     std::shared_ptr<chord_sandbox::RemoteMachine> remoteMachine;
-    TU_ASSIGN_OR_RETURN (remoteMachine, isolate.spawn(
+    TU_ASSIGN_OR_RETURN (remoteMachine, m_isolate->launch(
         programName, specifier.toUrl(), tempo_config::ConfigMap(config), m_options.protocolPlugs));
 
     TU_LOG_INFO << "spawned remote machine";

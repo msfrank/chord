@@ -8,6 +8,32 @@
 #include <tempo_config/time_conversions.h>
 
 tempo_utils::Status
+chord_tooling::SecurityConfigParser::convertValue(
+      const tempo_config::ConfigNode &node,
+      SecurityConfig &securityConfig) const
+{
+    if (node.getNodeType() != tempo_config::ConfigNodeType::kMap)
+        return tempo_config::ConfigStatus::forCondition(
+            tempo_config::ConfigCondition::kWrongType, "security config must be a map");
+    auto securityMap = node.toMap();
+
+    tempo_config::PathParser pemRootCABundleFileParser;
+    tempo_config::PathParser pemSigningCertificateFileParser;
+    tempo_config::PathParser pemSigningPrivateKeyFileParser;
+
+    TU_RETURN_IF_NOT_OK (tempo_config::parse_config(securityConfig.pemRootCABundleFile,
+        pemRootCABundleFileParser, securityMap, "pemRootCABundleFile"));
+
+    TU_RETURN_IF_NOT_OK (tempo_config::parse_config(securityConfig.pemSigningCertificateFile,
+        pemSigningCertificateFileParser, securityMap, "pemSigningCertificateFile"));
+
+    TU_RETURN_IF_NOT_OK (tempo_config::parse_config(securityConfig.pemSigningPrivateKeyFile,
+        pemSigningPrivateKeyFileParser, securityMap, "pemSigningPrivateKeyFile"));
+
+    return {};
+}
+
+tempo_utils::Status
 chord_tooling::AgentEntryParser::convertValue(const tempo_config::ConfigNode &node, AgentEntry &agentEntry) const
 {
     if (node.getNodeType() != tempo_config::ConfigNodeType::kMap)
@@ -87,5 +113,28 @@ chord_tooling::AgentEntryParser::parseTcp4Transport(const tempo_config::ConfigMa
 
     agentEntry.agentLocation = chord_common::TransportLocation::forUnix(unixListenerPath);
 
+    return {};
+}
+
+tempo_utils::Status
+chord_tooling::AgentStoreParser::convertValue(const tempo_config::ConfigNode &node, AgentStore &agentStore) const
+{
+    if (node.getNodeType() != tempo_config::ConfigNodeType::kMap)
+        return tempo_config::ConfigStatus::forCondition(
+            tempo_config::ConfigCondition::kWrongType, "agent entry config must be a map");
+    auto agentsMap = node.toMap();
+
+    AgentEntryParser agentEntryParser;
+    tempo_config::SharedPtrConstTParser sharedConstTargetEntryParser(&agentEntryParser);
+
+    absl::flat_hash_map<std::string,std::shared_ptr<const AgentEntry>> agentEntries;
+    for (auto it = agentsMap.mapBegin(); it != agentsMap.mapEnd(); it++) {
+        auto agentName = it->first;
+        std::shared_ptr<const AgentEntry> agentEntry;
+        TU_RETURN_IF_NOT_OK (tempo_config::parse_config(agentEntry, sharedConstTargetEntryParser, it->second));
+        agentEntries[agentName] = std::move(agentEntry);
+    }
+
+    agentStore = AgentStore(agentEntries);
     return {};
 }

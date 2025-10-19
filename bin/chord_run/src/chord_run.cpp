@@ -13,12 +13,14 @@
 #include <tempo_utils/uuid.h>
 #include <zuri_packager/packaging_conversions.h>
 
+#include "chord_tooling/chord_config.h"
+
 tempo_utils::Status
 chord_run::chord_run(int argc, const char *argv[])
 {
     tempo_config::PathParser distributionRootParser(DISTRIBUTION_ROOT);
-    tempo_config::UrlParser agentEndpointParser(tempo_utils::Url{});
-    tempo_config::StringParser agentServerNameParser(std::string{});
+    tempo_config::StringParser sessionIsolateParser(std::string{});
+    tempo_config::StringParser sessionNameParser(std::string{});
     tempo_config::PathParser pemRootCABundleFileParser(std::filesystem::path{});
     tempo_config::BooleanParser colorizeOutputParser(false);
     tempo_config::IntegerParser verboseParser(0);
@@ -31,9 +33,9 @@ chord_run::chord_run(int argc, const char *argv[])
     std::vector<tempo_command::Default> defaults = {
         {"distributionRoot", distributionRootParser.getDefault(),
             "Specify an alternative distribution root directory", "DIR"},
-        {"agentEndpoint", {}, "connect to the specified agent endpoint", "ENDPOINT"},
-        {"agentServerName", {}, "the agent server name", "NAME"},
-        {"pemRootCABundleFile", {}, "the root CA certificate bundle used by gRPC", "FILE"},
+        {"sessionIsolate", {}, "Spawn session from the specified isolate", "ISOLATE"},
+        {"sessionName", {}, "The session name", "NAME"},
+        {"pemRootCABundleFile", {}, "The root CA certificate bundle used by gRPC", "FILE"},
         {"colorizeOutput", colorizeOutputParser.getDefault(),
             "Display colorized output"},
         {"verbose", verboseParser.getDefault(),
@@ -48,8 +50,8 @@ chord_run::chord_run(int argc, const char *argv[])
 
     const std::vector<tempo_command::Grouping> groupings = {
         {"distributionRoot", {"--distribution-root"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
-        {"agentEndpoint", {"-u", "--agent-endpoint"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
-        {"agentServerName", {"--agent-server-name"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
+        {"sessionIsolate", {"-s", "--session-isolate"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
+        {"sessionName", {"-n", "--session-name"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"pemRootCABundleFile", {"--ca-bundle"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"colorizeOutput", {"-c", "--colorize"}, tempo_command::GroupingType::NO_ARGUMENT},
         {"verbose", {"-v"}, tempo_command::GroupingType::NO_ARGUMENT},
@@ -61,6 +63,8 @@ chord_run::chord_run(int argc, const char *argv[])
 
     const std::vector<tempo_command::Mapping> optMappings = {
         {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "distributionRoot"},
+        {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "sessionIsolate"},
+        {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "sessionName"},
         {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "pemRootCABundleFile"},
         {tempo_command::MappingType::TRUE_IF_INSTANCE, "colorizeOutput"},
         {tempo_command::MappingType::COUNT_INSTANCES, "verbose"},
@@ -156,15 +160,15 @@ chord_run::chord_run(int argc, const char *argv[])
     TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(distributionRoot, distributionRootParser,
         commandConfig, "distributionRoot"));
 
-    // determine the agent endpoint
-    tempo_utils::Url agentEndpoint;
-    TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(agentEndpoint, agentEndpointParser,
-        commandConfig, "agentEndpoint"));
+    // determine the session isolate
+    std::string sessionIsolate;
+    TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(sessionIsolate, sessionIsolateParser,
+        commandConfig, "sessionIsolate"));
 
-    // determine the agent endpoint
-    std::string agentServerName;
-    TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(agentServerName, agentServerNameParser,
-        commandConfig, "agentServerName"));
+    // determine the session name
+    std::string sessionName;
+    TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(sessionName, sessionNameParser,
+        commandConfig, "sessionName"));
 
     // determine the pem root CA bundle file
     std::filesystem::path pemRootCABundleFile;
@@ -191,17 +195,10 @@ chord_run::chord_run(int argc, const char *argv[])
 
     TU_LOG_V << "using distribution root " << distributionRoot;
 
-    // // load chord config
-    // std::shared_ptr<chord_tooling::ChordConfig> chordConfig;
-    // if (!workspaceRoot.empty()) {
-    //     std::filesystem::path workspaceConfigFile;
-    //     TU_ASSIGN_OR_RETURN (workspaceConfigFile, tempo_config::find_workspace_config(workspaceRoot));
-    //     TU_ASSIGN_OR_RETURN (chordConfig, chord_tooling::ChordConfig::forWorkspace(
-    //         workspaceConfigFile, {}, distributionRoot));
-    // } else {
-    //     TU_ASSIGN_OR_RETURN (chordConfig, chord_tooling::ChordConfig::forUser(
-    //         {}, distributionRoot));
-    // }
+    // load chord config
+    std::shared_ptr<chord_tooling::ChordConfig> chordConfig;
+    TU_ASSIGN_OR_RETURN (chordConfig, chord_tooling::ChordConfig::forUser(
+        {}, distributionRoot));
 
-    return run_package_command(agentEndpoint, agentServerName, pemRootCABundleFile, packageSpecifier, mainArgs);
+    return run_package_command(sessionIsolate, sessionName, pemRootCABundleFile, packageSpecifier, mainArgs);
 }

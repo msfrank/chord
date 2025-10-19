@@ -2,10 +2,13 @@
 
 #include <chord_tooling/chord_config.h>
 #include <chord_tooling/tooling_result.h>
+#include <tempo_config/container_conversions.h>
 #include <tempo_config/parse_config.h>
 #include <tempo_config/program_config.h>
 #include <tempo_config/workspace_config.h>
 #include <tempo_utils/user_home.h>
+
+#include "chord_tooling/tooling_conversions.h"
 
 chord_tooling::ChordConfig::ChordConfig(
     const std::filesystem::path &distributionRoot,
@@ -121,7 +124,7 @@ configure_workspace_config_options(
  * @param distributionRootOverride Override the auto-detected distribution root.
  * @return
  */
-tempo_utils::Result<std::shared_ptr<chord_tooling::ChordConfig>>
+tempo_utils::Result<const std::shared_ptr<chord_tooling::ChordConfig>>
 chord_tooling::ChordConfig::forSystem(const std::filesystem::path &distributionRootOverride)
 {
     std::filesystem::path distributionRoot = !distributionRootOverride.empty()?
@@ -154,7 +157,7 @@ chord_tooling::ChordConfig::forSystem(const std::filesystem::path &distributionR
  * @param distributionRootOverride Override the auto-detected distribution root.
  * @return
  */
-tempo_utils::Result<std::shared_ptr<chord_tooling::ChordConfig>>
+tempo_utils::Result<const std::shared_ptr<chord_tooling::ChordConfig>>
 chord_tooling::ChordConfig::forUser(
     const std::filesystem::path &userHomeOverride,
     const std::filesystem::path &distributionRootOverride)
@@ -197,7 +200,7 @@ chord_tooling::ChordConfig::forUser(
  * @param distributionRootOverride Override the auto-detected distribution root.
  * @return
  */
-tempo_utils::Result<std::shared_ptr<chord_tooling::ChordConfig>>
+tempo_utils::Result<const std::shared_ptr<chord_tooling::ChordConfig>>
 chord_tooling::ChordConfig::forWorkspace(
     const std::filesystem::path &workspaceConfigFile,
     const std::filesystem::path &userHomeOverride,
@@ -241,15 +244,15 @@ chord_tooling::ChordConfig::configure()
         return ToolingStatus::forCondition(ToolingCondition::kToolingInvariant,
             "invalid 'chord' config node; expected a map");
 
-    auto agentsMap = m_chordMap.mapAt("agents").toMap();
-    if (agentsMap.getNodeType() == tempo_config::ConfigNodeType::kMap) {
-        m_agentStore = std::make_shared<AgentStore>(agentsMap);
-        TU_RETURN_IF_NOT_OK (m_agentStore->configure());
-    }
+    AgentStoreParser agentStoreParser;
+    tempo_config::SharedPtrConstTParser sharedConstAgentStoreParser(&agentStoreParser);
+    TU_RETURN_IF_NOT_OK (tempo_config::parse_config(m_agentStore,
+        sharedConstAgentStoreParser, m_chordMap, "agents"));
 
-    auto securityMap = m_chordMap.mapAt("security").toMap();
-    m_securityConfig = std::make_shared<SecurityConfig>(securityMap);
-    TU_RETURN_IF_NOT_OK (m_securityConfig->configure());
+    SecurityConfigParser securityConfigParser;
+    tempo_config::SharedPtrConstTParser sharedConstSecurityConfigParser(&securityConfigParser);
+    TU_RETURN_IF_NOT_OK (tempo_config::parse_config(m_securityConfig,
+        sharedConstSecurityConfigParser, m_chordMap, "security"));
 
     return {};
 }
@@ -278,13 +281,13 @@ chord_tooling::ChordConfig::getWorkspaceConfigFile() const
     return m_workspaceConfigFile;
 }
 
-std::shared_ptr<chord_tooling::AgentStore>
+std::shared_ptr<const chord_tooling::AgentStore>
 chord_tooling::ChordConfig::getAgentStore() const
 {
     return m_agentStore;
 }
 
-std::shared_ptr<chord_tooling::SecurityConfig>
+std::shared_ptr<const chord_tooling::SecurityConfig>
 chord_tooling::ChordConfig::getSecurityConfig() const
 {
     return m_securityConfig;

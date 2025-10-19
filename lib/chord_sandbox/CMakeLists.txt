@@ -7,8 +7,10 @@ add_library(chord_sandbox SHARED)
 add_library(chord::chord_sandbox ALIAS chord_sandbox)
 
 set(CHORD_SANDBOX_INCLUDES
+    include/chord_sandbox/abstract_endpoint_signer.h
     include/chord_sandbox/chord_isolate.h
     include/chord_sandbox/grpc_connector.h
+    include/chord_sandbox/local_endpoint_signer.h
     include/chord_sandbox/remote_machine.h
     include/chord_sandbox/remoting_client.h
     include/chord_sandbox/run_protocol_plug.h
@@ -20,6 +22,7 @@ set_target_properties(chord_sandbox PROPERTIES PUBLIC_HEADER "${CHORD_SANDBOX_IN
 target_sources(chord_sandbox PRIVATE
     src/grpc_connector.cpp
     src/chord_isolate.cpp
+    src/local_endpoint_signer.cpp
     src/remote_machine.cpp
     src/remoting_client.cpp
     src/run_protocol_plug.cpp
@@ -46,13 +49,9 @@ target_include_directories(chord_sandbox PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     )
 
-if(${IS_DEBUG_BUILD})
-    target_compile_definitions(chord_sandbox PRIVATE
-        "CHORD_AGENT_EXECUTABLE=\"${CHORD_BUILD_CHORD_AGENT_PATH}\"")
-else()
-    target_compile_definitions(chord_sandbox PRIVATE
-        "CHORD_AGENT_EXECUTABLE=\"${CHORD_RUNTIME_CHORD_AGENT_PATH}\"")
-endif()
+target_compile_definitions(chord_sandbox PRIVATE
+    "CHORD_AGENT_EXECUTABLE=\"${CHORD_RUNTIME_CHORD_AGENT_PATH}\""
+    )
 
 set_target_properties(chord_sandbox PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY ${CHORD_BUILD_LIB_DIR}

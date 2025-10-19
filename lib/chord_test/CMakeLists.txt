@@ -36,13 +36,9 @@ target_include_directories(chord_test PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     )
 
-if(${IS_DEBUG_BUILD})
-    target_compile_definitions(chord_test PRIVATE
-        "CHORD_AGENT_EXECUTABLE=\"${CHORD_BUILD_CHORD_AGENT_PATH}\"")
-else()
-    target_compile_definitions(chord_test PRIVATE
-        "CHORD_AGENT_EXECUTABLE=\"${CHORD_RUNTIME_CHORD_AGENT_PATH}\"")
-endif()
+target_compile_definitions(chord_test PRIVATE
+    "CHORD_AGENT_EXECUTABLE=\"${CHORD_RUNTIME_CHORD_AGENT_PATH}\""
+    )
 
 set_target_properties(chord_test PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY ${CHORD_BUILD_LIB_DIR}

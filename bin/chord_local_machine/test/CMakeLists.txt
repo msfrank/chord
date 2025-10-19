@@ -22,7 +22,7 @@ add_subdirectory(data)
 add_executable(chord_local_machine_testsuite ${TEST_CASES} test_mocks.h)
 add_dependencies(chord_local_machine_testsuite chord-local-machine-test-data)
 target_compile_definitions(chord_local_machine_testsuite PRIVATE
-    "CHORD_LOCAL_MACHINE_EXECUTABLE=\"${CHORD_LOCAL_MACHINE_DIST_PATH}\""
+    "CHORD_LOCAL_MACHINE_EXECUTABLE=\"${CHORD_BUILD_CHORD_LOCAL_MACHINE_PATH}\""
     "TEST1_SPECIFIER=\"${TEST1_SPECIFIER}\""
     "TEST1_ZPK=\"${TEST1_ZPK}\""
     "ZURI_STD_PACKAGE_ZPK=\"${ZURI_INSTALL_PACKAGES_DIR}/${ZURI_STD_PACKAGE_ZPK}\""
@@ -41,7 +41,7 @@ gtest_discover_tests(chord_local_machine_testsuite)
 add_library(ChordLocalMachineTestSuite OBJECT ${TEST_CASES} test_mocks.h)
 add_dependencies(chord_local_machine_testsuite chord-local-machine-test-data)
 target_compile_definitions(ChordLocalMachineTestSuite PRIVATE
-    "CHORD_LOCAL_MACHINE_EXECUTABLE=\"${CHORD_LOCAL_MACHINE_DIST_PATH}\""
+    "CHORD_LOCAL_MACHINE_EXECUTABLE=\"${CHORD_BUILD_CHORD_LOCAL_MACHINE_PATH}\""
     "TEST1_SPECIFIER=\"${TEST1_SPECIFIER}\""
     "TEST1_ZPK=\"${TEST1_ZPK}\""
     "ZURI_STD_PACKAGE_ZPK=\"${ZURI_INSTALL_PACKAGES_DIR}/${ZURI_STD_PACKAGE_ZPK}\""

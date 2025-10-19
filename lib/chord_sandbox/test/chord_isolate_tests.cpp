@@ -33,38 +33,45 @@ TEST_F(ChordIsolate, InitializeAndShutdown)
     ASSERT_TRUE (tempdirMaker.isValid());
     auto testerDirectory = tempdirMaker.getTempdir();
 
-    auto generateCAKeyPairResult = tempo_security::generate_self_signed_ca_key_pair(keygen,
+    tempo_security::CertificateKeyPair caKeyPair;
+    TU_ASSIGN_OR_RAISE (caKeyPair, tempo_security::generate_self_signed_ca_key_pair(keygen,
         organization, organizationalUnit, caCommonName,
         1, std::chrono::seconds{60}, -1,
-        testerDirectory, "ca");
-    ASSERT_TRUE (generateCAKeyPairResult.isResult());
-    auto caKeyPair = generateCAKeyPairResult.getResult();
+        testerDirectory, "ca"));
 
-    auto generateAgentKeyPairResult = tempo_security::generate_key_pair(caKeyPair, keygen,
+    tempo_security::CertificateKeyPair agentKeyPair;
+    TU_ASSIGN_OR_RAISE (agentKeyPair, tempo_security::generate_key_pair(caKeyPair, keygen,
         organization, organizationalUnit, agentServerName,
         1, std::chrono::seconds{60},
-        testerDirectory, agentPrefix);
-    ASSERT_TRUE (generateAgentKeyPairResult.isResult());
-    auto agentKeyPair = generateAgentKeyPairResult.getResult();
+        testerDirectory, agentPrefix));
 
-    // construct the sandbox
-    chord_sandbox::SandboxOptions options;
-    options.discoveryPolicy = chord_sandbox::AgentDiscoveryPolicy::ALWAYS_SPAWN;
-    options.endpointTransport = chord_common::TransportType::Unix;
-    options.agentPath = std::filesystem::path(CHORD_AGENT_EXECUTABLE);
+    chord_tooling::SecurityConfig securityConfig;
+    securityConfig.pemRootCABundleFile = caKeyPair.getPemCertificateFile();
+    securityConfig.pemSigningCertificateFile = caKeyPair.getPemCertificateFile();
+    securityConfig.pemSigningPrivateKeyFile = caKeyPair.getPemPrivateKeyFile();
+
+    chord_tooling::AgentEntry agentEntry;
+    agentEntry.pemCertificateFile = agentKeyPair.getPemCertificateFile();
+    agentEntry.pemPrivateKeyFile = agentKeyPair.getPemPrivateKeyFile();
+    agentEntry.agentLocation = chord_common::TransportLocation::forUnix(testerDirectory / "agent.sock");
+    agentEntry.idleTimeout = absl::Seconds(15);
+
+    chord_sandbox::IsolateOptions options;
     options.runDirectory = testerDirectory;
-    options.idleTimeout = absl::Seconds(15);
-    options.caKeyPair = caKeyPair;
-    options.agentKeyPair = agentKeyPair;
-    options.pemRootCABundleFile = caKeyPair.getPemCertificateFile();
-    options.agentServerName = agentServerName;
+    options.agentPath = std::filesystem::path(CHORD_AGENT_EXECUTABLE);
+    options.agentServerNameOverride = agentServerName;
 
     // initialize the sandbox
-    chord_sandbox::ChordIsolate isolate(options);
-    ASSERT_THAT (isolate.initialize(), tempo_test::IsOk());
+    auto spawnIsolateResult = chord_sandbox::ChordIsolate::spawn(
+        agentServerName,
+        std::make_shared<const chord_tooling::SecurityConfig>(std::move(securityConfig)),
+        std::make_shared<chord_tooling::AgentEntry>(std::move(agentEntry)),
+        options);
+    ASSERT_THAT (spawnIsolateResult, tempo_test::IsResult());
+    auto isolate = spawnIsolateResult.getResult();
 
     // shut down the sandbox
-    ASSERT_THAT (isolate.shutdown(), tempo_test::IsOk());
+    ASSERT_THAT (isolate->shutdown(), tempo_test::IsOk());
 }
 
 TEST_F(ChordIsolate, SpawnRemoteMachine)

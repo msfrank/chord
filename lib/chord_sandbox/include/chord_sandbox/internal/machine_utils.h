@@ -4,6 +4,8 @@
 #include <chord_sandbox/chord_isolate.h>
 #include <tempo_security/certificate_key_pair.h>
 
+#include "chord_sandbox/abstract_endpoint_signer.h"
+
 namespace chord_sandbox::internal {
 
     /**
@@ -42,8 +44,8 @@ namespace chord_sandbox::internal {
         const tempo_utils::Url &machineUrl,
         const absl::flat_hash_map<tempo_utils::Url, tempo_utils::Url> &protocolEndpoints,
         const absl::flat_hash_map<tempo_utils::Url,std::string> &endpointCsrs,
-        const tempo_security::CertificateKeyPair &caKeyPair,
-        std::chrono::seconds certificateValidity);
+        std::shared_ptr<AbstractEndpointSigner> endpointSigner,
+        absl::Duration requestedValidityPeriod);
 
 }
 

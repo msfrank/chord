@@ -5,22 +5,16 @@
 #include <tempo_config/container_conversions.h>
 #include <tempo_config/parse_config.h>
 
-chord_tooling::AgentStore::AgentStore(const tempo_config::ConfigMap &agentsMap)
-    : m_agentsMap(agentsMap)
+tempo_utils::Result<tempo_security::CertificateKeyPair>
+chord_tooling::AgentEntry::getAgentKeyPair() const
 {
+    return tempo_security::CertificateKeyPair::load(pemPrivateKeyFile, pemCertificateFile);
 }
 
-tempo_utils::Status
-chord_tooling::AgentStore::configure()
+chord_tooling::AgentStore::AgentStore(
+    const absl::flat_hash_map<std::string,std::shared_ptr<const AgentEntry>> &agentEntries)
+    : m_agentEntries(agentEntries)
 {
-    tempo_config::StringParser agentNameParser;
-    AgentEntryParser agentEntryParser;
-    tempo_config::SharedPtrConstTParser sharedConstTargetEntryParser(&agentEntryParser);
-    tempo_config::MapKVParser agentEntriesParser(&agentNameParser, &sharedConstTargetEntryParser);
-
-    TU_RETURN_IF_NOT_OK (tempo_config::parse_config(m_agentEntries, agentEntriesParser, m_agentsMap));
-
-    return {};
 }
 
 bool
@@ -54,4 +48,18 @@ int
 chord_tooling::AgentStore::numAgents() const
 {
     return m_agentEntries.size();
+}
+
+tempo_utils::Status
+chord_tooling::AgentStore::putAgent(std::string_view agentName, std::shared_ptr<const AgentEntry> agentEntry)
+{
+    m_agentEntries[agentName] = std::move(agentEntry);
+    return {};
+}
+
+tempo_utils::Status
+chord_tooling::AgentStore::removeAgent(std::string_view agentName)
+{
+    m_agentEntries.erase(agentName);
+    return {};
 }

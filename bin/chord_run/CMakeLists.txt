@@ -4,6 +4,8 @@ set(CMAKE_AUTOMOC OFF)
 
 # build ChordRunRuntime static archive
 add_library(ChordRunRuntime STATIC
+    include/chord_run/create_session.h
+    src/create_session.cpp
     include/chord_run/run_package_command.h
     src/run_package_command.cpp
     include/chord_run/run_result.h

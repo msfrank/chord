@@ -2,23 +2,17 @@
 #define CHORD_TOOLING_SECURITY_CONFIG_H
 
 #include <tempo_config/config_types.h>
-#include <tempo_utils/status.h>
+#include <tempo_security/certificate_key_pair.h>
+#include <tempo_utils/result.h>
 
 namespace chord_tooling {
 
-    class SecurityConfig {
+    struct SecurityConfig {
+        std::filesystem::path pemRootCABundleFile;
+        std::filesystem::path pemSigningCertificateFile;
+        std::filesystem::path pemSigningPrivateKeyFile;
 
-    public:
-        explicit SecurityConfig(const tempo_config::ConfigMap &securityMap);
-
-        tempo_utils::Status configure();
-
-        std::filesystem::path getPemRootCABundleFile() const;
-
-    private:
-        tempo_config::ConfigMap m_securityMap;
-
-        std::filesystem::path m_pemRootCABundleFile;
+        tempo_utils::Result<tempo_security::CertificateKeyPair> getSigningKeypair() const;
     };
 }
 #endif // CHORD_TOOLING_SECURITY_CONFIG_H

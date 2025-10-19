@@ -3,6 +3,7 @@
 
 #include <chord_common/transport_location.h>
 #include <tempo_config/config_types.h>
+#include <tempo_security/certificate_key_pair.h>
 #include <tempo_utils/status.h>
 
 namespace chord_tooling {
@@ -14,13 +15,14 @@ namespace chord_tooling {
         std::filesystem::path pemPrivateKeyFile;
         absl::Duration idleTimeout;
         absl::Duration registrationTimeout;
+
+        tempo_utils::Result<tempo_security::CertificateKeyPair> getAgentKeyPair() const;
     };
 
     class AgentStore {
     public:
-        explicit AgentStore(const tempo_config::ConfigMap &agentsMap);
-
-        tempo_utils::Status configure();
+        explicit AgentStore(
+            const absl::flat_hash_map<std::string,std::shared_ptr<const AgentEntry>> &agentEntries = {});
 
         bool hasAgent(std::string_view agentName) const;
         std::shared_ptr<const AgentEntry> getAgent(std::string_view agentName) const;
@@ -28,9 +30,10 @@ namespace chord_tooling {
         absl::flat_hash_map<std::string,std::shared_ptr<const AgentEntry>>::const_iterator agentsEnd() const;
         int numAgents() const;
 
-    private:
-        tempo_config::ConfigMap m_agentsMap;
+        tempo_utils::Status putAgent(std::string_view agentName, std::shared_ptr<const AgentEntry> agentEntry);
+        tempo_utils::Status removeAgent(std::string_view agentName);
 
+    private:
         absl::flat_hash_map<std::string,std::shared_ptr<const AgentEntry>> m_agentEntries;
     };
 }

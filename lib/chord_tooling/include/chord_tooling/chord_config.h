@@ -22,12 +22,12 @@ namespace chord_tooling {
     class ChordConfig {
 
     public:
-        static tempo_utils::Result<std::shared_ptr<ChordConfig>> forSystem(
+        static tempo_utils::Result<const std::shared_ptr<ChordConfig>> forSystem(
             const std::filesystem::path &distributionRootOverride = {});
-        static tempo_utils::Result<std::shared_ptr<ChordConfig>> forUser(
+        static tempo_utils::Result<const std::shared_ptr<ChordConfig>> forUser(
             const std::filesystem::path &userHomeOverride = {},
             const std::filesystem::path &distributionRootOverride = {});
-        static tempo_utils::Result<std::shared_ptr<ChordConfig>> forWorkspace(
+        static tempo_utils::Result<const std::shared_ptr<ChordConfig>> forWorkspace(
             const std::filesystem::path &workspaceConfigFile,
             const std::filesystem::path &userHomeOverride = {},
             const std::filesystem::path &distributionRootOverride = {});
@@ -37,8 +37,8 @@ namespace chord_tooling {
         std::filesystem::path getWorkspaceRoot() const;
         std::filesystem::path getWorkspaceConfigFile() const;
 
-        std::shared_ptr<AgentStore> getAgentStore() const;
-        std::shared_ptr<SecurityConfig> getSecurityConfig() const;
+        std::shared_ptr<const AgentStore> getAgentStore() const;
+        std::shared_ptr<const SecurityConfig> getSecurityConfig() const;
 
     private:
         std::filesystem::path m_distributionRoot;
@@ -47,8 +47,8 @@ namespace chord_tooling {
         tempo_config::ConfigMap m_chordMap;
         tempo_config::ConfigMap m_vendorMap;
 
-        std::shared_ptr<AgentStore> m_agentStore;
-        std::shared_ptr<SecurityConfig> m_securityConfig;
+        std::shared_ptr<const AgentStore> m_agentStore;
+        std::shared_ptr<const SecurityConfig> m_securityConfig;
 
         ChordConfig(
             const std::filesystem::path &distributionRoot,

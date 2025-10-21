@@ -1,5 +1,5 @@
 
-#include <chord_common/protocol_types.h>
+#include <chord_common/common_types.h>
 
 chord_common::RequestedPort::RequestedPort()
     : m_type(PortType::Invalid),

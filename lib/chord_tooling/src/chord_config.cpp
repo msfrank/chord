@@ -2,6 +2,7 @@
 
 #include <chord_tooling/chord_config.h>
 #include <chord_tooling/tooling_result.h>
+#include <tempo_config/base_conversions.h>
 #include <tempo_config/container_conversions.h>
 #include <tempo_config/parse_config.h>
 #include <tempo_config/program_config.h>
@@ -244,6 +245,11 @@ chord_tooling::ChordConfig::configure()
         return ToolingStatus::forCondition(ToolingCondition::kToolingInvariant,
             "invalid 'chord' config node; expected a map");
 
+    SignerStoreParser signerStoreParser;
+    tempo_config::SharedPtrConstTParser sharedConstSignerStoreParser(&signerStoreParser);
+    TU_RETURN_IF_NOT_OK (tempo_config::parse_config(m_signerStore,
+        sharedConstSignerStoreParser, m_chordMap, "signers"));
+
     AgentStoreParser agentStoreParser;
     tempo_config::SharedPtrConstTParser sharedConstAgentStoreParser(&agentStoreParser);
     TU_RETURN_IF_NOT_OK (tempo_config::parse_config(m_agentStore,
@@ -253,6 +259,18 @@ chord_tooling::ChordConfig::configure()
     tempo_config::SharedPtrConstTParser sharedConstSecurityConfigParser(&securityConfigParser);
     TU_RETURN_IF_NOT_OK (tempo_config::parse_config(m_securityConfig,
         sharedConstSecurityConfigParser, m_chordMap, "security"));
+
+    tempo_config::PathParser runDirectoryParser;
+    TU_RETURN_IF_NOT_OK (tempo_config::parse_config(m_runDirectory,
+        runDirectoryParser, m_chordMap, "runDirectory"));
+
+    tempo_config::StringParser defaultSignerNameParser;
+    TU_RETURN_IF_NOT_OK (tempo_config::parse_config(m_defaultSignerName,
+        defaultSignerNameParser, m_chordMap, "defaultSigner"));
+
+    tempo_config::StringParser defaultAgentNameParser;
+    TU_RETURN_IF_NOT_OK (tempo_config::parse_config(m_defaultAgentName,
+        defaultAgentNameParser, m_chordMap, "defaultAgent"));
 
     return {};
 }
@@ -281,6 +299,12 @@ chord_tooling::ChordConfig::getWorkspaceConfigFile() const
     return m_workspaceConfigFile;
 }
 
+std::shared_ptr<const chord_tooling::SignerStore>
+chord_tooling::ChordConfig::getSignerStore() const
+{
+    return m_signerStore;
+}
+
 std::shared_ptr<const chord_tooling::AgentStore>
 chord_tooling::ChordConfig::getAgentStore() const
 {
@@ -291,4 +315,22 @@ std::shared_ptr<const chord_tooling::SecurityConfig>
 chord_tooling::ChordConfig::getSecurityConfig() const
 {
     return m_securityConfig;
+}
+
+std::filesystem::path
+chord_tooling::ChordConfig::getRunDirectory() const
+{
+    return m_runDirectory;
+}
+
+std::string
+chord_tooling::ChordConfig::getDefaultSignerName() const
+{
+    return m_defaultSignerName;
+}
+
+std::string
+chord_tooling::ChordConfig::getDefaultAgentName() const
+{
+    return m_defaultAgentName;
 }

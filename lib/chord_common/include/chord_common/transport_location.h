@@ -8,11 +8,17 @@
 
 namespace chord_common {
 
+    constexpr const char *kChordUnixScheme = "chord+unix";
+    constexpr const char *kChordTcp4Scheme = "chord+tcp4";
+
     enum class TransportType {
         Invalid,
         Unix,
         Tcp4,
     };
+
+    TransportType parse_transport_scheme(std::string_view s);
+    const char *transport_scheme_to_string(TransportType type);
 
     class TransportLocation {
     public:
@@ -22,24 +28,37 @@ namespace chord_common {
         bool isValid() const;
 
         TransportType getType() const;
-        std::filesystem::path getUnixPath(const std::filesystem::path &relativeBase = {}) const;
+        std::filesystem::path getUnixPath() const;
         std::string getTcp4Address() const;
         bool hasTcp4Port() const;
         tu_uint16 getTcp4Port() const;
+        std::string getServerName() const;
 
-        tempo_utils::Url toUrl() const;
+        std::string toGrpcTarget() const;
         std::string toString() const;
 
-        static TransportLocation forUnix(const std::filesystem::path &path);
-        static TransportLocation forTcp4(std::string_view address, tu_uint16 port = 0);
-        static TransportLocation fromUrl(const tempo_utils::Url &url);
+        static TransportLocation forUnix(
+            const std::string &serverName,
+            const std::filesystem::path &unixPath);
+        static TransportLocation forTcp4(
+            const std::string &serverName,
+            const std::string &tcpAddress,
+            tu_uint16 tcpPort = 0);
+
         static TransportLocation fromString(std::string_view s);
 
     private:
-        TransportType m_type;
-        tempo_utils::Url m_location;
+        struct Priv {
+            TransportType type;
+            std::string endpointTarget;
+            std::string serverName;
+        };
+        std::shared_ptr<Priv> m_priv;
 
-        TransportLocation(TransportType type, const tempo_utils::Url &location);
+        TransportLocation(
+            TransportType type,
+            const std::string &endpointTarget,
+            const std::string &serverName);
     };
 }
 

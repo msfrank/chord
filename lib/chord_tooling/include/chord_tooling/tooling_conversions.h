@@ -5,6 +5,7 @@
 
 #include "agent_store.h"
 #include "security_config.h"
+#include "signer_store.h"
 
 namespace chord_tooling {
 
@@ -13,6 +14,22 @@ namespace chord_tooling {
         tempo_utils::Status convertValue(
             const tempo_config::ConfigNode &node,
             SecurityConfig &securityConfig) const override;
+    };
+
+    class SignerEntryParser : public tempo_config::AbstractConverter<SignerEntry> {
+    public:
+        tempo_utils::Status parseLocalSigner(const tempo_config::ConfigMap &map, SignerEntry &signerEntry) const;
+
+        tempo_utils::Status convertValue(
+            const tempo_config::ConfigNode &node,
+            SignerEntry &signerEntry) const override;
+    };
+
+    class SignerStoreParser : public tempo_config::AbstractConverter<SignerStore> {
+    public:
+        tempo_utils::Status convertValue(
+            const tempo_config::ConfigNode &node,
+            SignerStore &signerStore) const override;
     };
 
     class AgentEntryParser : public tempo_config::AbstractConverter<AgentEntry> {

@@ -6,26 +6,23 @@
 
 #include <grpcpp/channel.h>
 
-#include <chord_common/protocol_types.h>
+#include <chord_common/abstract_certificate_signer.h>
+#include <chord_common/common_types.h>
 #include <chord_common/transport_location.h>
 #include <chord_sandbox/remote_machine.h>
 #include <chord_sandbox/sandbox_result.h>
 #include <chord_sandbox/sandbox_types.h>
+#include <chord_tooling/chord_config.h>
 #include <lyric_common/module_location.h>
 #include <tempo_config/config_types.h>
 #include <tempo_security/certificate_key_pair.h>
 #include <tempo_utils/url.h>
 
-#include "abstract_endpoint_signer.h"
-#include "chord_tooling/chord_config.h"
-
 namespace chord_sandbox {
 
     struct IsolateOptions {
         std::filesystem::path agentPath = {};
-        std::string agentServerNameOverride = {};
-        std::filesystem::path runDirectory = {};
-        std::shared_ptr<AbstractEndpointSigner> endpointSigner = {};
+        std::shared_ptr<chord_common::AbstractCertificateSigner> certificateSigner = {};
     };
 
     struct RequestedPortAndHandler {
@@ -42,26 +39,24 @@ namespace chord_sandbox {
         virtual ~ChordIsolate() = default;
 
         static tempo_utils::Result<std::shared_ptr<ChordIsolate>> spawn(
-            std::string_view agentName,
-            std::shared_ptr<const chord_tooling::SecurityConfig> securityConfig,
-            std::shared_ptr<const chord_tooling::AgentEntry> agentEntry,
-            const IsolateOptions &options = {});
+            std::string_view sessionName,
+            const std::filesystem::path &runDirectory,
+            const std::filesystem::path &agentPath,
+            const std::filesystem::path &pemRootCABundleFile,
+            std::shared_ptr<chord_common::AbstractCertificateSigner> certificateSigner,
+            absl::Duration idleTimeout,
+            absl::Duration registrationTimeout);
 
-        static tempo_utils::Result<std::shared_ptr<ChordIsolate>> spawn(
-            std::string_view agentName,
-            std::shared_ptr<const chord_tooling::ChordConfig> chordConfig,
-            const IsolateOptions &options = {});
-
-        static tempo_utils::Result<std::shared_ptr<ChordIsolate>> connect(
-            std::string_view agentName,
-            const chord_common::TransportLocation &agentEndpoint,
-            std::shared_ptr<const chord_tooling::SecurityConfig> securityConfig,
-            const IsolateOptions &options = {});
+        // static tempo_utils::Result<std::shared_ptr<ChordIsolate>> spawn(
+        //     std::string_view agentName,
+        //     std::shared_ptr<const chord_tooling::ChordConfig> chordConfig,
+        //     const IsolateOptions &options = {});
 
         static tempo_utils::Result<std::shared_ptr<ChordIsolate>> connect(
-            std::string_view agentName,
-            std::shared_ptr<const chord_tooling::ChordConfig> chordConfig,
-            const IsolateOptions &options = {});
+            const std::filesystem::path &sessionDirectory,
+            const std::filesystem::path &pemRootCABundleFile,
+            std::shared_ptr<chord_common::AbstractCertificateSigner> certificateSigner,
+            absl::Duration connectTimeout);
 
         tempo_utils::Result<std::shared_ptr<RemoteMachine>> launch(
             std::string_view name,
@@ -75,7 +70,7 @@ namespace chord_sandbox {
     private:
         std::string m_name;
         std::filesystem::path m_pemRootCABundleFile;
-        std::shared_ptr<AbstractEndpointSigner> m_endpointSigner;
+        std::shared_ptr<chord_common::AbstractCertificateSigner> m_certificateSigner;
         std::shared_ptr<grpc::Channel> m_channel;
 
         struct SandboxPriv;
@@ -83,10 +78,18 @@ namespace chord_sandbox {
 
         absl::flat_hash_map<tempo_utils::Url,std::shared_ptr<RemoteMachine>> m_machines;
 
+        static tempo_utils::Result<std::shared_ptr<ChordIsolate>> spawn(
+            const std::filesystem::path &sessionDirectory,
+            const std::filesystem::path &agentPath,
+            const std::filesystem::path &pemRootCABundleFile,
+            std::shared_ptr<chord_common::AbstractCertificateSigner> certificateSigner,
+            absl::Duration idleTimeout,
+            absl::Duration registrationTimeout);
+
         ChordIsolate(
             std::string_view agentName,
             const std::filesystem::path &pemRootCABundleFile,
-            std::shared_ptr<AbstractEndpointSigner> endpointSigner,
+            std::shared_ptr<chord_common::AbstractCertificateSigner> certificateSigner,
             std::shared_ptr<grpc::Channel> channel,
             std::unique_ptr<SandboxPriv> priv);
     };

@@ -1,10 +1,8 @@
 #ifndef CHORD_SANDBOX_INTERNAL_MACHINE_UTILS_H
 #define CHORD_SANDBOX_INTERNAL_MACHINE_UTILS_H
 
+#include <chord_common/abstract_certificate_signer.h>
 #include <chord_sandbox/chord_isolate.h>
-#include <tempo_security/certificate_key_pair.h>
-
-#include "chord_sandbox/abstract_endpoint_signer.h"
 
 namespace chord_sandbox::internal {
 
@@ -44,7 +42,7 @@ namespace chord_sandbox::internal {
         const tempo_utils::Url &machineUrl,
         const absl::flat_hash_map<tempo_utils::Url, tempo_utils::Url> &protocolEndpoints,
         const absl::flat_hash_map<tempo_utils::Url,std::string> &endpointCsrs,
-        std::shared_ptr<AbstractEndpointSigner> endpointSigner,
+        std::shared_ptr<chord_common::AbstractCertificateSigner> certificateSigner,
         absl::Duration requestedValidityPeriod);
 
 }

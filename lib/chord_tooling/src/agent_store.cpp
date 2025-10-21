@@ -5,12 +5,6 @@
 #include <tempo_config/container_conversions.h>
 #include <tempo_config/parse_config.h>
 
-tempo_utils::Result<tempo_security::CertificateKeyPair>
-chord_tooling::AgentEntry::getAgentKeyPair() const
-{
-    return tempo_security::CertificateKeyPair::load(pemPrivateKeyFile, pemCertificateFile);
-}
-
 chord_tooling::AgentStore::AgentStore(
     const absl::flat_hash_map<std::string,std::shared_ptr<const AgentEntry>> &agentEntries)
     : m_agentEntries(agentEntries)

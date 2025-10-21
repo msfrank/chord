@@ -7,10 +7,10 @@ add_library(chord_sandbox SHARED)
 add_library(chord::chord_sandbox ALIAS chord_sandbox)
 
 set(CHORD_SANDBOX_INCLUDES
-    include/chord_sandbox/abstract_endpoint_signer.h
+    include/chord_sandbox/abstract_certificate_signer.h
     include/chord_sandbox/chord_isolate.h
     include/chord_sandbox/grpc_connector.h
-    include/chord_sandbox/local_endpoint_signer.h
+    include/chord_sandbox/local_certificate_signer.h
     include/chord_sandbox/remote_machine.h
     include/chord_sandbox/remoting_client.h
     include/chord_sandbox/run_protocol_plug.h
@@ -22,7 +22,7 @@ set_target_properties(chord_sandbox PROPERTIES PUBLIC_HEADER "${CHORD_SANDBOX_IN
 target_sources(chord_sandbox PRIVATE
     src/grpc_connector.cpp
     src/chord_isolate.cpp
-    src/local_endpoint_signer.cpp
+    src/local_certificate_signer.cpp
     src/remote_machine.cpp
     src/remoting_client.cpp
     src/run_protocol_plug.cpp
@@ -31,8 +31,8 @@ target_sources(chord_sandbox PRIVATE
 
     include/chord_sandbox/internal/machine_utils.h
     src/internal/machine_utils.cpp
-    include/chord_sandbox/internal/spawn_utils.h
-    src/internal/spawn_utils.cpp
+    include/chord_sandbox/internal/session_utils.h
+    src/internal/session_utils.cpp
     )
 
 # set the library version

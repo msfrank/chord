@@ -14,6 +14,8 @@
 #include <zuri_packager/package_writer.h>
 #include <zuri_test/placeholder_loader.h>
 
+#include "chord_sandbox/local_certificate_signer.h"
+
 chord_test::ChordSandboxTester::ChordSandboxTester(const SandboxTesterOptions &options)
     : m_options(options),
       m_eccKeygen(NID_X9_62_prime256v1)
@@ -45,22 +47,15 @@ chord_test::ChordSandboxTester::configure()
     TU_RETURN_IF_NOT_OK (runner->configureBaseTester());
 
     auto testerDirectory = m_runner->getTesterDirectory();
-
-    auto agentDomain = tempo_utils::generate_name("chord-sandbox-tester-XXXXXXXX");
-    auto agentServerName = absl::StrCat(agentDomain, ".test");
-
-    m_domain = absl::StrCat(tempo_utils::generate_name("XXXXXXXX"), ".test");
+    auto agentPath = std::filesystem::path(CHORD_AGENT_EXECUTABLE);
+    auto caCommonName = absl::StrCat(
+        "ca.", tempo_utils::generate_name("XXXXXXXX"), ".test");
 
     TU_ASSIGN_OR_RETURN (m_caKeyPair, tempo_security::generate_self_signed_ca_key_pair(
         m_eccKeygen, "Chord sandbox tester", "Certificate authority",
-        absl::StrCat("ca.", m_domain),
-        1, std::chrono::minutes {60}, -1,
+        caCommonName, 1, std::chrono::minutes {60}, -1,
         runner->getTesterDirectory(), "ca"));
-
-    tempo_security::CertificateKeyPair agentKeyPair;
-    TU_ASSIGN_OR_RETURN (agentKeyPair, tempo_security::generate_key_pair(
-        m_caKeyPair, m_eccKeygen, "Chord sandbox tester", "Chord agent",
-        agentServerName, 1, std::chrono::seconds{60}, testerDirectory, "agent"));
+    auto certificateSigner = std::make_shared<chord_sandbox::LocalCertificateSigner>(m_caKeyPair);
 
     // open the existing package cache if specified, otherwise create a new one
     std::shared_ptr<zuri_distributor::PackageCache> packageCache;
@@ -81,27 +76,11 @@ chord_test::ChordSandboxTester::configure()
     auto packageCacheLoader = std::make_shared<zuri_distributor::PackageCacheLoader>(packageCache);
     TU_RETURN_IF_NOT_OK (placeholderLoader->resolve(packageCacheLoader));
 
-    chord_tooling::SecurityConfig securityConfig;
-    securityConfig.pemRootCABundleFile = m_caKeyPair.getPemCertificateFile();
-    securityConfig.pemSigningCertificateFile = m_caKeyPair.getPemCertificateFile();
-    securityConfig.pemSigningPrivateKeyFile = m_caKeyPair.getPemPrivateKeyFile();
-
-    chord_tooling::AgentEntry agentEntry;
-    agentEntry.pemCertificateFile = agentKeyPair.getPemCertificateFile();
-    agentEntry.pemPrivateKeyFile = agentKeyPair.getPemPrivateKeyFile();
-    agentEntry.agentLocation = chord_common::TransportLocation::forUnix(testerDirectory / "agent.sock");
-
-    chord_sandbox::IsolateOptions options;
-    options.runDirectory = testerDirectory;
-    options.agentPath = std::filesystem::path(CHORD_AGENT_EXECUTABLE);
-    options.agentServerNameOverride = agentServerName;
-
     std::shared_ptr<chord_sandbox::ChordIsolate> isolate;
     TU_ASSIGN_OR_RETURN (isolate, chord_sandbox::ChordIsolate::spawn(
-        agentServerName,
-        std::make_shared<const chord_tooling::SecurityConfig>(std::move(securityConfig)),
-        std::make_shared<chord_tooling::AgentEntry>(std::move(agentEntry)),
-        options));
+        "test", testerDirectory, agentPath,
+        m_caKeyPair.getPemCertificateFile(), certificateSigner,
+        absl::Seconds(5), absl::Seconds(5)));
 
     m_isolate = isolate;
     m_packageCacheLoader = packageCacheLoader;

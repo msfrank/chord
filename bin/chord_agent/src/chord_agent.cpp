@@ -10,10 +10,14 @@
 #include <tempo_command/command_parser.h>
 #include <tempo_config/base_conversions.h>
 #include <tempo_config/enum_conversions.h>
+#include <tempo_security/x509_certificate.h>
 #include <tempo_utils/file_reader.h>
+#include <tempo_utils/file_writer.h>
 #include <tempo_utils/log_sink.h>
 #include <tempo_utils/log_stream.h>
 #include <tempo_utils/posix_result.h>
+
+#include "chord_common/common_conversions.h"
 
 static void
 on_termination_signal(uv_signal_t *handle, int signal)
@@ -56,29 +60,29 @@ run_chord_agent(int argc, const char *argv[])
     size_t len = 256;
     uv_os_gethostname(hostname, &len);
     auto processName = absl::StrCat(getpid(), "@", hostname);
+    auto cwd = std::filesystem::current_path();
 
-    tempo_config::StringParser agentNameParser;
+    tempo_config::StringParser sessionNameParser;
     tempo_config::StringParser listenEndpointParser(std::string{});
-    tempo_config::EnumTParser<chord_common::TransportType> listenTransportParser({
-        {"unix", chord_common::TransportType::Unix},
-        {"tcp", chord_common::TransportType::Tcp4},
-    }, chord_common::TransportType::Unix);
-    tempo_config::PathParser processRunDirectoryParser(std::filesystem::current_path());
+    chord_common::TransportTypeParser listenTransportParser(chord_common::TransportType::Unix);
+    tempo_config::PathParser processRunDirectoryParser(cwd);
     tempo_config::PathParser localMachineExecutableParser(std::filesystem::path(CHORD_LOCAL_MACHINE_EXECUTABLE));
-    tempo_config::PathParser pemCertificateFileParser(std::filesystem::path{});
-    tempo_config::PathParser pemPrivateKeyFileParser(std::filesystem::path{});
-    tempo_config::PathParser pemRootCABundleFileParser(std::filesystem::path{});
+    tempo_config::PathParser pemCertificateFileParser(cwd / "agent.crt");
+    tempo_config::PathParser pemPrivateKeyFileParser(cwd / "agent.key");
+    tempo_config::PathParser pemRootCABundleFileParser(cwd / "rootca.crt");
     tempo_config::BooleanParser runInBackgroundParser(false);
     tempo_config::BooleanParser temporarySessionParser(false);
     tempo_config::IntegerParser idleTimeoutParser(0);
     tempo_config::IntegerParser registrationTimeoutParser(5);
-    tempo_config::PathParser logFileParser(std::filesystem::path(absl::StrCat("chord-agent.", getpid(), ".log")));
+    tempo_config::PathParser logFileParser(std::filesystem::path{});
     tempo_config::PathParser pidFileParser(std::filesystem::path{});
+    tempo_config::PathParser endpointFileParser(std::filesystem::path{});
 
     std::vector<tempo_command::Default> defaults = {
-        {"agentName", {}, "the agent name", "NAME"},
+        {"sessionName", {}, "the session name", "NAME"},
         {"listenEndpoint", {}, "listen on the specified endpoint", "ENDPOINT"},
-        {"listenTransport", {}, "use the specified listener transport type", "TYPE"},
+        {"listenTransport", {}, "autoselect the listen endpoint using the specified transport type", "TYPE"},
+        {"endpointFile", {}, "record the listen endpoint in the specified endpoint file", "FILE"},
         {"processRunDirectory", processRunDirectoryParser.getDefault(),
             "run the agent in the specified directory", "DIR"},
         {"localMachineExecutable", localMachineExecutableParser.getDefault(),
@@ -96,9 +100,10 @@ run_chord_agent(int argc, const char *argv[])
     };
 
     std::vector<tempo_command::Grouping> groupings = {
-        {"agentName", {"--agent-name"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
+        {"sessionName", {"-n", "--session-name"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"listenEndpoint", {"-l", "--listen-endpoint"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"listenTransport", {"-t", "--listen-transport"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
+        {"endpointFile", {"-e", "--endpoint-file"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"processRunDirectory", {"-d", "--run-directory"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"pemCertificateFile", {"--certificate"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"pemPrivateKeyFile", {"--private-key"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
@@ -114,9 +119,10 @@ run_chord_agent(int argc, const char *argv[])
     };
 
     std::vector<tempo_command::Mapping> optMappings = {
-        {tempo_command::MappingType::ONE_INSTANCE, "agentName"},
+        {tempo_command::MappingType::ONE_INSTANCE, "sessionName"},
         {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "listenEndpoint"},
         {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "listenTransport"},
+        {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "endpointFile"},
         {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "processRunDirectory"},
         {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "pemCertificateFile"},
         {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "pemPrivateKeyFile"},
@@ -166,17 +172,17 @@ run_chord_agent(int argc, const char *argv[])
 
     TU_LOG_INFO << "command config:\n" << tempo_command::command_config_to_string(commandConfig);
 
-    // determine the agent name
-    std::string agentName;
-    TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(agentName, agentNameParser,
-        commandConfig, "agentName"));
+    // determine the session name
+    std::string sessionName;
+    TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(sessionName, sessionNameParser,
+        commandConfig, "sessionName"));
 
     // determine the listen endpoint
     std::string listenEndpoint;
     TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(listenEndpoint, listenEndpointParser,
         commandConfig, "listenEndpoint"));
 
-    // determin the listen transport
+    // determine the listen transport
     chord_common::TransportType listenTransport;
     TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(listenTransport, listenTransportParser,
         commandConfig, "listenTransport"));
@@ -236,66 +242,111 @@ run_chord_agent(int argc, const char *argv[])
     TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(pidFile, pidFileParser,
         commandConfig, "pidFile"));
 
-    // initialize logging
-    tempo_utils::LoggingConfiguration loggingConfig;
-    loggingConfig.severityFilter = tempo_utils::SeverityFilter::kVeryVerbose;
-    loggingConfig.flushEveryMessage = true;
-    bool usingDefaultLogSink = true;
-    if (!logFile.empty()) {
-        auto logSink = std::make_unique<tempo_utils::LogFileSink>(logFile);
-        tempo_utils::init_logging(loggingConfig, std::move(logSink));
-        usingDefaultLogSink = false;
+    // determine the endpoint file
+    std::filesystem::path endpointFile;
+    TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(endpointFile, endpointFileParser,
+        commandConfig, "endpointFile"));
+
+    // check for required files
+
+    if (!std::filesystem::is_regular_file(pemRootCABundleFile))
+        return tempo_command::CommandStatus::forCondition(
+            tempo_command::CommandCondition::kInvalidConfiguration,
+            "root CA file {} not found", pemRootCABundleFile.c_str());
+    if (!std::filesystem::is_regular_file(pemCertificateFile))
+        return tempo_command::CommandStatus::forCondition(
+            tempo_command::CommandCondition::kInvalidConfiguration,
+            "agent certificate {} not found", pemCertificateFile.c_str());
+    if (!std::filesystem::is_regular_file(pemPrivateKeyFile))
+        return tempo_command::CommandStatus::forCondition(
+            tempo_command::CommandCondition::kInvalidConfiguration,
+            "agent private key {} not found", pemPrivateKeyFile.c_str());
+
+    // check for either endpoint or transport type
+
+    if (listenEndpoint.empty() && listenTransport == chord_common::TransportType::Invalid)
+        return tempo_command::CommandStatus::forCondition(
+            tempo_command::CommandCondition::kInvalidConfiguration,
+            "one of --listen-endpoint and --listen-transport must be specified");
+
+    // get the endpoint server name from the certificate
+
+    std::shared_ptr<tempo_security::X509Certificate> agentCert;
+    TU_ASSIGN_OR_RETURN (agentCert, tempo_security::X509Certificate::readFile(pemCertificateFile));
+    auto serverName = agentCert->getCommonName();
+
+    // construct the listener target
+
+    chord_common::TransportLocation listenLocation;
+    if (listenEndpoint.empty()) {
+        // case 1: endpoint was not specified so autoselect the location based on the transport type
+        switch (listenTransport) {
+            case chord_common::TransportType::Unix: {
+                auto path = std::filesystem::absolute(processRunDirectory / "agent.sock");
+                listenLocation = chord_common::TransportLocation::forUnix(serverName, path);
+                break;
+            }
+            case chord_common::TransportType::Tcp4: {
+                listenLocation = chord_common::TransportLocation::forTcp4(serverName, "localhost");
+                break;
+            }
+            default:
+                return tempo_command::CommandStatus::forCondition(
+                    tempo_command::CommandCondition::kCommandError,
+                    "unknown --listen-transport type");
+        }
     } else {
-        tempo_utils::init_logging(loggingConfig);
+        auto maybeEndpoint = chord_common::TransportLocation::fromString(listenEndpoint);
+        if (maybeEndpoint.isValid()) {
+            // case 2: full endpoint was specified
+            if (maybeEndpoint.getServerName() != serverName)
+                return tempo_command::CommandStatus::forCondition(
+                    tempo_command::CommandCondition::kCommandError,
+                    "--listen-endpoint is a full uri and server name does not match the agent certificate");
+            listenLocation = maybeEndpoint;
+        } else {
+            // case 3: partial endpoint was specified
+            switch (listenTransport) {
+                case chord_common::TransportType::Unix:
+                    listenLocation = chord_common::TransportLocation::forUnix(serverName, listenEndpoint);
+                    break;
+                case chord_common::TransportType::Tcp4:
+                    listenLocation = chord_common::TransportLocation::forTcp4(serverName, listenEndpoint);
+                    break;
+                default:
+                    return tempo_command::CommandStatus::forCondition(
+                        tempo_command::CommandCondition::kCommandError,
+                        "--listen-endpoint is not a full uri and --listen-transport is not specified");
+            }
+        }
     }
 
-    // construct the listener url
-    std::string listenerUrl;
-    switch (listenTransport) {
-        case chord_common::TransportType::Unix: {
-            if (listenEndpoint.empty()) {
-                auto path = std::filesystem::absolute(processRunDirectory / "agent.sock");
-                listenerUrl = absl::StrCat("unix:", path.string());
-            } else {
-                listenerUrl = absl::StrCat("unix:", listenEndpoint);
-            }
-            break;
-        }
-        case chord_common::TransportType::Tcp4: {
-            if (listenEndpoint.empty()) {
-                listenerUrl = "dns:localhost";
-            } else {
-                listenerUrl = absl::StrCat("dns:", listenEndpoint);
-            }
-            break;
-        }
-        default:
-            return tempo_command::CommandStatus::forCondition(tempo_command::CommandCondition::kCommandError,
-                "unknown transport type");
-    }
+    auto listenTarget = listenLocation.toGrpcTarget();
 
     // if agent should run in the background, then fork and continue in the child
     if (runInBackground) {
 
-        //
-        if (usingDefaultLogSink) {
-            tempo_utils::cleanup_logging();
-        }
-
+        // ensure stdout and stderr are closed before forking
         if (fclose(stdout) < 0)
             return tempo_utils::PosixStatus::last("failed to close stdout");
         if (fclose(stderr) < 0)
             return tempo_utils::PosixStatus::last("failed to close stderr");
 
-        //
+        // fork
         auto pid = fork();
         if (pid < 0)
             return tempo_command::CommandStatus::forCondition(tempo_command::CommandCondition::kCommandError,
                 "failed to fork into the background");
+        // exit the parent process
         if (pid > 0) {
             TU_LOG_INFO << "forked agent into the background with pid " << pid;
             return {};
         }
+
+        // useful for debugging the child process
+        //kill(getpid(), SIGSTOP);
+
+        // make child process the session leader
         auto sid = setsid();
         if (sid < 0)
             return tempo_command::CommandStatus::forCondition(tempo_command::CommandCondition::kCommandError,
@@ -303,7 +354,24 @@ run_chord_agent(int argc, const char *argv[])
         TU_LOG_INFO << "set session sid " << sid;
     }
 
-    // TODO: if pid file is specified, then write the pid file
+    tempo_utils::LoggingConfiguration loggingConfig;
+    loggingConfig.severityFilter = tempo_utils::SeverityFilter::kVeryVerbose;
+    loggingConfig.flushEveryMessage = true;
+
+    // initialize logging
+    if (!logFile.empty()) {
+        auto logSink = std::make_unique<tempo_utils::LogFileSink>(logFile);
+        tempo_utils::init_logging(loggingConfig, std::move(logSink));
+    } else {
+        tempo_utils::init_logging(loggingConfig);
+    }
+
+    // if pid file is specified, then write the pid file
+    if (!pidFile.empty()) {
+        auto pidString = absl::StrCat(getpid());
+        tempo_utils::FileWriter pidWriter(pidFile, pidString, tempo_utils::FileWriterMode::CREATE_OR_OVERWRITE);
+        TU_RETURN_IF_NOT_OK (pidWriter.getStatus());
+    }
 
     // initialize uv loop
     uv_loop_t loop;
@@ -314,17 +382,43 @@ run_chord_agent(int argc, const char *argv[])
     TU_RETURN_IF_NOT_OK (supervisor.initialize());
 
     // construct the agent service
-    AgentService service(listenerUrl, &supervisor, agentName, localMachineExecutable);
+    AgentService service(&supervisor, sessionName, localMachineExecutable);
 
     // construct the server and start it up
     grpc::ServerBuilder builder;
     std::shared_ptr<grpc::ServerCredentials> credentials;
     TU_ASSIGN_OR_RETURN (credentials, make_ssl_server_credentials(pemCertificateFile,
         pemPrivateKeyFile, pemRootCABundleFile));
-    builder.AddListeningPort(listenerUrl, credentials);
+    int selectedPort = 0;
+    builder.AddListeningPort(listenTarget, credentials, &selectedPort);
     builder.RegisterService(&service);
     std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
-    TU_LOG_INFO << "starting service using endpoint " << listenerUrl;
+
+    // if port was autoselected then update the location
+    if (selectedPort > 0) {
+        switch (listenLocation.getType()) {
+            case chord_common::TransportType::Unix:
+                break;
+            case chord_common::TransportType::Tcp4:
+                listenLocation = chord_common::TransportLocation::forTcp4(
+                    serverName, listenLocation.getTcp4Address(), static_cast<tu_uint16>(selectedPort));
+                break;
+            default:
+                TU_UNREACHABLE();
+        }
+    }
+
+    // set the listen target on the service
+    listenTarget = listenLocation.toGrpcTarget();
+    service.setListenTarget(listenTarget);
+    TU_LOG_INFO << "started service on " << listenTarget;
+
+    // if endpoint file is specified, then write the endpoint file
+    if (!endpointFile.empty()) {
+        tempo_utils::FileWriter endpointWriter(
+            endpointFile, listenLocation.toString(), tempo_utils::FileWriterMode::CREATE_OR_OVERWRITE);
+        TU_RETURN_IF_NOT_OK (endpointWriter.getStatus());
+    }
 
     // catch SIGTERM indicating request to cleanly shutdown
     uv_signal_t sigterm;

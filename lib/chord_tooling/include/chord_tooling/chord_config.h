@@ -9,6 +9,7 @@
 
 #include "agent_store.h"
 #include "security_config.h"
+#include "signer_store.h"
 
 namespace chord_tooling {
 
@@ -37,8 +38,13 @@ namespace chord_tooling {
         std::filesystem::path getWorkspaceRoot() const;
         std::filesystem::path getWorkspaceConfigFile() const;
 
+        std::shared_ptr<const SignerStore> getSignerStore() const;
         std::shared_ptr<const AgentStore> getAgentStore() const;
         std::shared_ptr<const SecurityConfig> getSecurityConfig() const;
+
+        std::filesystem::path getRunDirectory() const;
+        std::string getDefaultSignerName() const;
+        std::string getDefaultAgentName() const;
 
     private:
         std::filesystem::path m_distributionRoot;
@@ -47,14 +53,19 @@ namespace chord_tooling {
         tempo_config::ConfigMap m_chordMap;
         tempo_config::ConfigMap m_vendorMap;
 
+        std::shared_ptr<const SignerStore> m_signerStore;
         std::shared_ptr<const AgentStore> m_agentStore;
         std::shared_ptr<const SecurityConfig> m_securityConfig;
+
+        std::filesystem::path m_runDirectory;
+        std::string m_defaultSignerName;
+        std::string m_defaultAgentName;
 
         ChordConfig(
             const std::filesystem::path &distributionRoot,
             const std::filesystem::path &userRoot,
             const std::filesystem::path &workspaceConfigFile,
-            const tempo_config::ConfigMap &zuriMap,
+            const tempo_config::ConfigMap &chordMap,
             const tempo_config::ConfigMap &vendorMap);
 
         tempo_utils::Status configure();

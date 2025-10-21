@@ -10,6 +10,7 @@ set(CHORD_TOOLING_INCLUDES
     include/chord_tooling/agent_store.h
     include/chord_tooling/chord_config.h
     include/chord_tooling/security_config.h
+    include/chord_tooling/signer_store.h
     include/chord_tooling/tooling_conversions.h
     include/chord_tooling/tooling_result.h
     )
@@ -19,6 +20,7 @@ target_sources(chord_tooling PRIVATE
     src/agent_store.cpp
     src/chord_config.cpp
     src/security_config.cpp
+    src/signer_store.cpp
     src/tooling_conversions.cpp
     src/tooling_result.cpp
     )

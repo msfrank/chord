@@ -5,6 +5,11 @@
 
 namespace chord_common {
 
+    enum class SignerType {
+        Invalid,
+        Local,
+    };
+
     enum class PortType {
         Invalid,
         OneShot,

@@ -10,63 +10,45 @@
 #include <tempo_utils/file_utilities.h>
 #include <tempo_utils/tempdir_maker.h>
 
+#include "chord_sandbox/local_certificate_signer.h"
+
 class ChordIsolate : public ::testing::Test {
 protected:
     chord_test::SandboxTesterOptions options;
+    std::unique_ptr<tempo_utils::TempdirMaker> tempdir;
 
     void SetUp() override {
+        tempo_utils::init_logging(tempo_utils::LoggingConfiguration{});
         options.isTemporary = false;
+        tempdir = std::make_unique<tempo_utils::TempdirMaker>("tester.XXXXXXXX");
+        TU_ASSERT (tempdir->isValid());
     }
 };
 
 TEST_F(ChordIsolate, InitializeAndShutdown)
 {
-    std::string organization("test");
-    auto organizationalUnit = tempo_utils::generate_name("XXXXXXXX");
-    auto caCommonName = absl::StrCat("ca.", organizationalUnit, ".", organization);
-    auto agentPrefix = tempo_utils::generate_name("agent-XXXXXXXX");
-    auto agentServerName = absl::StrCat(agentPrefix, ".", organizationalUnit, ".", organization);
+    auto testerDirectory = tempdir->getTempdir();
+    auto agentPath = std::filesystem::path(CHORD_AGENT_EXECUTABLE);
+    auto caCommonName = absl::StrCat(
+        "ca.", tempo_utils::generate_name("XXXXXXXX"), ".test");
 
-    tempo_security::ECCPrivateKeyGenerator keygen(NID_X9_62_prime256v1);
-
-    tempo_utils::TempdirMaker tempdirMaker("tester.XXXXXXXX");
-    ASSERT_TRUE (tempdirMaker.isValid());
-    auto testerDirectory = tempdirMaker.getTempdir();
+    tempo_security::ECCPrivateKeyGenerator keygen(tempo_security::ECCurveId::Prime256v1);
 
     tempo_security::CertificateKeyPair caKeyPair;
     TU_ASSIGN_OR_RAISE (caKeyPair, tempo_security::generate_self_signed_ca_key_pair(keygen,
-        organization, organizationalUnit, caCommonName,
-        1, std::chrono::seconds{60}, -1,
+        "ChordIsolate", "InitializeAndShutdown",
+        caCommonName, 1, std::chrono::seconds{60 * 60 * 24}, -1,
         testerDirectory, "ca"));
+    auto certificateSigner = std::make_shared<chord_sandbox::LocalCertificateSigner>(caKeyPair);
+    auto pemRootCABundleFile = caKeyPair.getPemCertificateFile();
 
-    tempo_security::CertificateKeyPair agentKeyPair;
-    TU_ASSIGN_OR_RAISE (agentKeyPair, tempo_security::generate_key_pair(caKeyPair, keygen,
-        organization, organizationalUnit, agentServerName,
-        1, std::chrono::seconds{60},
-        testerDirectory, agentPrefix));
-
-    chord_tooling::SecurityConfig securityConfig;
-    securityConfig.pemRootCABundleFile = caKeyPair.getPemCertificateFile();
-    securityConfig.pemSigningCertificateFile = caKeyPair.getPemCertificateFile();
-    securityConfig.pemSigningPrivateKeyFile = caKeyPair.getPemPrivateKeyFile();
-
-    chord_tooling::AgentEntry agentEntry;
-    agentEntry.pemCertificateFile = agentKeyPair.getPemCertificateFile();
-    agentEntry.pemPrivateKeyFile = agentKeyPair.getPemPrivateKeyFile();
-    agentEntry.agentLocation = chord_common::TransportLocation::forUnix(testerDirectory / "agent.sock");
-    agentEntry.idleTimeout = absl::Seconds(15);
-
-    chord_sandbox::IsolateOptions options;
-    options.runDirectory = testerDirectory;
-    options.agentPath = std::filesystem::path(CHORD_AGENT_EXECUTABLE);
-    options.agentServerNameOverride = agentServerName;
+    auto idleTimeout = absl::Seconds(60);
+    auto registrationTimeout = absl::Seconds(60);
 
     // initialize the sandbox
     auto spawnIsolateResult = chord_sandbox::ChordIsolate::spawn(
-        agentServerName,
-        std::make_shared<const chord_tooling::SecurityConfig>(std::move(securityConfig)),
-        std::make_shared<chord_tooling::AgentEntry>(std::move(agentEntry)),
-        options);
+        "test", testerDirectory, agentPath, pemRootCABundleFile, certificateSigner,
+        idleTimeout, registrationTimeout);;
     ASSERT_THAT (spawnIsolateResult, tempo_test::IsResult());
     auto isolate = spawnIsolateResult.getResult();
 

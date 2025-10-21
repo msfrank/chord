@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include <chord_sandbox/internal/spawn_utils.h>
+#include <chord_sandbox/internal/session_utils.h>
 
 TEST(SpawnUtils, SpawnTemporaryAgent)
 {

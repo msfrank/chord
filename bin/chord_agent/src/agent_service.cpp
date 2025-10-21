@@ -8,21 +8,34 @@
 #include <tempo_utils/file_utilities.h>
 
 AgentService::AgentService(
-    const std::string &listenEndpoint,
     MachineSupervisor *supervisor,
     std::string_view agentName,
     const std::filesystem::path &localMachineExecutable)
-    : m_listenEndpoint(listenEndpoint),
-      m_supervisor(supervisor),
+    : m_supervisor(supervisor),
       m_agentName(agentName),
       m_localMachineExecutable(localMachineExecutable)
 {
-    TU_ASSERT (!m_listenEndpoint.empty());
     TU_ASSERT (m_supervisor != nullptr);
+    TU_ASSERT (!m_agentName.empty());
     TU_ASSERT (!m_localMachineExecutable.empty());
     uv_timeval64_t tv;
     uv_gettimeofday(&tv);
     m_uptime = tv.tv_sec;
+    m_lock = std::make_unique<absl::Mutex>();
+}
+
+std::string
+AgentService::getListenTarget() const
+{
+    absl::MutexLock lock(m_lock.get());
+    return m_listenTarget;
+}
+
+void
+AgentService::setListenTarget(const std::string &listenTarget)
+{
+    absl::MutexLock lock(m_lock.get());
+    m_listenTarget = listenTarget;
 }
 
 grpc::ServerUnaryReactor *
@@ -163,7 +176,7 @@ AgentService::CreateMachine(
     }
 
     // append the final required builder args
-    builder.appendArg(m_listenEndpoint);
+    builder.appendArg(m_listenTarget);
     builder.appendArg(request->execution_url());
     builder.appendArg(machineUrl.toString());
 

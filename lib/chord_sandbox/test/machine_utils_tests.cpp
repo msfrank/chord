@@ -12,7 +12,7 @@
 #include <tempo_utils/file_writer.h>
 #include <tempo_utils/tempdir_maker.h>
 
-#include "chord_sandbox/local_endpoint_signer.h"
+#include "chord_sandbox/local_certificate_signer.h"
 
 using ::testing::_;
 using ::testing::DoAll;
@@ -97,7 +97,7 @@ TEST(MachineUtils, RunMachineSucceeds)
         testerDirectory, "ca");
     ASSERT_TRUE (generateCAKeyPairResult.isResult());
     auto caKeyPair = generateCAKeyPairResult.getResult();
-    auto endpointSigner = std::make_shared<chord_sandbox::LocalEndpointSigner>(caKeyPair);
+    auto endpointSigner = std::make_shared<chord_sandbox::LocalCertificateSigner>(caKeyPair);
 
     chord_invoke::MockInvokeServiceStub stub;
     chord_invoke::RunMachineRequest runMachineRequest;

@@ -9,10 +9,12 @@ class AgentService : public chord_invoke::InvokeService::CallbackService {
 
 public:
     AgentService(
-        const std::string &listenEndpoint,
         MachineSupervisor *supervisor,
         std::string_view agentName,
         const std::filesystem::path &localMachineExecutable);
+
+    std::string getListenTarget() const;
+    void setListenTarget(const std::string &listenTarget);
 
     grpc::ServerUnaryReactor *
     IdentifyAgent(
@@ -51,11 +53,13 @@ public:
         chord_invoke::DeleteMachineResult *response) override;
 
 private:
-    std::string m_listenEndpoint;
     MachineSupervisor *m_supervisor;
     std::string m_agentName;
     std::filesystem::path m_localMachineExecutable;
     tu_uint64 m_uptime;
+
+    std::unique_ptr<absl::Mutex> m_lock;
+    std::string m_listenTarget ABSL_GUARDED_BY(m_lock);
 };
 
 class OnAgentSpawn : public OnSupervisorSpawn {

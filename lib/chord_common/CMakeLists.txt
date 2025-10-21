@@ -7,15 +7,18 @@ add_library(chord_common SHARED)
 add_library(chord::chord_common ALIAS chord_common)
 
 set(CHORD_COMMON_INCLUDES
+    include/chord_common/abstract_certificate_signer.h
     include/chord_common/abstract_protocol_handler.h
     include/chord_common/abstract_protocol_writer.h
-    include/chord_common/protocol_types.h
+    include/chord_common/common_conversions.h
+    include/chord_common/common_types.h
     include/chord_common/transport_location.h
     )
 set_target_properties(chord_common PROPERTIES PUBLIC_HEADER "${CHORD_COMMON_INCLUDES}")
 
 target_sources(chord_common PRIVATE
-    src/protocol_types.cpp
+    src/common_conversions.cpp
+    src/common_types.cpp
     src/transport_location.cpp
     )
 
@@ -41,9 +44,12 @@ set_target_properties(chord_common PROPERTIES
 
 target_link_libraries(chord_common
     PUBLIC
+    tempo::tempo_config
     tempo::tempo_security
     tempo::tempo_utils
     absl::flat_hash_map
+    PRIVATE
+    Boost::headers
     gRPC::grpc++
     uv::uv
     )

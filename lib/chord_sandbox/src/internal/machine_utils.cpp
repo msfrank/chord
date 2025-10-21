@@ -112,7 +112,7 @@ chord_sandbox::internal::run_machine(
         const tempo_utils::Url &machineUrl,
         const absl::flat_hash_map<tempo_utils::Url, tempo_utils::Url> &protocolEndpoints,
         const absl::flat_hash_map<tempo_utils::Url,std::string> &endpointCsrs,
-        std::shared_ptr<AbstractEndpointSigner> endpointSigner,
+        std::shared_ptr<chord_common::AbstractCertificateSigner> certificateSigner,
         absl::Duration requestedValidityPeriod)
 {
     grpc::ClientContext runMachineContext;
@@ -130,7 +130,7 @@ chord_sandbox::internal::run_machine(
         signedEndpoint->set_endpoint_url(entry.first.toString());
 
         std::string pemCertificateBytes;
-        TU_ASSIGN_OR_RETURN (pemCertificateBytes, endpointSigner->signEndpoint(
+        TU_ASSIGN_OR_RETURN (pemCertificateBytes, certificateSigner->signEndpoint(
             entry.first, entry.second, requestedValidityPeriod));
         signedEndpoint->set_certificate(pemCertificateBytes);
 

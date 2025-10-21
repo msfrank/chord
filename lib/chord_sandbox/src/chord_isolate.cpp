@@ -2,21 +2,18 @@
 
 #include <absl/container/flat_hash_map.h>
 #include <absl/strings/ascii.h>
+#include <grpcpp/create_channel.h>
 
 #include <chord_invoke/invoke_service.grpc.pb.h>
 #include <chord_sandbox/internal/machine_utils.h>
-#include <chord_sandbox/internal/spawn_utils.h>
+#include <chord_sandbox/internal/session_utils.h>
+#include <chord_sandbox/local_certificate_signer.h>
 #include <chord_sandbox/run_protocol_plug.h>
-#include <grpcpp/create_channel.h>
-#include <tempo_security/certificate_key_pair.h>
 #include <tempo_security/x509_certificate_signing_request.h>
+#include <tempo_utils/directory_maker.h>
 #include <tempo_utils/file_reader.h>
 #include <tempo_utils/log_stream.h>
-#include <tempo_utils/process_builder.h>
-#include <tempo_utils/process_runner.h>
 #include <tempo_utils/url.h>
-
-#include "chord_sandbox/local_endpoint_signer.h"
 
 struct chord_sandbox::ChordIsolate::SandboxPriv {
     std::unique_ptr<chord_invoke::InvokeService::Stub> stub;
@@ -25,52 +22,15 @@ struct chord_sandbox::ChordIsolate::SandboxPriv {
 #include <chord_sandbox/chord_isolate.h>
 #include <chord_sandbox/grpc_connector.h>
 
-static std::string
-transport_location_to_grpc_target(const chord_common::TransportLocation &location)
-{
-    switch (location.getType()) {
-        case chord_common::TransportType::Unix: {
-            auto path = location.getUnixPath();
-            return absl::StrCat("unix://", std::filesystem::absolute(path).string());
-        }
-        case chord_common::TransportType::Tcp4: {
-            std::string target;
-            auto address = location.getTcp4Address();
-            if (std::isdigit(address.front())) {
-                target = absl::StrCat("ipv4:", address);
-            } else {
-                target = absl::StrCat("dns:///", address);
-            }
-            auto portNumber = location.getTcp4Port();
-            if (portNumber > 0) {
-                absl::StrAppend(&target, ":", portNumber);
-            }
-            return target;
-        }
-        default:
-            return {};
-    }
-}
-
 tempo_utils::Result<std::shared_ptr<chord_sandbox::ChordIsolate>>
 chord_sandbox::ChordIsolate::connect(
-    std::string_view agentName,
-    const chord_common::TransportLocation &agentEndpoint,
-    std::shared_ptr<const chord_tooling::SecurityConfig> securityConfig,
-    const IsolateOptions &options)
+    const std::filesystem::path &sessionDirectory,
+    const std::filesystem::path &pemRootCABundleFile,
+    std::shared_ptr<chord_common::AbstractCertificateSigner> certificateSigner,
+    absl::Duration connectTimeout)
 {
-    auto &pemRootCABundleFile = securityConfig->pemRootCABundleFile;
-
-    std::shared_ptr<AbstractEndpointSigner> endpointSigner;
-    if (options.endpointSigner == nullptr) {
-        tempo_security::CertificateKeyPair localCAKeypair;
-        TU_ASSIGN_OR_RETURN (localCAKeypair, securityConfig->getSigningKeypair());
-        endpointSigner = std::make_shared<LocalEndpointSigner>(localCAKeypair);
-    } else {
-        endpointSigner = options.endpointSigner;
-    }
-
-    auto target = transport_location_to_grpc_target(agentEndpoint);
+    chord_common::TransportLocation endpoint;
+    TU_ASSIGN_OR_RETURN (endpoint, internal::load_session_endpoint(sessionDirectory, connectTimeout));
 
     // construct the channel credentials
     grpc::SslCredentialsOptions sslCredentialsOptions;
@@ -84,10 +44,9 @@ chord_sandbox::ChordIsolate::connect(
 
     // construct the client
     grpc::ChannelArguments channelArguments;
-    if (!options.agentServerNameOverride.empty()) {
-        channelArguments.SetSslTargetNameOverride(options.agentServerNameOverride);
-    }
+    channelArguments.SetSslTargetNameOverride(endpoint.getServerName());
 
+    auto target = endpoint.toGrpcTarget();
     auto channel = grpc::CreateCustomChannel(target, credentials, channelArguments);
     auto priv = std::make_unique<SandboxPriv>();
     priv->stub = chord_invoke::InvokeService::NewStub(channel);
@@ -103,72 +62,79 @@ chord_sandbox::ChordIsolate::connect(
 
     TU_LOG_INFO << "connected to agent " << identifyResult.agent_name();
 
+    auto sessionName = sessionDirectory.filename().string();
     auto isolate = std::shared_ptr<ChordIsolate>(new ChordIsolate(
-        agentName, pemRootCABundleFile, endpointSigner, channel, std::move(priv)));
+        sessionName, pemRootCABundleFile, certificateSigner, channel, std::move(priv)));
     return isolate;
 }
 
-tempo_utils::Result<std::shared_ptr<chord_sandbox::ChordIsolate>>
-chord_sandbox::ChordIsolate::connect(
-    std::string_view agentName,
-    std::shared_ptr<const chord_tooling::ChordConfig> chordConfig,
-    const IsolateOptions &options)
-{
-    auto agentStore = chordConfig->getAgentStore();
-    auto agentEntry = agentStore->getAgent(agentName);
-    if (agentEntry == nullptr)
-        return SandboxStatus::forCondition(SandboxCondition::kInvalidConfiguration,
-            "unknown agent '{}'", agentName);
-    auto agentEndpoint = agentEntry->agentLocation;
-
-    auto securityConfig = chordConfig->getSecurityConfig();
-
-    return connect(agentName, agentEndpoint, securityConfig, options);
-}
-
-tempo_utils::Result<std::shared_ptr<chord_sandbox::ChordIsolate>>
-chord_sandbox::ChordIsolate::spawn(
-    std::string_view agentName,
-    std::shared_ptr<const chord_tooling::ChordConfig> chordConfig,
-    const IsolateOptions &options) {
-    auto agentStore = chordConfig->getAgentStore();
-    auto agentEntry = agentStore->getAgent(agentName);
-    if (agentEntry == nullptr)
-        return SandboxStatus::forCondition(SandboxCondition::kInvalidConfiguration,
-            "unknown agent '{}'", agentName);
-
-    auto securityConfig = chordConfig->getSecurityConfig();
-
-    return spawn(agentName, securityConfig, agentEntry, options);
-}
+// tempo_utils::Result<std::shared_ptr<chord_sandbox::ChordIsolate>>
+// chord_sandbox::ChordIsolate::spawn(
+//     std::string_view agentName,
+//     std::shared_ptr<const chord_tooling::ChordConfig> chordConfig,
+//     const IsolateOptions &options) {
+//     auto agentStore = chordConfig->getAgentStore();
+//     auto agentEntry = agentStore->getAgent(agentName);
+//     if (agentEntry == nullptr)
+//         return SandboxStatus::forCondition(SandboxCondition::kInvalidConfiguration,
+//             "unknown agent '{}'", agentName);
+//
+//     auto securityConfig = chordConfig->getSecurityConfig();
+//
+// std::shared_ptr<chord_common::AbstractCertificateSigner> certificateSigner;
+// if (options.certificateSigner == nullptr) {
+//     tempo_security::CertificateKeyPair localCAKeypair;
+//     TU_ASSIGN_OR_RETURN (localCAKeypair, securityConfig->getSigningKeypair());
+//     certificateSigner = std::make_shared<LocalCertificateSigner>(localCAKeypair);
+// } else {
+//     certificateSigner = options.certificateSigner;
+// }
+//
+//     return spawn(agentName, securityConfig, agentEntry, options);
+// }
 
 tempo_utils::Result<std::shared_ptr<chord_sandbox::ChordIsolate>>
 chord_sandbox::ChordIsolate::spawn(
-    std::string_view agentName,
-    std::shared_ptr<const chord_tooling::SecurityConfig> securityConfig,
-    std::shared_ptr<const chord_tooling::AgentEntry> agentEntry,
-    const IsolateOptions &options)
+    std::string_view sessionName,
+    const std::filesystem::path &runDirectory,
+    const std::filesystem::path &agentPath,
+    const std::filesystem::path &pemRootCABundleFile,
+    std::shared_ptr<chord_common::AbstractCertificateSigner> certificateSigner,
+    absl::Duration idleTimeout,
+    absl::Duration registrationTimeout)
 {
-    auto &pemRootCABundleFile = securityConfig->pemRootCABundleFile;
+    tempo_utils::DirectoryMaker dirmaker(runDirectory, sessionName,
+        std::filesystem::perms::owner_all);
+    TU_RETURN_IF_NOT_OK (dirmaker.getStatus());
+    auto sessionDirectory = dirmaker.getAbsolutePath();
 
-    std::shared_ptr<AbstractEndpointSigner> endpointSigner;
-    if (options.endpointSigner == nullptr) {
-        tempo_security::CertificateKeyPair localCAKeypair;
-        TU_ASSIGN_OR_RETURN (localCAKeypair, securityConfig->getSigningKeypair());
-        endpointSigner = std::make_shared<LocalEndpointSigner>(localCAKeypair);
-    } else {
-        endpointSigner = options.endpointSigner;
+    auto spawnResult = spawn(sessionDirectory, agentPath, pemRootCABundleFile,
+        certificateSigner, idleTimeout, registrationTimeout);
+    if (spawnResult.isStatus()) {
+        std::error_code ec;
+        std::filesystem::remove_all(sessionDirectory, ec);
     }
+    return spawnResult;
+}
 
-    internal::SpawnAgentResult spawnAgentResult;
-    TU_ASSIGN_OR_RETURN (spawnAgentResult, internal::spawn_agent(
-        options.agentPath,
-        options.agentServerNameOverride,
-        options.runDirectory,
-        agentEntry->idleTimeout,
-        agentEntry->pemCertificateFile,
-        agentEntry->pemPrivateKeyFile,
-        pemRootCABundleFile));
+tempo_utils::Result<std::shared_ptr<chord_sandbox::ChordIsolate>>
+chord_sandbox::ChordIsolate::spawn(
+    const std::filesystem::path &sessionDirectory,
+    const std::filesystem::path &agentPath,
+    const std::filesystem::path &pemRootCABundleFile,
+    std::shared_ptr<chord_common::AbstractCertificateSigner> certificateSigner,
+    absl::Duration idleTimeout,
+    absl::Duration registrationTimeout)
+{
+    internal::PrepareSessionResult prepareSessionResult;
+    TU_ASSIGN_OR_RETURN (prepareSessionResult, internal::prepare_session(
+        sessionDirectory, pemRootCABundleFile, certificateSigner));
+
+    internal::SpawnSessionResult spawnSessionResult;
+    TU_ASSIGN_OR_RETURN (spawnSessionResult, internal::spawn_session(
+        sessionDirectory, agentPath, pemRootCABundleFile,
+        prepareSessionResult.pemCertificateFile, prepareSessionResult.pemPrivateKeyFile,
+        idleTimeout, registrationTimeout));
 
     // construct the channel credentials
     grpc::SslCredentialsOptions sslCredentialsOptions;
@@ -182,11 +148,11 @@ chord_sandbox::ChordIsolate::spawn(
 
     // construct the client
     grpc::ChannelArguments channelArguments;
-    if (!options.agentServerNameOverride.empty()) {
-        channelArguments.SetSslTargetNameOverride(options.agentServerNameOverride);
-    }
+    channelArguments.SetSslTargetNameOverride(spawnSessionResult.endpoint.getServerName());
+    TU_LOG_INFO << "using target name " << spawnSessionResult.endpoint.getServerName();
 
-    auto channel = grpc::CreateCustomChannel(spawnAgentResult.endpoint, credentials, channelArguments);
+    auto target = spawnSessionResult.endpoint.toGrpcTarget();
+    auto channel = grpc::CreateCustomChannel(target, credentials, channelArguments);
     auto priv = std::make_unique<SandboxPriv>();
     priv->stub = chord_invoke::InvokeService::NewStub(channel);
 
@@ -201,26 +167,27 @@ chord_sandbox::ChordIsolate::spawn(
 
     TU_LOG_INFO << "connected to agent " << identifyResult.agent_name();
 
+    auto sessionName = sessionDirectory.filename().string();
     auto isolate = std::shared_ptr<ChordIsolate>(new ChordIsolate(
-        agentName, pemRootCABundleFile, endpointSigner, channel, std::move(priv)));
+        sessionName, pemRootCABundleFile, certificateSigner, channel, std::move(priv)));
     return isolate;
 }
 
 chord_sandbox::ChordIsolate::ChordIsolate(
     std::string_view agentName,
     const std::filesystem::path &pemRootCABundleFile,
-    std::shared_ptr<AbstractEndpointSigner> endpointSigner,
+    std::shared_ptr<chord_common::AbstractCertificateSigner> certificateSigner,
     std::shared_ptr<grpc::Channel> channel,
     std::unique_ptr<SandboxPriv> priv)
     : m_name(agentName),
       m_pemRootCABundleFile(pemRootCABundleFile),
-      m_endpointSigner(endpointSigner),
+      m_certificateSigner(certificateSigner),
       m_channel(channel),
       m_priv(std::move(priv))
 {
     TU_ASSERT (!m_name.empty());
     TU_ASSERT (!m_pemRootCABundleFile.empty());
-    TU_ASSERT (m_endpointSigner != nullptr);
+    TU_ASSERT (m_certificateSigner != nullptr);
     TU_ASSERT (m_channel != nullptr);
     TU_ASSERT (m_priv != nullptr);
 }
@@ -262,7 +229,7 @@ chord_sandbox::ChordIsolate::launch(
     internal::RunMachineResult runMachineResult;
     TU_ASSIGN_OR_RETURN (runMachineResult, internal::run_machine(m_priv->stub.get(),
         createMachineResult.machineUrl, createMachineResult.protocolEndpoints,
-        createMachineResult.endpointCsrs, m_endpointSigner, absl::Hours(4)));
+        createMachineResult.endpointCsrs, m_certificateSigner, absl::Hours(4)));
 
     // create the connector
     auto connector = std::make_shared<GrpcConnector>(

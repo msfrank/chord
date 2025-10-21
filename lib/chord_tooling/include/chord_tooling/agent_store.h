@@ -9,10 +9,12 @@
 namespace chord_tooling {
 
     struct AgentEntry {
-        chord_common::TransportLocation agentLocation;
+        chord_common::TransportType transportType;
+        std::filesystem::path unixListenerPath;
+        std::string tcpListenerAddress;
+        tu_uint16 tcpListenerPort;
         std::vector<std::filesystem::path> packageCacheDirectories;
-        std::filesystem::path pemCertificateFile;
-        std::filesystem::path pemPrivateKeyFile;
+        std::string certificateSigner;
         absl::Duration idleTimeout;
         absl::Duration registrationTimeout;
 

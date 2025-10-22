@@ -3,7 +3,7 @@
 #include <chord_agent/machine_supervisor.h>
 #include <tempo_utils/log_stream.h>
 
-MachineProcess::MachineProcess(
+chord_agent::MachineProcess::MachineProcess(
     const tempo_utils::Url &machineUrl,
     const tempo_utils::ProcessInvoker &invoker,
     MachineSupervisor *supervisor)
@@ -23,7 +23,7 @@ MachineProcess::MachineProcess(
     m_logger = std::make_unique<MachineLogger>(m_machineUrl, m_supervisor->getLoop());
 }
 
-MachineProcess::~MachineProcess()
+chord_agent::MachineProcess::~MachineProcess()
 {
     delete m_lock;
 }
@@ -34,7 +34,7 @@ MachineProcess::~MachineProcess()
  * @return The machine url.
  */
 tempo_utils::Url
-MachineProcess::getMachineUrl() const
+chord_agent::MachineProcess::getMachineUrl() const
 {
     return m_machineUrl;
 }
@@ -44,8 +44,8 @@ MachineProcess::getMachineUrl() const
  *
  * @return The current state of the machine.
  */
-MachineState
-MachineProcess::getState() const
+chord_agent::MachineState
+chord_agent::MachineProcess::getState() const
 {
     absl::MutexLock locker(m_lock);
     return m_state;
@@ -57,7 +57,7 @@ MachineProcess::getState() const
  * @param state The current state of the machine.
  */
 void
-MachineProcess::setState(MachineState state)
+chord_agent::MachineProcess::setState(MachineState state)
 {
     absl::MutexLock locker(m_lock);
     m_state = state;
@@ -71,7 +71,7 @@ MachineProcess::setState(MachineState state)
  * @param signal The signal which caused the process to exit, if applicable.
  */
 void
-on_process_exit(uv_process_t *child, int64_t status, int signal)
+chord_agent::on_process_exit(uv_process_t *child, int64_t status, int signal)
 {
     auto *machine = (MachineProcess *) child->data;
     TU_LOG_INFO << "child process " << child->pid << " exited with status " << status;
@@ -86,7 +86,7 @@ on_process_exit(uv_process_t *child, int64_t status, int signal)
  * @return Ok status if the process was spawned successfully, otherwise notOk status.
  */
 tempo_utils::Status
-MachineProcess::spawn(const std::filesystem::path &cwd)
+chord_agent::MachineProcess::spawn(const std::filesystem::path &cwd)
 {
     absl::MutexLock locker(m_lock);
 
@@ -141,7 +141,7 @@ MachineProcess::spawn(const std::filesystem::path &cwd)
  * @return
  */
 tempo_utils::Status
-MachineProcess::terminate(int signal)
+chord_agent::MachineProcess::terminate(int signal)
 {
     absl::MutexLock locker(m_lock);
 
@@ -175,7 +175,7 @@ MachineProcess::terminate(int signal)
  * @param signal The termination signal.
  */
 void
-MachineProcess::release(tu_int64 status, int signal)
+chord_agent::MachineProcess::release(tu_int64 status, int signal)
 {
     // update internal state while holding the lock
     {

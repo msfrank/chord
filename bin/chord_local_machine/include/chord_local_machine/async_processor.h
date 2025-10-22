@@ -1,5 +1,5 @@
-#ifndef CHORD_LOCAL_MACHINE_ASYNC_PROCESSOR_H
-#define CHORD_LOCAL_MACHINE_ASYNC_PROCESSOR_H
+#ifndef CHORD_MACHINE_ASYNC_PROCESSOR_H
+#define CHORD_MACHINE_ASYNC_PROCESSOR_H
 
 #include <queue>
 
@@ -10,76 +10,79 @@
 
 #include "abstract_message_sender.h"
 
-/**
- *
- */
-class BaseAsyncProcessor {
-public:
-    BaseAsyncProcessor();
-    virtual ~BaseAsyncProcessor();
+namespace chord_machine {
 
-    tempo_utils::Status initialize(uv_loop_t *loop);
-    void processAvailableMessages();
-    void runUntilCancelled();
+    /**
+     *
+     */
+    class BaseAsyncProcessor {
+    public:
+        BaseAsyncProcessor();
+        virtual ~BaseAsyncProcessor();
 
-protected:
-    virtual void processAbstractMessage(AbstractMessage *message) = 0;
-    void sendAbstractMessage(AbstractMessage *message);
-    void cancelProcessing();
+        tempo_utils::Status initialize(uv_loop_t *loop);
+        void processAvailableMessages();
+        void runUntilCancelled();
 
-private:
-    absl::Mutex m_lock;
-    std::queue<AbstractMessage *> m_queue ABSL_GUARDED_BY(m_lock);
-    uv_async_t *m_async;
+    protected:
+        virtual void processAbstractMessage(AbstractMessage *message) = 0;
+        void sendAbstractMessage(AbstractMessage *message);
+        void cancelProcessing();
 
-    friend void on_message_receive(uv_async_t *async);
-};
+    private:
+        absl::Mutex m_lock;
+        std::queue<AbstractMessage *> m_queue ABSL_GUARDED_BY(m_lock);
+        uv_async_t *m_async;
 
-/**
- *
- * @tparam MessageType
- */
-template<class MessageType>
-class AsyncProcessor : public BaseAsyncProcessor, public AbstractMessageSender<MessageType> {
+        friend void on_message_receive(uv_async_t *async);
+    };
 
-public:
-    typedef bool (*TypedMessageReceivedCallback)(MessageType *, void *);
+    /**
+     *
+     * @tparam MessageType
+     */
+    template<class MessageType>
+    class AsyncProcessor : public BaseAsyncProcessor, public AbstractMessageSender<MessageType> {
 
-public:
-    AsyncProcessor(TypedMessageReceivedCallback received, void *data);
-    void sendMessage(MessageType *message) override;
+    public:
+        typedef bool (*TypedMessageReceivedCallback)(MessageType *, void *);
 
-protected:
-    void processAbstractMessage(AbstractMessage *message) override;
+    public:
+        AsyncProcessor(TypedMessageReceivedCallback received, void *data);
+        void sendMessage(MessageType *message) override;
 
-private:
-    TypedMessageReceivedCallback m_received;
-    void *m_data;
-};
+    protected:
+        void processAbstractMessage(AbstractMessage *message) override;
 
-template<class MessageType>
-AsyncProcessor<MessageType>::AsyncProcessor(TypedMessageReceivedCallback received, void *data)
-    : BaseAsyncProcessor(),
-      m_received(received),
-      m_data(data)
-{
-    TU_ASSERT (m_received != nullptr);
-}
+    private:
+        TypedMessageReceivedCallback m_received;
+        void *m_data;
+    };
 
-template<class MessageType>
-void
-AsyncProcessor<MessageType>::sendMessage(MessageType *message)
-{
-    sendAbstractMessage(message);
-}
+    template<class MessageType>
+    AsyncProcessor<MessageType>::AsyncProcessor(TypedMessageReceivedCallback received, void *data)
+        : BaseAsyncProcessor(),
+          m_received(received),
+          m_data(data)
+    {
+        TU_ASSERT (m_received != nullptr);
+    }
 
-template<class MessageType>
-void
-AsyncProcessor<MessageType>::processAbstractMessage(AbstractMessage *message)
-{
-    if (!m_received(static_cast<MessageType *>(message), m_data)) {
-        cancelProcessing();
+    template<class MessageType>
+    void
+    AsyncProcessor<MessageType>::sendMessage(MessageType *message)
+    {
+        sendAbstractMessage(message);
+    }
+
+    template<class MessageType>
+    void
+    AsyncProcessor<MessageType>::processAbstractMessage(AbstractMessage *message)
+    {
+        if (!m_received(static_cast<MessageType *>(message), m_data)) {
+            cancelProcessing();
+        }
     }
 }
 
-#endif // CHORD_LOCAL_MACHINE_ASYNC_PROCESSOR_H
+#endif // CHORD_MACHINE_ASYNC_PROCESSOR_H

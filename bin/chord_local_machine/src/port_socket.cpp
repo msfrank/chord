@@ -2,7 +2,7 @@
 #include <chord_local_machine/port_socket.h>
 #include <tempo_utils/memory_bytes.h>
 
-PortSocket::PortSocket(std::shared_ptr<lyric_runtime::DuplexPort> port)
+chord_machine::PortSocket::PortSocket(std::shared_ptr<lyric_runtime::DuplexPort> port)
     : m_port(port),
       m_writer(nullptr)
 {
@@ -10,13 +10,13 @@ PortSocket::PortSocket(std::shared_ptr<lyric_runtime::DuplexPort> port)
 }
 
 bool
-PortSocket::isAttached()
+chord_machine::PortSocket::isAttached()
 {
     return m_writer != nullptr;
 }
 
 tempo_utils::Status
-PortSocket::attach(chord_common::AbstractProtocolWriter *writer)
+chord_machine::PortSocket::attach(chord_common::AbstractProtocolWriter *writer)
 {
     m_writer = writer;
     auto status = m_port->attach(this);
@@ -27,7 +27,7 @@ PortSocket::attach(chord_common::AbstractProtocolWriter *writer)
 }
 
 tempo_utils::Status
-PortSocket::send(std::string_view message)
+chord_machine::PortSocket::send(std::string_view message)
 {
     if (m_writer == nullptr)
         return tempo_utils::GenericStatus::forCondition(
@@ -37,7 +37,7 @@ PortSocket::send(std::string_view message)
 }
 
 tempo_utils::Status
-PortSocket::handle(std::string_view message)
+chord_machine::PortSocket::handle(std::string_view message)
 {
     auto bytes = tempo_utils::MemoryBytes::copy(message);
     TU_LOG_INFO << "port " << m_port->getUrl() << " received message (" << bytes->getSize() << " bytes)";
@@ -47,14 +47,14 @@ PortSocket::handle(std::string_view message)
 }
 
 tempo_utils::Status
-PortSocket::detach()
+chord_machine::PortSocket::detach()
 {
     m_writer = nullptr;
     return m_port->detach();
 }
 
 tempo_utils::Status
-PortSocket::write(std::shared_ptr<tempo_utils::ImmutableBytes> payload)
+chord_machine::PortSocket::write(std::shared_ptr<tempo_utils::ImmutableBytes> payload)
 {
     if (m_writer == nullptr)
         return tempo_utils::GenericStatus::forCondition(

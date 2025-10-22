@@ -1,5 +1,5 @@
-#ifndef CHORD_LOCAL_MACHINE_REMOTING_SERVICE_H
-#define CHORD_LOCAL_MACHINE_REMOTING_SERVICE_H
+#ifndef CHORD_MACHINE_REMOTING_SERVICE_H
+#define CHORD_MACHINE_REMOTING_SERVICE_H
 
 #include <queue>
 
@@ -14,139 +14,142 @@
 
 #include "local_machine.h"
 
-class CommunicateStream;
-class MonitorStream;
+namespace chord_machine {
 
-/**
- * gRPC service implementing the RemotingService service definition.
- */
-class RemotingService : public chord_remoting::RemotingService::CallbackService {
-public:
-    RemotingService();
-    RemotingService(bool startSuspended, std::shared_ptr<LocalMachine> localMachine, uv_async_t *initComplete);
+    class CommunicateStream;
+    class MonitorStream;
 
-    grpc::ServerUnaryReactor *
-    SuspendMachine(
-        grpc::CallbackServerContext *context,
-        const chord_remoting::SuspendMachineRequest *request,
-        chord_remoting::SuspendMachineResult *response) override;
+    /**
+     * gRPC service implementing the RemotingService service definition.
+     */
+    class RemotingService : public chord_remoting::RemotingService::CallbackService {
+    public:
+        RemotingService();
+        RemotingService(bool startSuspended, std::shared_ptr<LocalMachine> localMachine, uv_async_t *initComplete);
 
-    grpc::ServerUnaryReactor *
-    ResumeMachine(
-        grpc::CallbackServerContext *context,
-        const chord_remoting::ResumeMachineRequest *request,
-        chord_remoting::ResumeMachineResult *response) override;
+        grpc::ServerUnaryReactor *
+        SuspendMachine(
+            grpc::CallbackServerContext *context,
+            const chord_remoting::SuspendMachineRequest *request,
+            chord_remoting::SuspendMachineResult *response) override;
 
-    grpc::ServerUnaryReactor *
-    TerminateMachine(
-        grpc::CallbackServerContext *context,
-        const chord_remoting::TerminateMachineRequest *request,
-        chord_remoting::TerminateMachineResult *response) override;
+        grpc::ServerUnaryReactor *
+        ResumeMachine(
+            grpc::CallbackServerContext *context,
+            const chord_remoting::ResumeMachineRequest *request,
+            chord_remoting::ResumeMachineResult *response) override;
 
-    grpc::ServerBidiReactor<
-        chord_remoting::Message,
-        chord_remoting::Message> *
-    Communicate(grpc::CallbackServerContext *context) override;
+        grpc::ServerUnaryReactor *
+        TerminateMachine(
+            grpc::CallbackServerContext *context,
+            const chord_remoting::TerminateMachineRequest *request,
+            chord_remoting::TerminateMachineResult *response) override;
 
-    grpc::ServerWriteReactor<chord_remoting::MonitorEvent> *
-    Monitor(
-        grpc::CallbackServerContext *context,
-        const chord_remoting::MonitorRequest *request) override;
+        grpc::ServerBidiReactor<
+            chord_remoting::Message,
+            chord_remoting::Message> *
+        Communicate(grpc::CallbackServerContext *context) override;
 
-    virtual tempo_utils::Status registerProtocolHandler(
-        const tempo_utils::Url &protocolUrl,
-        std::shared_ptr<chord_common::AbstractProtocolHandler> handler,
-        bool requiredAtLaunch);
-    virtual bool hasProtocolHandler(const tempo_utils::Url &protocolUrl);
-    virtual std::shared_ptr<chord_common::AbstractProtocolHandler> getProtocolHandler(
-        const tempo_utils::Url &protocolUrl);
+        grpc::ServerWriteReactor<chord_remoting::MonitorEvent> *
+        Monitor(
+            grpc::CallbackServerContext *context,
+            const chord_remoting::MonitorRequest *request) override;
 
-    virtual void notifyMachineStateChanged(chord_remoting::MachineState currState);
-    virtual void notifyMachineExit(tempo_utils::StatusCode statusCode);
+        virtual tempo_utils::Status registerProtocolHandler(
+            const tempo_utils::Url &protocolUrl,
+            std::shared_ptr<chord_common::AbstractProtocolHandler> handler,
+            bool requiredAtLaunch);
+        virtual bool hasProtocolHandler(const tempo_utils::Url &protocolUrl);
+        virtual std::shared_ptr<chord_common::AbstractProtocolHandler> getProtocolHandler(
+            const tempo_utils::Url &protocolUrl);
 
-private:
-    std::shared_ptr<LocalMachine> m_localMachine;
-    uv_async_t *m_initComplete;
-    absl::Mutex m_lock;
-    absl::flat_hash_map<
-        tempo_utils::Url,
-        std::shared_ptr<chord_common::AbstractProtocolHandler>> m_handlers ABSL_GUARDED_BY(m_lock);
-    absl::flat_hash_set<tempo_utils::Url> m_requiredAtLaunch ABSL_GUARDED_BY(m_lock);
-    absl::flat_hash_map<tempo_utils::Url,CommunicateStream *> m_communicateStreams ABSL_GUARDED_BY(m_lock);
-    absl::flat_hash_set<MonitorStream *> m_monitorStreams ABSL_GUARDED_BY(m_lock);
-    chord_remoting::MachineState m_cachedState ABSL_GUARDED_BY(m_lock);
+        virtual void notifyMachineStateChanged(chord_remoting::MachineState currState);
+        virtual void notifyMachineExit(tempo_utils::StatusCode statusCode);
 
-    CommunicateStream *allocateCommunicateStream(const tempo_utils::Url &protocolUrl);
-    void freeCommunicateStream(const tempo_utils::Url &protocolUrl);
-    MonitorStream *allocateMonitorStream();
-    void freeMonitorStream(MonitorStream *stream);
+    private:
+        std::shared_ptr<LocalMachine> m_localMachine;
+        uv_async_t *m_initComplete;
+        absl::Mutex m_lock;
+        absl::flat_hash_map<
+            tempo_utils::Url,
+            std::shared_ptr<chord_common::AbstractProtocolHandler>> m_handlers ABSL_GUARDED_BY(m_lock);
+        absl::flat_hash_set<tempo_utils::Url> m_requiredAtLaunch ABSL_GUARDED_BY(m_lock);
+        absl::flat_hash_map<tempo_utils::Url,CommunicateStream *> m_communicateStreams ABSL_GUARDED_BY(m_lock);
+        absl::flat_hash_set<MonitorStream *> m_monitorStreams ABSL_GUARDED_BY(m_lock);
+        chord_remoting::MachineState m_cachedState ABSL_GUARDED_BY(m_lock);
 
-    friend class CommunicateStream;
-    friend class MonitorStream;
-};
+        CommunicateStream *allocateCommunicateStream(const tempo_utils::Url &protocolUrl);
+        void freeCommunicateStream(const tempo_utils::Url &protocolUrl);
+        MonitorStream *allocateMonitorStream();
+        void freeMonitorStream(MonitorStream *stream);
 
-/**
- * Reactor implementing the Communicate rpc.
- */
-class CommunicateStream
-    : public grpc::ServerBidiReactor<
-        chord_remoting::Message,
-        chord_remoting::Message>,
-      public chord_common::AbstractProtocolWriter
-{
-public:
-    CommunicateStream(const tempo_utils::Url &protocolUrl, RemotingService *remotingService);
-    ~CommunicateStream() override;
-
-    void OnReadDone(bool ok) override;
-    void OnWriteDone(bool ok) override;
-    void OnCancel() override;
-    void OnDone() override;
-    tempo_utils::Status write(std::string_view message) override;
-
-    tempo_utils::Status attachHandler(std::shared_ptr<chord_common::AbstractProtocolHandler> handler);
-
-    struct PendingWrite {
-        chord_remoting::Message message;
-        PendingWrite *next;
+        friend class CommunicateStream;
+        friend class MonitorStream;
     };
 
-private:
-    tempo_utils::Url m_protcolUrl;
-    std::shared_ptr<chord_common::AbstractProtocolHandler> m_handler;
-    chord_remoting::Message m_incoming;
-    absl::Mutex m_lock;
-    RemotingService *m_remotingService;
-    PendingWrite *m_head ABSL_GUARDED_BY(m_lock);
-    PendingWrite *m_tail ABSL_GUARDED_BY(m_lock);
-};
+    /**
+     * Reactor implementing the Communicate rpc.
+     */
+    class CommunicateStream
+        : public grpc::ServerBidiReactor<
+            chord_remoting::Message,
+            chord_remoting::Message>,
+          public chord_common::AbstractProtocolWriter
+    {
+    public:
+        CommunicateStream(const tempo_utils::Url &protocolUrl, RemotingService *remotingService);
+        ~CommunicateStream() override;
 
-/**
- * Reactor implementing the Monitor rpc.
- */
-class MonitorStream : public grpc::ServerWriteReactor<chord_remoting::MonitorEvent> {
-public:
-    MonitorStream(RemotingService *remotingService, chord_remoting::MachineState currState);
-    ~MonitorStream() override;
+        void OnReadDone(bool ok) override;
+        void OnWriteDone(bool ok) override;
+        void OnCancel() override;
+        void OnDone() override;
+        tempo_utils::Status write(std::string_view message) override;
 
-    void OnWriteDone(bool ok) override;
-    void OnCancel() override;
-    void OnDone() override;
-    tempo_utils::Status notifyMachineStateChanged(chord_remoting::MachineState currState);
-    tempo_utils::Status notifyMachineExit(tempo_utils::StatusCode statusCode);
+        tempo_utils::Status attachHandler(std::shared_ptr<chord_common::AbstractProtocolHandler> handler);
 
-    struct PendingWrite {
-        chord_remoting::MonitorEvent event;
-        PendingWrite *next;
+        struct PendingWrite {
+            chord_remoting::Message message;
+            PendingWrite *next;
+        };
+
+    private:
+        tempo_utils::Url m_protcolUrl;
+        std::shared_ptr<chord_common::AbstractProtocolHandler> m_handler;
+        chord_remoting::Message m_incoming;
+        absl::Mutex m_lock;
+        RemotingService *m_remotingService;
+        PendingWrite *m_head ABSL_GUARDED_BY(m_lock);
+        PendingWrite *m_tail ABSL_GUARDED_BY(m_lock);
     };
 
-private:
-    absl::Mutex m_lock;
-    RemotingService *m_remotingService;
-    PendingWrite *m_head ABSL_GUARDED_BY(m_lock);
-    PendingWrite *m_tail ABSL_GUARDED_BY(m_lock);
+    /**
+     * Reactor implementing the Monitor rpc.
+     */
+    class MonitorStream : public grpc::ServerWriteReactor<chord_remoting::MonitorEvent> {
+    public:
+        MonitorStream(RemotingService *remotingService, chord_remoting::MachineState currState);
+        ~MonitorStream() override;
 
-    tempo_utils::Status enqueueWrite(chord_remoting::MonitorEvent &&event);
-};
+        void OnWriteDone(bool ok) override;
+        void OnCancel() override;
+        void OnDone() override;
+        tempo_utils::Status notifyMachineStateChanged(chord_remoting::MachineState currState);
+        tempo_utils::Status notifyMachineExit(tempo_utils::StatusCode statusCode);
 
-#endif // CHORD_LOCAL_MACHINE_REMOTING_SERVICE_H
+        struct PendingWrite {
+            chord_remoting::MonitorEvent event;
+            PendingWrite *next;
+        };
+
+    private:
+        absl::Mutex m_lock;
+        RemotingService *m_remotingService;
+        PendingWrite *m_head ABSL_GUARDED_BY(m_lock);
+        PendingWrite *m_tail ABSL_GUARDED_BY(m_lock);
+
+        tempo_utils::Status enqueueWrite(chord_remoting::MonitorEvent &&event);
+    };
+}
+
+#endif // CHORD_MACHINE_REMOTING_SERVICE_H

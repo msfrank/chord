@@ -12,6 +12,7 @@ set(CHORD_COMMON_INCLUDES
     include/chord_common/abstract_protocol_writer.h
     include/chord_common/common_conversions.h
     include/chord_common/common_types.h
+    include/chord_common/grpc_status.h
     include/chord_common/transport_location.h
     )
 set_target_properties(chord_common PROPERTIES PUBLIC_HEADER "${CHORD_COMMON_INCLUDES}")
@@ -19,6 +20,7 @@ set_target_properties(chord_common PROPERTIES PUBLIC_HEADER "${CHORD_COMMON_INCL
 target_sources(chord_common PRIVATE
     src/common_conversions.cpp
     src/common_types.cpp
+    src/grpc_status.cpp
     src/transport_location.cpp
     )
 

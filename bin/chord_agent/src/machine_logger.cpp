@@ -2,7 +2,7 @@
 #include <chord_agent/machine_logger.h>
 #include <tempo_utils/log_stream.h>
 
-MachineLogger::MachineLogger(const tempo_utils::Url &machineUrl, uv_loop_t *loop)
+chord_agent::MachineLogger::MachineLogger(const tempo_utils::Url &machineUrl, uv_loop_t *loop)
     : m_machineUrl(machineUrl),
       m_loop(loop)
 {
@@ -14,13 +14,13 @@ MachineLogger::MachineLogger(const tempo_utils::Url &machineUrl, uv_loop_t *loop
     m_errIsClosed = true;
 }
 
-MachineLogger::~MachineLogger()
+chord_agent::MachineLogger::~MachineLogger()
 {
     closeLoggerUnconditionally();
 }
 
 tempo_utils::Status
-MachineLogger::initialize()
+chord_agent::MachineLogger::initialize()
 {
     if (m_loop == nullptr)
         return tempo_utils::GenericStatus::forCondition(
@@ -60,9 +60,9 @@ on_buf_alloc(uv_handle_t* handle, size_t suggested_size, uv_buf_t *buf)
 }
 
 void
-on_pipe_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
+chord_agent::on_pipe_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
-    auto *logger = (MachineLogger *) stream->data;
+    auto *logger = (chord_agent::MachineLogger *) stream->data;
 
     // empty read, nothing to do
     if (nread == 0)
@@ -94,7 +94,7 @@ on_pipe_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 }
 
 tempo_utils::Status
-MachineLogger::openLogger()
+chord_agent::MachineLogger::openLogger()
 {
     int ret;
 
@@ -110,11 +110,11 @@ MachineLogger::openLogger()
             tempo_utils::GenericCondition::kInternalViolation,
             "failed to start read on error pipe: {} ({})", uv_strerror(ret), uv_err_name(ret));
 
-    return tempo_utils::Status();
+    return {};
 }
 
 tempo_utils::Status
-MachineLogger::closeLogger(uv_stream_t *stream)
+chord_agent::MachineLogger::closeLogger(uv_stream_t *stream)
 {
     TU_ASSERT (stream != nullptr);
 
@@ -126,11 +126,11 @@ MachineLogger::closeLogger(uv_stream_t *stream)
         uv_close((uv_handle_t *) &m_err, nullptr);
         m_errIsClosed = true;
     }
-    return tempo_utils::Status();
+    return {};
 }
 
 tempo_utils::Status
-MachineLogger::closeLoggerUnconditionally()
+chord_agent::MachineLogger::closeLoggerUnconditionally()
 {
     if (!m_outIsClosed) {
         uv_close((uv_handle_t *) &m_out, nullptr);
@@ -138,17 +138,17 @@ MachineLogger::closeLoggerUnconditionally()
     if (!m_errIsClosed) {
         uv_close((uv_handle_t *) &m_err, nullptr);
     }
-    return tempo_utils::Status();
+    return {};
 }
 
 uv_stream_t *
-MachineLogger::getOutput() const
+chord_agent::MachineLogger::getOutput() const
 {
     return (uv_stream_t *) &m_out;
 }
 
 uv_stream_t *
-MachineLogger::getError() const
+chord_agent::MachineLogger::getError() const
 {
     return (uv_stream_t *) &m_err;
 }

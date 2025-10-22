@@ -1,5 +1,5 @@
-#ifndef CHORD_LOCAL_MACHINE_CONFIG_UTILS_H
-#define CHORD_LOCAL_MACHINE_CONFIG_UTILS_H
+#ifndef CHORD_MACHINE_CONFIG_UTILS_H
+#define CHORD_MACHINE_CONFIG_UTILS_H
 
 #include <filesystem>
 #include <string>
@@ -11,24 +11,27 @@
 #include <tempo_utils/url.h>
 #include <lyric_common/module_location.h>
 
-struct ChordLocalMachineConfig {
-    std::filesystem::path runDirectory;
-    std::vector<std::filesystem::path> packageCacheDirectories;
-    absl::flat_hash_set<tempo_utils::Url> expectedPorts;
-    bool startSuspended;
-    tempo_utils::Url supervisorUrl;
-    std::string supervisorNameOverride;
-    tempo_utils::Url machineUrl;
-    std::string machineNameOverride;
-    std::filesystem::path pemRootCABundleFile;
-    std::filesystem::path logFile;
-    tempo_utils::Url mainLocation;
-    std::string binderEndpoint;
-    std::string binderOrganization;
-    std::string binderOrganizationalUnit;
-    std::string binderCsrFilenameStem;
-};
+namespace chord_machine {
 
-tempo_utils::Status configure(ChordLocalMachineConfig &chordLocalMachineConfig, int argc, const char *argv[]);
+    struct ChordLocalMachineConfig {
+        std::filesystem::path runDirectory;
+        std::vector<std::filesystem::path> packageCacheDirectories;
+        absl::flat_hash_set<tempo_utils::Url> expectedPorts;
+        bool startSuspended;
+        tempo_utils::Url supervisorUrl;
+        std::string supervisorNameOverride;
+        tempo_utils::Url machineUrl;
+        std::string machineNameOverride;
+        std::filesystem::path pemRootCABundleFile;
+        std::filesystem::path logFile;
+        tempo_utils::Url mainLocation;
+        std::string binderEndpoint;
+        std::string binderOrganization;
+        std::string binderOrganizationalUnit;
+        std::string binderCsrFilenameStem;
+    };
 
-#endif // CHORD_LOCAL_MACHINE_CONFIG_UTILS_H
+    tempo_utils::Status configure(ChordLocalMachineConfig &chordLocalMachineConfig, int argc, const char *argv[]);
+}
+
+#endif // CHORD_MACHINE_CONFIG_UTILS_H

@@ -8,7 +8,7 @@ TEST(AsyncQueue, QueueIsInitiallyEmpty)
     uv_loop_t loop;
     uv_loop_init(&loop);
 
-    AsyncQueue<RunnerRequest> queue;
+    chord_machine::AsyncQueue<chord_machine::RunnerRequest> queue;
     queue.initialize(&loop);
 
     ASSERT_FALSE (queue.messagesPending());
@@ -19,23 +19,23 @@ TEST(AsyncQueue, SendMessageAndReceiveSynchronously)
     uv_loop_t loop;
     uv_loop_init(&loop);
 
-    AsyncQueue<RunnerRequest> queue;
+    chord_machine::AsyncQueue<chord_machine::RunnerRequest> queue;
     queue.initialize(&loop);
 
     ASSERT_FALSE (queue.messagesPending());
-    queue.sendMessage(new TerminateRunner());
+    queue.sendMessage(new chord_machine::TerminateRunner());
     ASSERT_TRUE (queue.messagesPending());
     auto *message = queue.waitForMessage();
     ASSERT_TRUE (message != nullptr);
-    ASSERT_EQ (RunnerRequest::MessageType::Terminate, message->type);
+    ASSERT_EQ (chord_machine::RunnerRequest::MessageType::Terminate, message->type);
     delete message;
 }
 
 static void producer_thread(void *ptr)
 {
-    auto *queue = static_cast<AsyncQueue<RunnerRequest> *>(ptr);
+    auto *queue = static_cast<chord_machine::AsyncQueue<chord_machine::RunnerRequest> *>(ptr);
     uv_sleep(250);
-    queue->sendMessage(new TerminateRunner());
+    queue->sendMessage(new chord_machine::TerminateRunner());
 }
 
 TEST(AsyncQueue, SendMessageAndReceiveAsync)
@@ -43,7 +43,7 @@ TEST(AsyncQueue, SendMessageAndReceiveAsync)
     uv_loop_t loop;
     uv_loop_init(&loop);
 
-    AsyncQueue<RunnerRequest> queue;
+    chord_machine::AsyncQueue<chord_machine::RunnerRequest> queue;
     queue.initialize(&loop);
 
     uv_thread_t tid;
@@ -52,7 +52,7 @@ TEST(AsyncQueue, SendMessageAndReceiveAsync)
     ASSERT_FALSE (queue.messagesPending());
     auto *message = queue.waitForMessage();
     ASSERT_TRUE (message != nullptr);
-    ASSERT_EQ (RunnerRequest::MessageType::Terminate, message->type);
+    ASSERT_EQ (chord_machine::RunnerRequest::MessageType::Terminate, message->type);
     delete message;
 
     uv_thread_join(&tid);

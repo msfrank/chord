@@ -1,5 +1,5 @@
-#ifndef CHORD_LOCAL_MACHINE_INTERPRETER_THREAD_H
-#define CHORD_LOCAL_MACHINE_INTERPRETER_THREAD_H
+#ifndef CHORD_MACHINE_INTERPRETER_RUNNER_H
+#define CHORD_MACHINE_INTERPRETER_RUNNER_H
 
 #include <uv.h>
 
@@ -9,119 +9,122 @@
 #include "abstract_message_sender.h"
 #include "async_queue.h"
 
-struct RunnerRequest : AbstractMessage {
-    enum class MessageType {
-        Suspend,
-        Resume,
-        Terminate,
+namespace chord_machine {
+
+    struct RunnerRequest : AbstractMessage {
+        enum class MessageType {
+            Suspend,
+            Resume,
+            Terminate,
+        };
+        MessageType type;
+        explicit RunnerRequest(MessageType type): type(type) {};
     };
-    MessageType type;
-    explicit RunnerRequest(MessageType type): type(type) {};
-};
 
-struct SuspendRunner : RunnerRequest {
-    SuspendRunner() : RunnerRequest(MessageType::Suspend) {};
-    std::string toString() const override { return "SuspendRunner"; };
-};
-
-struct ResumeRunner : RunnerRequest {
-    ResumeRunner() : RunnerRequest(MessageType::Resume) {};
-    std::string toString() const override { return "ResumeRunner"; };
-};
-
-struct TerminateRunner : RunnerRequest {
-    TerminateRunner() : RunnerRequest(MessageType::Terminate) {};
-    std::string toString() const override { return "TerminateRunner"; };
-};
-
-struct RunnerReply : AbstractMessage {
-    enum class MessageType {
-        Running,
-        Suspended,
-        Completed,
-        Cancelled,
-        Failure,
+    struct SuspendRunner : RunnerRequest {
+        SuspendRunner() : RunnerRequest(MessageType::Suspend) {};
+        std::string toString() const override { return "SuspendRunner"; };
     };
-    MessageType type;
-    explicit RunnerReply(MessageType type): type(type) {};
-};
 
-struct RunnerRunning : RunnerReply {
-    RunnerRunning()
-        : RunnerReply(MessageType::Running)
-    {};
-    std::string toString() const override { return "RunnerRunning"; };
-};
-
-struct RunnerSuspended : RunnerReply {
-    RunnerSuspended()
-        : RunnerReply(MessageType::Suspended)
-    {};
-    std::string toString() const override { return "RunnerSuspended"; };
-};
-
-struct RunnerCancelled : RunnerReply {
-    RunnerCancelled()
-        : RunnerReply(MessageType::Cancelled)
-    {};
-    std::string toString() const override { return "RunnerCancelled"; };
-};
-
-struct RunnerCompleted : RunnerReply {
-    tempo_utils::StatusCode statusCode;
-    explicit RunnerCompleted(tempo_utils::StatusCode statusCode)
-        : RunnerReply(MessageType::Completed),
-          statusCode(statusCode)
-    {};
-    std::string toString() const override { return "RunnerCompleted"; };
-};
-
-struct RunnerFailure : RunnerReply {
-    tempo_utils::Status status;
-    explicit RunnerFailure(const tempo_utils::Status &status)
-        : RunnerReply(MessageType::Failure),
-          status(status)
-    {};
-    std::string toString() const override {
-        return absl::StrCat("RunnerFailure(",status.toString(),")");
+    struct ResumeRunner : RunnerRequest {
+        ResumeRunner() : RunnerRequest(MessageType::Resume) {};
+        std::string toString() const override { return "ResumeRunner"; };
     };
-};
 
-enum class InterpreterRunnerState {
-    INITIAL,
-    RUNNING,
-    STOPPED,
-    SHUTDOWN,
-    FAILED,
-};
+    struct TerminateRunner : RunnerRequest {
+        TerminateRunner() : RunnerRequest(MessageType::Terminate) {};
+        std::string toString() const override { return "TerminateRunner"; };
+    };
 
-class InterpreterRunner {
-public:
-    InterpreterRunner(
-        std::unique_ptr<lyric_runtime::BytecodeInterpreter> interp,
-        AbstractMessageSender<RunnerReply> *outgoing);
+    struct RunnerReply : AbstractMessage {
+        enum class MessageType {
+            Running,
+            Suspended,
+            Completed,
+            Cancelled,
+            Failure,
+        };
+        MessageType type;
+        explicit RunnerReply(MessageType type): type(type) {};
+    };
 
-    AbstractMessageSender<RunnerRequest> *getIncomingSender() const;
-    InterpreterRunnerState getState() const;
-    tempo_utils::Status getStatus() const;
-    lyric_runtime::InterpreterExit getExit() const;
+    struct RunnerRunning : RunnerReply {
+        RunnerRunning()
+            : RunnerReply(MessageType::Running)
+        {};
+        std::string toString() const override { return "RunnerRunning"; };
+    };
 
-    tempo_utils::Status run();
+    struct RunnerSuspended : RunnerReply {
+        RunnerSuspended()
+            : RunnerReply(MessageType::Suspended)
+        {};
+        std::string toString() const override { return "RunnerSuspended"; };
+    };
 
-private:
-    std::unique_ptr<lyric_runtime::BytecodeInterpreter> m_interp;
-    AbstractMessageSender<RunnerReply> *m_outgoing;
-    std::unique_ptr<AsyncQueue<RunnerRequest>> m_incoming;
+    struct RunnerCancelled : RunnerReply {
+        RunnerCancelled()
+            : RunnerReply(MessageType::Cancelled)
+        {};
+        std::string toString() const override { return "RunnerCancelled"; };
+    };
 
-    std::unique_ptr<absl::Mutex> m_lock;
-    InterpreterRunnerState m_state ABSL_GUARDED_BY(m_lock);
-    tempo_utils::Status m_status ABSL_GUARDED_BY(m_lock);
-    lyric_runtime::InterpreterExit m_exit ABSL_GUARDED_BY(m_lock);
+    struct RunnerCompleted : RunnerReply {
+        tempo_utils::StatusCode statusCode;
+        explicit RunnerCompleted(tempo_utils::StatusCode statusCode)
+            : RunnerReply(MessageType::Completed),
+              statusCode(statusCode)
+        {};
+        std::string toString() const override { return "RunnerCompleted"; };
+    };
 
-    void beforeRunInterpreter();
-    void runInterpreter();
-    void suspendInterpreter();
-    void shutdownInterpreter();
-};
+    struct RunnerFailure : RunnerReply {
+        tempo_utils::Status status;
+        explicit RunnerFailure(const tempo_utils::Status &status)
+            : RunnerReply(MessageType::Failure),
+              status(status)
+        {};
+        std::string toString() const override {
+            return absl::StrCat("RunnerFailure(",status.toString(),")");
+        };
+    };
 
-#endif // CHORD_LOCAL_MACHINE_INTERPRETER_THREAD_H
+    enum class InterpreterRunnerState {
+        INITIAL,
+        RUNNING,
+        STOPPED,
+        SHUTDOWN,
+        FAILED,
+    };
+
+    class InterpreterRunner {
+    public:
+        InterpreterRunner(
+            std::unique_ptr<lyric_runtime::BytecodeInterpreter> interp,
+            AbstractMessageSender<RunnerReply> *outgoing);
+
+        AbstractMessageSender<RunnerRequest> *getIncomingSender() const;
+        InterpreterRunnerState getState() const;
+        tempo_utils::Status getStatus() const;
+        lyric_runtime::InterpreterExit getExit() const;
+
+        tempo_utils::Status run();
+
+    private:
+        std::unique_ptr<lyric_runtime::BytecodeInterpreter> m_interp;
+        AbstractMessageSender<RunnerReply> *m_outgoing;
+        std::unique_ptr<AsyncQueue<RunnerRequest>> m_incoming;
+
+        std::unique_ptr<absl::Mutex> m_lock;
+        InterpreterRunnerState m_state ABSL_GUARDED_BY(m_lock);
+        tempo_utils::Status m_status ABSL_GUARDED_BY(m_lock);
+        lyric_runtime::InterpreterExit m_exit ABSL_GUARDED_BY(m_lock);
+
+        void beforeRunInterpreter();
+        void runInterpreter();
+        void suspendInterpreter();
+        void shutdownInterpreter();
+    };
+}
+
+#endif // CHORD_MACHINE_INTERPRETER_RUNNER_H

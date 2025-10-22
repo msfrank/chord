@@ -17,9 +17,8 @@ main(int argc, const char *argv[])
         kill(getpid(), SIGSTOP);
     }
 
-    auto status = run_chord_agent(argc, argv);
+    auto status = chord_agent::chord_agent(argc, argv);
     if (!status.isOk()) {
-        TU_LOG_V << status;
         tempo_command::display_status_and_exit(status);
     }
     return 0;

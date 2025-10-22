@@ -4,7 +4,7 @@
 #include <tempo_security/generate_utils.h>
 
 std::shared_ptr<lyric_runtime::InterpreterState>
-ComponentConstructor::createInterpreterState(
+chord_machine::ComponentConstructor::createInterpreterState(
     std::shared_ptr<lyric_runtime::AbstractLoader> systemLoader,
     std::shared_ptr<lyric_runtime::AbstractLoader> applicationLoader,
     const lyric_runtime::InterpreterStateOptions &interpreterOptions) const
@@ -18,8 +18,8 @@ ComponentConstructor::createInterpreterState(
     return createInterpreter.getResult();
 }
 
-std::shared_ptr<LocalMachine>
-ComponentConstructor::createLocalMachine(
+std::shared_ptr<chord_machine::LocalMachine>
+chord_machine::ComponentConstructor::createLocalMachine(
     const tempo_utils::Url &machineUrl,
     bool startSuspended,
     std::shared_ptr<lyric_runtime::InterpreterState> &interpreterState,
@@ -31,8 +31,8 @@ ComponentConstructor::createLocalMachine(
     return std::make_shared<LocalMachine>(machineUrl, startSuspended, interpreterState, processor);
 }
 
-std::unique_ptr<RemotingService>
-ComponentConstructor::createRemotingService(
+std::unique_ptr<chord_machine::RemotingService>
+chord_machine::ComponentConstructor::createRemotingService(
     bool startSuspended,
     std::shared_ptr<LocalMachine> localMachine,
     uv_async_t *initComplete) const
@@ -43,7 +43,7 @@ ComponentConstructor::createRemotingService(
 }
 
 std::shared_ptr<grpc::ChannelInterface>
-ComponentConstructor:: createCustomChannel(
+chord_machine::ComponentConstructor:: createCustomChannel(
     std::string_view targetEndpoint,
     const std::shared_ptr<grpc::ChannelCredentials> &channelCreds,
     const grpc::ChannelArguments &channelArgs) const
@@ -54,14 +54,14 @@ ComponentConstructor:: createCustomChannel(
 }
 
 std::unique_ptr<chord_invoke::InvokeService::StubInterface>
-ComponentConstructor::createInvokeStub(std::shared_ptr<grpc::ChannelInterface> customChannel) const
+chord_machine::ComponentConstructor::createInvokeStub(std::shared_ptr<grpc::ChannelInterface> customChannel) const
 {
     TU_ASSERT (customChannel != nullptr);
     return chord_invoke::InvokeService::NewStub(customChannel);
 }
 
-std::shared_ptr<GrpcBinder>
-ComponentConstructor::createGrpcBinder(
+std::shared_ptr<chord_machine::GrpcBinder>
+chord_machine::ComponentConstructor::createGrpcBinder(
     std::string_view binderEndpoint,
     const lyric_common::RuntimePolicy &runtimePolicy,
     const std::filesystem::path &pemPrivateKeyFile,

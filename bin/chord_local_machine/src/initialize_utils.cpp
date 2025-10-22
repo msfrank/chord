@@ -13,7 +13,7 @@
 #include <lyric_bootstrap/bootstrap_loader.h>
 
 tempo_utils::Status
-make_interpreter_state(
+chord_machine::make_interpreter_state(
     std::shared_ptr<lyric_runtime::InterpreterState> &interpreterState,
     const ComponentConstructor &componentConstructor,
     const ChordLocalMachineConfig &chordLocalMachineConfig)
@@ -50,7 +50,7 @@ make_interpreter_state(
 }
 
 tempo_utils::Status
-make_local_machine(
+chord_machine::make_local_machine(
     std::shared_ptr<LocalMachine> &localMachine,
     const ComponentConstructor &componentConstructor,
     const ChordLocalMachineConfig &chordLocalMachineConfig,
@@ -63,7 +63,7 @@ make_local_machine(
 }
 
 tempo_utils::Status
-make_remoting_service(
+chord_machine::make_remoting_service(
     std::unique_ptr<RemotingService> &remotingService,
     const ComponentConstructor &componentConstructor,
     const ChordLocalMachineConfig &chordLocalMachineConfig,
@@ -76,7 +76,7 @@ make_remoting_service(
 }
 
 tempo_utils::Status
-make_custom_channel(
+chord_machine::make_custom_channel(
     std::shared_ptr<grpc::ChannelInterface> &channel,
     const ComponentConstructor &componentConstructor,
     const ChordLocalMachineConfig &chordLocalMachineConfig)
@@ -103,7 +103,7 @@ make_custom_channel(
 }
 
 tempo_utils::Status
-make_invoke_service_stub(
+chord_machine::make_invoke_service_stub(
     std::unique_ptr<chord_invoke::InvokeService::StubInterface> &stub,
     const ComponentConstructor &componentConstructor,
     const ChordLocalMachineConfig &chordLocalMachineConfig,
@@ -114,7 +114,7 @@ make_invoke_service_stub(
 }
 
 tempo_utils::Status
-make_csr_key_pair(
+chord_machine::make_csr_key_pair(
     tempo_security::CSRKeyPair &csrKeyPair,
     const ComponentConstructor &componentConstructor,
     const ChordLocalMachineConfig &chordLocalMachineConfig)
@@ -143,7 +143,7 @@ make_csr_key_pair(
 }
 
 tempo_utils::Status
-make_grpc_binder(
+chord_machine::make_grpc_binder(
     std::shared_ptr<GrpcBinder> &binder,
     const ComponentConstructor &componentConstructor,
     const ChordLocalMachineConfig &chordLocalMachineConfig,

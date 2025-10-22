@@ -1,6 +1,8 @@
 
 # build ChordAgentRuntime static archive
 add_library(ChordAgentRuntime OBJECT
+    src/agent_result.cpp
+    include/chord_agent/agent_result.h
     src/agent_service.cpp
     include/chord_agent/agent_service.h
     src/machine_logger.cpp

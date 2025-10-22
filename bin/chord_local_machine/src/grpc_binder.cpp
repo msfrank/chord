@@ -5,7 +5,7 @@
 #include <tempo_utils/file_reader.h>
 #include <tempo_utils/log_stream.h>
 
-GrpcBinder::GrpcBinder(
+chord_machine::GrpcBinder::GrpcBinder(
         std::string_view endpoint,
         const lyric_common::RuntimePolicy &policy,
         const std::filesystem::path &pemPrivateKeyFile,
@@ -24,7 +24,7 @@ GrpcBinder::GrpcBinder(
 }
 
 tempo_utils::Status
-GrpcBinder::initialize(const std::filesystem::path &pemCertificateFile)
+chord_machine::GrpcBinder::initialize(const std::filesystem::path &pemCertificateFile)
 {
     TU_LOG_FATAL_IF (m_server != nullptr) << "transport is already running";
 
@@ -64,7 +64,7 @@ GrpcBinder::initialize(const std::filesystem::path &pemCertificateFile)
 }
 
 tempo_utils::Status
-GrpcBinder::shutdown()
+chord_machine::GrpcBinder::shutdown()
 {
     if (m_server == nullptr)
         return {};
@@ -75,7 +75,7 @@ GrpcBinder::shutdown()
     return {};
 }
 
-DriverMetadataProcessor::DriverMetadataProcessor(GrpcBinder *binder)
+chord_machine::DriverMetadataProcessor::DriverMetadataProcessor(GrpcBinder *binder)
     : grpc::AuthMetadataProcessor(),
       m_binder(binder)
 {
@@ -83,7 +83,7 @@ DriverMetadataProcessor::DriverMetadataProcessor(GrpcBinder *binder)
 }
 
 grpc::Status
-DriverMetadataProcessor::Process(
+chord_machine::DriverMetadataProcessor::Process(
     const InputMetadata &auth_metadata,
     grpc::AuthContext *context,
     OutputMetadata *consumed_auth_metadata,

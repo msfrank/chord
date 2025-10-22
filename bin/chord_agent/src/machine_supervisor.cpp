@@ -6,7 +6,7 @@
 #include <chord_agent/machine_supervisor.h>
 #include <tempo_utils/log_stream.h>
 
-MachineSupervisor::MachineSupervisor(
+chord_agent::MachineSupervisor::MachineSupervisor(
     uv_loop_t *loop,
     const std::filesystem::path &processRunDirectory,
     int idleTimeoutSeconds,
@@ -20,14 +20,14 @@ MachineSupervisor::MachineSupervisor(
     TU_ASSERT (m_loop != nullptr);
 }
 
-MachineSupervisor::~MachineSupervisor()
+chord_agent::MachineSupervisor::~MachineSupervisor()
 {
 }
 
 static void
 on_idle_timer(uv_timer_t *timer)
 {
-    auto *supervisor = (MachineSupervisor *) timer->data;
+    auto *supervisor = (chord_agent::MachineSupervisor *) timer->data;
     if (supervisor->isIdle()) {
         TU_LOG_INFO << "idle timeout exceeded";
         uv_stop(timer->loop);
@@ -40,7 +40,7 @@ on_idle_timer(uv_timer_t *timer)
  * @return Ok status if supervisor initialization completed successfully, otherwise notOk status.
  */
 tempo_utils::Status
-MachineSupervisor::initialize()
+chord_agent::MachineSupervisor::initialize()
 {
     absl::MutexLock locker(&m_lock);
 
@@ -60,7 +60,7 @@ MachineSupervisor::initialize()
  * @return true if the supervisor is idle, otherwise false.
  */
 bool
-MachineSupervisor::isIdle()
+chord_agent::MachineSupervisor::isIdle()
 {
     absl::MutexLock locker(&m_lock);
     return m_machines.empty() && m_waiting.empty();
@@ -72,7 +72,7 @@ MachineSupervisor::isIdle()
  * @return The main loop.
  */
 uv_loop_t *
-MachineSupervisor::getLoop() const
+chord_agent::MachineSupervisor::getLoop() const
 {
     return m_loop;
 }
@@ -84,7 +84,7 @@ MachineSupervisor::getLoop() const
  * @param timer The spawning timer.
  */
 void
-on_spawning_timeout(uv_timer_t *timer)
+chord_agent::on_spawning_timeout(uv_timer_t *timer)
 {
     auto *ctx = (SpawningContext *) timer->data;
     ctx->supervisor->abandon(ctx->url);
@@ -97,7 +97,7 @@ on_spawning_timeout(uv_timer_t *timer)
  * @param timer The signing timer.
  */
 void
-on_signing_timeout(uv_timer_t *timer)
+chord_agent::on_signing_timeout(uv_timer_t *timer)
 {
     auto *ctx = (SigningContext *) timer->data;
     ctx->supervisor->abandon(ctx->url);
@@ -110,7 +110,7 @@ on_signing_timeout(uv_timer_t *timer)
  * @param timer The ready timer.
  */
 void
-on_ready_timeout(uv_timer_t *timer)
+chord_agent::on_ready_timeout(uv_timer_t *timer)
 {
     auto *ctx = (ReadyContext *) timer->data;
     ctx->supervisor->abandon(ctx->url);
@@ -125,7 +125,7 @@ on_ready_timeout(uv_timer_t *timer)
  * @return Ok status if machine process spawned successfully, otherwise notOk status.
  */
 tempo_utils::Status
-MachineSupervisor::spawnMachine(
+chord_agent::MachineSupervisor::spawnMachine(
     const tempo_utils::Url &machineUrl,
     const tempo_utils::ProcessInvoker &invoker,
     std::shared_ptr<OnSupervisorSpawn> waiter)
@@ -193,7 +193,7 @@ MachineSupervisor::spawnMachine(
  * @return Ok status if the operation completed successfully, otherwise notOk status.
  */
 tempo_utils::Status
-MachineSupervisor::requestCertificates(
+chord_agent::MachineSupervisor::requestCertificates(
     const tempo_utils::Url &machineUrl,
     const chord_invoke::SignCertificatesRequest &signCertificatesRequest,
     std::shared_ptr<OnSupervisorSign> waiter)
@@ -253,7 +253,7 @@ MachineSupervisor::requestCertificates(
  * @return Ok status if the operation completed successfully, otherwise notOk status.
  */
 tempo_utils::Status
-MachineSupervisor::bindCertificates(
+chord_agent::MachineSupervisor::bindCertificates(
     const tempo_utils::Url &machineUrl,
     const chord_invoke::RunMachineRequest &runMachineRequest,
     std::shared_ptr<OnSupervisorReady> waiter)
@@ -312,7 +312,7 @@ MachineSupervisor::bindCertificates(
  * @return Ok status if the operation completed successfully, otherwise notOk status.
  */
 tempo_utils::Status
-MachineSupervisor::startMachine(
+chord_agent::MachineSupervisor::startMachine(
     const tempo_utils::Url &machineUrl,
     const chord_invoke::AdvertiseEndpointsRequest &advertiseEndpointsRequest)
 {
@@ -358,7 +358,7 @@ MachineSupervisor::startMachine(
  * @return Ok status if the operation completed successfully, otherwise notOk status.
  */
 tempo_utils::Status
-MachineSupervisor::terminateMachine(
+chord_agent::MachineSupervisor::terminateMachine(
     const tempo_utils::Url &machineUrl,
     std::shared_ptr<OnSupervisorTerminate> waiter)
 {
@@ -406,7 +406,7 @@ MachineSupervisor::terminateMachine(
  * @return Ok status if the operation completed successfully, otherwise notOk status.
  */
 tempo_utils::Status
-MachineSupervisor::abandon(const tempo_utils::Url &machineUrl)
+chord_agent::MachineSupervisor::abandon(const tempo_utils::Url &machineUrl)
 {
     TU_LOG_INFO << "abandon " << machineUrl;
 
@@ -483,7 +483,7 @@ MachineSupervisor::abandon(const tempo_utils::Url &machineUrl)
  * @return Ok status if the operation completed successfully, otherwise notOk status.
  */
 tempo_utils::Status
-MachineSupervisor::release(const tempo_utils::Url &machineUrl, tu_int64 status, int signal)
+chord_agent::MachineSupervisor::release(const tempo_utils::Url &machineUrl, tu_int64 status, int signal)
 {
     TU_LOG_INFO << "release " << machineUrl;
 
@@ -540,7 +540,7 @@ MachineSupervisor::release(const tempo_utils::Url &machineUrl, tu_int64 status, 
  * @return Ok status if supervisor shutdown completed successfully, otherwise notOk status.
  */
 tempo_utils::Status
-MachineSupervisor::shutdown()
+chord_agent::MachineSupervisor::shutdown()
 {
     absl::MutexLock locker(&m_lock);
 
@@ -550,18 +550,18 @@ MachineSupervisor::shutdown()
     return tempo_utils::GenericStatus::ok();
 }
 
-OnInternalTerminate::OnInternalTerminate()
+chord_agent::OnInternalTerminate::OnInternalTerminate()
 {
 }
 
 void
-OnInternalTerminate::onComplete(ExitStatus exitStatus)
+chord_agent::OnInternalTerminate::onComplete(ExitStatus exitStatus)
 {
     TU_LOG_V << "internal termination completed";
 }
 
 void
-OnInternalTerminate::onStatus(tempo_utils::Status status)
+chord_agent::OnInternalTerminate::onStatus(tempo_utils::Status status)
 {
     TU_LOG_V << "internal termination failed: " << status;
 }

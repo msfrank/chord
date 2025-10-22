@@ -3,7 +3,7 @@
 
 static void runner_thread(void *data)
 {
-    auto *runner = static_cast<InterpreterRunner *>(data);
+    auto *runner = static_cast<chord_machine::InterpreterRunner *>(data);
     TU_ASSERT (runner != nullptr);
     auto status = runner->run();
     if (status.notOk()) {
@@ -13,7 +13,7 @@ static void runner_thread(void *data)
     }
 }
 
-LocalMachine::LocalMachine(
+chord_machine::LocalMachine::LocalMachine(
     const tempo_utils::Url &machineUrl,
     bool startSuspended,
     std::shared_ptr<lyric_runtime::InterpreterState> interpreterState,
@@ -31,26 +31,26 @@ LocalMachine::LocalMachine(
     uv_thread_create(&m_tid, runner_thread, m_runner.get());
 }
 
-LocalMachine::~LocalMachine()
+chord_machine::LocalMachine::~LocalMachine()
 {
     terminate();
     uv_thread_join(&m_tid);
 }
 
 tempo_utils::Url
-LocalMachine::getMachineUrl() const
+chord_machine::LocalMachine::getMachineUrl() const
 {
     return m_machineUrl;
 }
 
-InterpreterRunnerState
-LocalMachine::getRunnerState() const
+chord_machine::InterpreterRunnerState
+chord_machine::LocalMachine::getRunnerState() const
 {
     return m_runner->getState();
 }
 
 tempo_utils::Status
-LocalMachine::notifyInitComplete()
+chord_machine::LocalMachine::notifyInitComplete()
 {
     if (!m_startSuspended) {
         resume();
@@ -59,21 +59,21 @@ LocalMachine::notifyInitComplete()
 }
 
 tempo_utils::Status
-LocalMachine::suspend()
+chord_machine::LocalMachine::suspend()
 {
     m_commandQueue->sendMessage(new SuspendRunner());
     return {};
 }
 
 tempo_utils::Status
-LocalMachine::resume()
+chord_machine::LocalMachine::resume()
 {
     m_commandQueue->sendMessage(new ResumeRunner());
     return {};
 }
 
 tempo_utils::Status
-LocalMachine::terminate()
+chord_machine::LocalMachine::terminate()
 {
     m_commandQueue->sendMessage(new TerminateRunner());
     return {};

@@ -1,17 +1,20 @@
-#ifndef CHORD_LOCAL_MACHINE_ABSTRACT_MESSAGE_SENDER_H
-#define CHORD_LOCAL_MACHINE_ABSTRACT_MESSAGE_SENDER_H
+#ifndef CHORD_MACHINE_ABSTRACT_MESSAGE_SENDER_H
+#define CHORD_MACHINE_ABSTRACT_MESSAGE_SENDER_H
 
-struct AbstractMessage {
-    virtual ~AbstractMessage() = default;
-    virtual std::string toString() const { return "AbstractMessage"; };
-};
+namespace chord_machine {
 
-template<class MessageType>
-class AbstractMessageSender {
-public:
-    virtual ~AbstractMessageSender() = default;
+    struct AbstractMessage {
+        virtual ~AbstractMessage() = default;
+        virtual std::string toString() const { return "AbstractMessage"; };
+    };
 
-    virtual void sendMessage(MessageType *message) = 0;
-};
+    template<class MessageType>
+    class AbstractMessageSender {
+    public:
+        virtual ~AbstractMessageSender() = default;
 
-#endif // CHORD_LOCAL_MACHINE_ABSTRACT_MESSAGE_SENDER_H
+        virtual void sendMessage(MessageType *message) = 0;
+    };
+}
+
+#endif // CHORD_MACHINE_ABSTRACT_MESSAGE_SENDER_H

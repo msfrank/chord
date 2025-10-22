@@ -3,12 +3,12 @@
 #include <tempo_utils/log_stream.h>
 #include <tempo_utils/url.h>
 
-RemotingService::RemotingService()
+chord_machine::RemotingService::RemotingService()
     : m_initComplete(nullptr)
 {
 }
 
-RemotingService::RemotingService(
+chord_machine::RemotingService::RemotingService(
     bool startSuspended,
     std::shared_ptr<LocalMachine> localMachine,
     uv_async_t *initComplete)
@@ -21,7 +21,7 @@ RemotingService::RemotingService(
 }
 
 grpc::ServerUnaryReactor *
-RemotingService::SuspendMachine(
+chord_machine::RemotingService::SuspendMachine(
     grpc::CallbackServerContext *context,
     const chord_remoting::SuspendMachineRequest *request,
     chord_remoting::SuspendMachineResult *response)
@@ -39,7 +39,7 @@ RemotingService::SuspendMachine(
 }
 
 grpc::ServerUnaryReactor *
-RemotingService::ResumeMachine(
+chord_machine::RemotingService::ResumeMachine(
     grpc::CallbackServerContext *context,
     const chord_remoting::ResumeMachineRequest *request,
     chord_remoting::ResumeMachineResult *response)
@@ -57,7 +57,7 @@ RemotingService::ResumeMachine(
 }
 
 grpc::ServerUnaryReactor *
-RemotingService::TerminateMachine(
+chord_machine::RemotingService::TerminateMachine(
     grpc::CallbackServerContext *context,
     const chord_remoting::TerminateMachineRequest *request,
     chord_remoting::TerminateMachineResult *response)
@@ -87,7 +87,7 @@ public:
 grpc::ServerBidiReactor<
     chord_remoting::Message,
     chord_remoting::Message> *
-RemotingService::Communicate(grpc::CallbackServerContext *context)
+chord_machine::RemotingService::Communicate(grpc::CallbackServerContext *context)
 {
     // get the peer identity
     tempo_utils::Url protocolUrl;
@@ -110,7 +110,7 @@ RemotingService::Communicate(grpc::CallbackServerContext *context)
 }
 
 grpc::ServerWriteReactor<chord_remoting::MonitorEvent> *
-RemotingService::Monitor(
+chord_machine::RemotingService::Monitor(
     grpc::CallbackServerContext *context,
     const ::chord_remoting::MonitorRequest *request)
 {
@@ -118,7 +118,7 @@ RemotingService::Monitor(
 }
 
 tempo_utils::Status
-RemotingService::registerProtocolHandler(
+chord_machine::RemotingService::registerProtocolHandler(
     const tempo_utils::Url &protocolUrl,
     std::shared_ptr<chord_common::AbstractProtocolHandler> handler,
     bool requiredAtLaunch)
@@ -139,14 +139,14 @@ RemotingService::registerProtocolHandler(
 }
 
 bool
-RemotingService::hasProtocolHandler(const tempo_utils::Url &protocolUrl)
+chord_machine::RemotingService::hasProtocolHandler(const tempo_utils::Url &protocolUrl)
 {
     absl::MutexLock locker(&m_lock);
     return m_handlers.contains(protocolUrl);
 }
 
 std::shared_ptr<chord_common::AbstractProtocolHandler>
-RemotingService::getProtocolHandler(const tempo_utils::Url &protocolUrl)
+chord_machine::RemotingService::getProtocolHandler(const tempo_utils::Url &protocolUrl)
 {
     absl::MutexLock locker(&m_lock);
 
@@ -156,7 +156,7 @@ RemotingService::getProtocolHandler(const tempo_utils::Url &protocolUrl)
 }
 
 void
-RemotingService::notifyMachineStateChanged(chord_remoting::MachineState currState)
+chord_machine::RemotingService::notifyMachineStateChanged(chord_remoting::MachineState currState)
 {
     absl::MutexLock locker(&m_lock);
     m_cachedState = currState;
@@ -166,7 +166,7 @@ RemotingService::notifyMachineStateChanged(chord_remoting::MachineState currStat
 }
 
 void
-RemotingService::notifyMachineExit(tempo_utils::StatusCode statusCode)
+chord_machine::RemotingService::notifyMachineExit(tempo_utils::StatusCode statusCode)
 {
     absl::MutexLock locker(&m_lock);
     for (auto *stream : m_monitorStreams) {
@@ -174,8 +174,8 @@ RemotingService::notifyMachineExit(tempo_utils::StatusCode statusCode)
     }
 }
 
-CommunicateStream *
-RemotingService::allocateCommunicateStream(const tempo_utils::Url &protocolUrl)
+chord_machine::CommunicateStream *
+chord_machine::RemotingService::allocateCommunicateStream(const tempo_utils::Url &protocolUrl)
 {
     absl::MutexLock locker(&m_lock);
 
@@ -222,7 +222,7 @@ RemotingService::allocateCommunicateStream(const tempo_utils::Url &protocolUrl)
 }
 
 void
-RemotingService::freeCommunicateStream(const tempo_utils::Url &protocolUrl)
+chord_machine::RemotingService::freeCommunicateStream(const tempo_utils::Url &protocolUrl)
 {
     TU_ASSERT (protocolUrl.isValid());
     absl::MutexLock locker(&m_lock);
@@ -233,8 +233,8 @@ RemotingService::freeCommunicateStream(const tempo_utils::Url &protocolUrl)
     m_communicateStreams.erase(entry);
 }
 
-MonitorStream *
-RemotingService::allocateMonitorStream()
+chord_machine::MonitorStream *
+chord_machine::RemotingService::allocateMonitorStream()
 {
     absl::MutexLock locker(&m_lock);
     auto *stream = new MonitorStream(this, m_cachedState);
@@ -243,7 +243,7 @@ RemotingService::allocateMonitorStream()
 }
 
 void
-RemotingService::freeMonitorStream(MonitorStream *stream)
+chord_machine::RemotingService::freeMonitorStream(MonitorStream *stream)
 {
     TU_ASSERT (stream != nullptr);
     absl::MutexLock locker(&m_lock);
@@ -251,7 +251,7 @@ RemotingService::freeMonitorStream(MonitorStream *stream)
     delete stream;
 }
 
-CommunicateStream::CommunicateStream(const tempo_utils::Url &protocolUrl, RemotingService *remotingService)
+chord_machine::CommunicateStream::CommunicateStream(const tempo_utils::Url &protocolUrl, RemotingService *remotingService)
     : m_protcolUrl(protocolUrl),
       m_remotingService(remotingService),
       m_head(nullptr),
@@ -263,7 +263,7 @@ CommunicateStream::CommunicateStream(const tempo_utils::Url &protocolUrl, Remoti
     StartRead(&m_incoming);
 }
 
-CommunicateStream::~CommunicateStream()
+chord_machine::CommunicateStream::~CommunicateStream()
 {
     if (m_handler->isAttached()) {
         TU_LOG_WARN << "handler was still attached to CommunicateStream during cleanup";
@@ -277,7 +277,7 @@ CommunicateStream::~CommunicateStream()
 }
 
 void
-CommunicateStream::OnReadDone(bool ok)
+chord_machine::CommunicateStream::OnReadDone(bool ok)
 {
     if (!ok) {
         TU_LOG_V << "read failed";
@@ -291,7 +291,7 @@ CommunicateStream::OnReadDone(bool ok)
 }
 
 void
-CommunicateStream::OnWriteDone(bool ok)
+chord_machine::CommunicateStream::OnWriteDone(bool ok)
 {
     if (!ok) {
         TU_LOG_V << "write failed";
@@ -311,14 +311,14 @@ CommunicateStream::OnWriteDone(bool ok)
 }
 
 void
-CommunicateStream::OnCancel()
+chord_machine::CommunicateStream::OnCancel()
 {
     TU_LOG_V << "Communicate stream cancelled";
     Finish(grpc::Status::OK);
 }
 
 void
-CommunicateStream::OnDone()
+chord_machine::CommunicateStream::OnDone()
 {
     TU_LOG_V << "Communicate stream done";
     m_handler->detach();
@@ -326,7 +326,7 @@ CommunicateStream::OnDone()
 }
 
 tempo_utils::Status
-CommunicateStream::write(std::string_view message)
+chord_machine::CommunicateStream::write(std::string_view message)
 {
     auto *pending = new PendingWrite();
     pending->message.set_version(chord_remoting::MessageVersion::Version1);
@@ -354,7 +354,7 @@ CommunicateStream::write(std::string_view message)
 }
 
 tempo_utils::Status
-CommunicateStream::attachHandler(std::shared_ptr<chord_common::AbstractProtocolHandler> handler)
+chord_machine::CommunicateStream::attachHandler(std::shared_ptr<chord_common::AbstractProtocolHandler> handler)
 {
     TU_ASSERT (!m_handler);
     m_handler = handler;
@@ -362,7 +362,7 @@ CommunicateStream::attachHandler(std::shared_ptr<chord_common::AbstractProtocolH
     return tempo_utils::GenericStatus::ok();
 }
 
-MonitorStream::MonitorStream(RemotingService *remotingService, chord_remoting::MachineState currState)
+chord_machine::MonitorStream::MonitorStream(RemotingService *remotingService, chord_remoting::MachineState currState)
     : m_remotingService(remotingService),
       m_head(nullptr),
       m_tail(nullptr)
@@ -372,7 +372,7 @@ MonitorStream::MonitorStream(RemotingService *remotingService, chord_remoting::M
     notifyMachineStateChanged(currState);
 }
 
-MonitorStream::~MonitorStream()
+chord_machine::MonitorStream::~MonitorStream()
 {
     while (m_head != nullptr) {
         auto *curr = m_head;
@@ -382,7 +382,7 @@ MonitorStream::~MonitorStream()
 }
 
 void
-MonitorStream::OnWriteDone(bool ok)
+chord_machine::MonitorStream::OnWriteDone(bool ok)
 {
     if (!ok) {
         TU_LOG_V << "write failed";
@@ -401,21 +401,21 @@ MonitorStream::OnWriteDone(bool ok)
 }
 
 void
-MonitorStream::OnCancel()
+chord_machine::MonitorStream::OnCancel()
 {
     TU_LOG_V << "Monitor stream cancelled";
     Finish(grpc::Status::OK);
 }
 
 void
-MonitorStream::OnDone()
+chord_machine::MonitorStream::OnDone()
 {
     TU_LOG_V << "Monitor stream done";
     m_remotingService->freeMonitorStream(this);
 }
 
 tempo_utils::Status
-MonitorStream::enqueueWrite(chord_remoting::MonitorEvent &&event)
+chord_machine::MonitorStream::enqueueWrite(chord_remoting::MonitorEvent &&event)
 {
     auto *pending = new PendingWrite();
     pending->event = std::move(event);
@@ -440,7 +440,7 @@ MonitorStream::enqueueWrite(chord_remoting::MonitorEvent &&event)
 }
 
 tempo_utils::Status
-MonitorStream::notifyMachineStateChanged(chord_remoting::MachineState currState)
+chord_machine::MonitorStream::notifyMachineStateChanged(chord_remoting::MachineState currState)
 {
     chord_remoting::MonitorEvent event;
     auto *stateChanged = event.mutable_state_changed();
@@ -449,7 +449,7 @@ MonitorStream::notifyMachineStateChanged(chord_remoting::MachineState currState)
 }
 
 tempo_utils::Status
-MonitorStream::notifyMachineExit(tempo_utils::StatusCode statusCode)
+chord_machine::MonitorStream::notifyMachineExit(tempo_utils::StatusCode statusCode)
 {
     chord_remoting::MonitorEvent event;
     auto *machineExit = event.mutable_machine_exit();

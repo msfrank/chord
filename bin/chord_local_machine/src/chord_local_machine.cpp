@@ -29,7 +29,7 @@ on_signal(uv_signal_t *handle, int signum)
             TU_LOG_INFO << "caught signal " << signum;
             break;
     }
-    auto *chordLocalMachineData = (ChordLocalMachineData *) handle->loop->data;
+    auto *chordLocalMachineData = (chord_machine::ChordLocalMachineData *) handle->loop->data;
     chordLocalMachineData->signum = signum;
     uv_stop(handle->loop);
 }
@@ -38,40 +38,40 @@ static void
 on_init_complete(uv_async_t *handle)
 {
     TU_LOG_INFO << "launch protocols connected";
-    auto *chordLocalMachineData = (ChordLocalMachineData *) handle->loop->data;
+    auto *chordLocalMachineData = (chord_machine::ChordLocalMachineData *) handle->loop->data;
     chordLocalMachineData->localMachine->notifyInitComplete();
 }
 
 static bool
-on_runner_reply(RunnerReply *message, void *data)
+on_runner_reply(chord_machine::RunnerReply *message, void *data)
 {
-    auto *chordLocalMachineData = static_cast<ChordLocalMachineData *>(data);
+    auto *chordLocalMachineData = static_cast<chord_machine::ChordLocalMachineData *>(data);
     chord_remoting::MachineState newState = chord_remoting::UnknownState;
     tempo_utils::StatusCode statusCode = tempo_utils::StatusCode::kUnknown;
     bool stopProcessor = false;
 
     switch (message->type) {
-        case RunnerReply::MessageType::Running:
+        case chord_machine::RunnerReply::MessageType::Running:
             newState = chord_remoting::Running;
             stopProcessor = false;
             break;
-        case RunnerReply::MessageType::Suspended:
+        case chord_machine::RunnerReply::MessageType::Suspended:
             newState = chord_remoting::Suspended;
             stopProcessor = false;
             break;
-        case RunnerReply::MessageType::Cancelled:
+        case chord_machine::RunnerReply::MessageType::Cancelled:
             newState = chord_remoting::Cancelled;
             statusCode = tempo_utils::StatusCode::kCancelled;
             stopProcessor = true;
             break;
-        case RunnerReply::MessageType::Completed:
+        case chord_machine::RunnerReply::MessageType::Completed:
             newState = chord_remoting::Completed;
-            statusCode = static_cast<RunnerCompleted *>(message)->statusCode;
+            statusCode = static_cast<chord_machine::RunnerCompleted *>(message)->statusCode;
             stopProcessor = true;
             break;
-        case RunnerReply::MessageType::Failure:
+        case chord_machine::RunnerReply::MessageType::Failure:
             newState = chord_remoting::Failure;
-            statusCode = static_cast<RunnerFailure *>(message)->status.getStatusCode();
+            statusCode = static_cast<chord_machine::RunnerFailure *>(message)->status.getStatusCode();
             stopProcessor = true;
             break;
     }
@@ -86,7 +86,7 @@ on_runner_reply(RunnerReply *message, void *data)
 }
 
 tempo_utils::Status
-run_chord_local_machine(int argc, const char *argv[])
+chord_machine::chord_local_machine(int argc, const char *argv[])
 {
     ChordLocalMachineConfig chordLocalMachineConfig;
     TU_RETURN_IF_NOT_OK (configure(chordLocalMachineConfig, argc, argv));

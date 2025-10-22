@@ -1,7 +1,7 @@
 
 #include <chord_local_machine/interpreter_runner.h>
 
-InterpreterRunner::InterpreterRunner(
+chord_machine::InterpreterRunner::InterpreterRunner(
     std::unique_ptr<lyric_runtime::BytecodeInterpreter> interp,
     AbstractMessageSender<RunnerReply> *outgoing)
     : m_interp(std::move(interp)),
@@ -14,36 +14,36 @@ InterpreterRunner::InterpreterRunner(
     TU_ASSERT (m_outgoing != nullptr);
 }
 
-AbstractMessageSender<RunnerRequest> *
-InterpreterRunner::getIncomingSender() const
+chord_machine::AbstractMessageSender<chord_machine::RunnerRequest> *
+chord_machine::InterpreterRunner::getIncomingSender() const
 {
     absl::MutexLock locker(m_lock.get());
     return m_incoming.get();
 }
 
-InterpreterRunnerState
-InterpreterRunner::getState() const
+chord_machine::InterpreterRunnerState
+chord_machine::InterpreterRunner::getState() const
 {
     absl::MutexLock locker(m_lock.get());
     return m_state;
 }
 
 tempo_utils::Status
-InterpreterRunner::getStatus() const
+chord_machine::InterpreterRunner::getStatus() const
 {
     absl::MutexLock locker(m_lock.get());
     return m_status;
 }
 
 lyric_runtime::InterpreterExit
-InterpreterRunner::getExit() const
+chord_machine::InterpreterRunner::getExit() const
 {
     absl::MutexLock locker(m_lock.get());
     return m_exit;
 }
 
 tempo_utils::Status
-InterpreterRunner::run()
+chord_machine::InterpreterRunner::run()
 {
     auto *state = m_interp->interpreterState();
     auto *loop = state->mainLoop();
@@ -83,7 +83,7 @@ InterpreterRunner::run()
 }
 
 void
-InterpreterRunner::beforeRunInterpreter()
+chord_machine::InterpreterRunner::beforeRunInterpreter()
 {
     TU_LOG_V << "beforeRunInterpreter";
 
@@ -119,7 +119,7 @@ InterpreterRunner::beforeRunInterpreter()
 }
 
 void
-InterpreterRunner::runInterpreter()
+chord_machine::InterpreterRunner::runInterpreter()
 {
     TU_LOG_V << "runInterpreter";
 
@@ -148,7 +148,7 @@ InterpreterRunner::runInterpreter()
 }
 
 void
-InterpreterRunner::suspendInterpreter()
+chord_machine::InterpreterRunner::suspendInterpreter()
 {
     TU_LOG_V << "suspendInterpreter";
 
@@ -178,7 +178,7 @@ InterpreterRunner::suspendInterpreter()
 }
 
 void
-InterpreterRunner::shutdownInterpreter()
+chord_machine::InterpreterRunner::shutdownInterpreter()
 {
     TU_LOG_V << "shutdownInterpreter";
 

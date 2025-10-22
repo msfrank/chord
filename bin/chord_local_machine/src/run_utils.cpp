@@ -6,7 +6,7 @@
 #include <tempo_utils/tempfile_maker.h>
 
 tempo_utils::Status
-sign_certificates(
+chord_machine::sign_certificates(
     const ChordLocalMachineConfig &chordLocalMachineConfig,
     ChordLocalMachineData &chordLocalMachineData)
 {
@@ -65,7 +65,7 @@ sign_certificates(
 }
 
 tempo_utils::Status
-register_protocols(
+chord_machine::register_protocols(
     const ChordLocalMachineConfig &chordLocalMachineConfig,
     ChordLocalMachineData &chordLocalMachineData)
 {
@@ -98,7 +98,8 @@ register_protocols(
     return {};
 }
 
-tempo_utils::Status advertise_endpoints(
+tempo_utils::Status
+chord_machine::advertise_endpoints(
     const ChordLocalMachineConfig &chordLocalMachineConfig,
     ChordLocalMachineData &chordLocalMachineData)
 {
@@ -127,7 +128,7 @@ tempo_utils::Status advertise_endpoints(
 }
 
 tempo_utils::Status
-run_local_machine(
+chord_machine::run_local_machine(
     const ChordLocalMachineConfig &chordLocalMachineConfig,
     ChordLocalMachineData &chordLocalMachineData)
 {

@@ -1,13 +1,15 @@
 
 #include <uv.h>
 
+#include <chord_agent/agent_result.h>
 #include <chord_agent/agent_service.h>
+#include <chord_common/grpc_status.h>
 #include <tempo_config/base_conversions.h>
 #include <tempo_config/container_conversions.h>
 #include <tempo_config/parse_config.h>
 #include <tempo_utils/file_utilities.h>
 
-AgentService::AgentService(
+chord_agent::AgentService::AgentService(
     MachineSupervisor *supervisor,
     std::string_view agentName,
     const std::filesystem::path &localMachineExecutable)
@@ -25,21 +27,21 @@ AgentService::AgentService(
 }
 
 std::string
-AgentService::getListenTarget() const
+chord_agent::AgentService::getListenTarget() const
 {
     absl::MutexLock lock(m_lock.get());
     return m_listenTarget;
 }
 
 void
-AgentService::setListenTarget(const std::string &listenTarget)
+chord_agent::AgentService::setListenTarget(const std::string &listenTarget)
 {
     absl::MutexLock lock(m_lock.get());
     m_listenTarget = listenTarget;
 }
 
 grpc::ServerUnaryReactor *
-AgentService::AgentService::IdentifyAgent(
+chord_agent::AgentService::IdentifyAgent(
     grpc::CallbackServerContext *context,
     const chord_invoke::IdentifyAgentRequest *request,
     chord_invoke::IdentifyAgentResult *response)
@@ -62,7 +64,7 @@ parse_config_hash(
     tempo_config::PathParser runDirectoryParser(std::filesystem::current_path());
     tempo_config::PathParser installDirectoryParser(std::filesystem::path{});
     tempo_config::PathParser packageDirectoryParser;
-    tempo_config::SeqTParser<std::filesystem::path> packageDirectoriesParser(&packageDirectoryParser, {});
+    tempo_config::SeqTParser packageDirectoriesParser(&packageDirectoryParser, {});
     tempo_config::StringParser agentServerNameParser(defaultAgentName);
     tempo_config::PathParser pemRootCABundleFileParser;
     tempo_config::PathParser pemCertificateFileParser(std::filesystem::path{});
@@ -100,22 +102,6 @@ parse_config_hash(
         builder.appendArg("--supervisor-server-name", agentServerName);
     }
 
-    // determine the pem certificate file
-    std::filesystem::path pemCertificateFile;
-    TU_RETURN_IF_NOT_OK(tempo_config::parse_config(pemCertificateFile, pemCertificateFileParser,
-        config, "pemCertificateFile"));
-    if (!pemCertificateFile.empty()) {
-        builder.appendArg("--certificate", pemCertificateFile.string());
-    }
-
-    // determine the pem private key file
-    std::filesystem::path pemPrivateKeyFile;
-    TU_RETURN_IF_NOT_OK(tempo_config::parse_config(pemPrivateKeyFile, pemPrivateKeyFileParser,
-        config, "pemPrivateKeyFile"));
-    if (!pemPrivateKeyFile.empty()) {
-        builder.appendArg("--private-key", pemPrivateKeyFile.string());
-    }
-
     // determine the pem root CA bundle file
     std::filesystem::path pemRootCABundleFile;
     TU_RETURN_IF_NOT_OK(tempo_config::parse_config(pemRootCABundleFile, pemRootCABundleFileParser,
@@ -125,30 +111,19 @@ parse_config_hash(
     return {};
 }
 
-grpc::ServerUnaryReactor *
-AgentService::CreateMachine(
+tempo_utils::Status
+chord_agent::AgentService::doCreateMachine(
+    grpc::ServerUnaryReactor *reactor,
     grpc::CallbackServerContext *context,
     const chord_invoke::CreateMachineRequest *request,
     chord_invoke::CreateMachineResult *response)
 {
-    TU_LOG_INFO << "CreateMachine request: " << request->DebugString();
-    auto *reactor = context->DefaultReactor();
+    tempo_config::ConfigNode config;
+    TU_ASSIGN_OR_RETURN (config, tempo_config::read_config_string(request->config_hash()));
 
-    auto parseConfigHashResult = tempo_config::read_config_string(request->config_hash());
-    if (parseConfigHashResult.isStatus()) {
-        grpc::Status status(grpc::StatusCode::INVALID_ARGUMENT, parseConfigHashResult.getStatus().toString());
-        TU_LOG_INFO << "CreateMachine failed: " << status.error_message();
-        reactor->Finish(status);
-        return reactor;
-    }
-    auto config = parseConfigHashResult.getResult();
-
-    if (config.getNodeType() != tempo_config::ConfigNodeType::kMap) {
-        grpc::Status status(grpc::StatusCode::INVALID_ARGUMENT, "invalid config hash");
-        TU_LOG_INFO << "CreateMachine failed: " << status.error_message();
-        reactor->Finish(status);
-        return reactor;
-    }
+    if (config.getNodeType() != tempo_config::ConfigNodeType::kMap)
+        return AgentStatus::forCondition(AgentCondition::kInvalidConfiguration,
+            "invalid config hash");
     auto configMap = config.toMap();
 
     // construct the unique machine url
@@ -157,13 +132,7 @@ AgentService::CreateMachine(
 
     // append builder args based on the config hash
     tempo_utils::ProcessBuilder builder(m_localMachineExecutable);
-    auto parseConfigMapStatus = parse_config_hash(builder, configMap, m_agentName);
-    if (parseConfigMapStatus.notOk()) {
-        grpc::Status status(grpc::StatusCode::INVALID_ARGUMENT, parseConfigMapStatus.toString());
-        TU_LOG_INFO << "CreateMachine failed: " << status.error_message();
-        reactor->Finish(status);
-        return reactor;
-    }
+    TU_RETURN_IF_NOT_OK (parse_config_hash(builder, configMap, m_agentName));
 
     // append expected port args
     for (const auto &requestedPort : request->requested_ports()) {
@@ -187,160 +156,189 @@ AgentService::CreateMachine(
         waiter->onStatus(spawnMachineStatus);
     }
 
-    return reactor;
+    return {};
 }
 
 grpc::ServerUnaryReactor *
-AgentService::SignCertificates(
+chord_agent::AgentService::CreateMachine(
+    grpc::CallbackServerContext *context,
+    const chord_invoke::CreateMachineRequest *request,
+    chord_invoke::CreateMachineResult *response)
+{
+    TU_LOG_INFO << "CreateMachine request: " << request->DebugString();
+    auto *reactor = context->DefaultReactor();
+    auto status = doCreateMachine(reactor, context, request, response);
+    if (status.notOk()) {
+        reactor->Finish(chord_common::convert_status(status));
+    }
+    return reactor;
+}
+
+tempo_utils::Status
+chord_agent::AgentService::doSignCertificates(
+    grpc::ServerUnaryReactor *reactor,
     grpc::CallbackServerContext *context,
     const chord_invoke::SignCertificatesRequest *request,
     chord_invoke::SignCertificatesResult *response)
 {
-    TU_LOG_INFO << "SignCertificates request: " << request->DebugString();
-    auto *reactor = context->DefaultReactor();
-
     // verify machine url is valid
     auto machineUrl = tempo_utils::Url::fromString(request->machine_url());
-    if (!machineUrl.isValid()) {
-        grpc::Status status(grpc::StatusCode::INVALID_ARGUMENT, "invalid parameter machine_url");
-        TU_LOG_INFO << "SignCertificates failed: " << status.error_message();
-        reactor->Finish(status);
-        return reactor;
-    }
+    if (!machineUrl.isValid())
+        return AgentStatus::forCondition(AgentCondition::kInvalidConfiguration,
+            "invalid parameter machine_url");
 
     // verify any duplicate declared ports each have a unique endpoint
     absl::flat_hash_map<tempo_utils::Url, absl::flat_hash_set<tempo_utils::Url>> declaredPorts;
     for (const auto &declaredPort : request->declared_ports()) {
+
         auto protocolUrl = tempo_utils::Url::fromString(declaredPort.protocol_url());
-        if (request->declared_endpoints_size() <= declaredPort.endpoint_index()) {
-            grpc::Status status(grpc::StatusCode::INVALID_ARGUMENT, "invalid endpoint index for declared port");
-            TU_LOG_INFO << "SignCertificates failed: " << status.error_message();
-            reactor->Finish(status);
-            return reactor;
-        }
+        if (request->declared_endpoints_size() <= declaredPort.endpoint_index())
+            return AgentStatus::forCondition(AgentCondition::kInvalidConfiguration,
+                "invalid endpoint index for declared port");
 
         const auto &declaredEndpoint = request->declared_endpoints(declaredPort.endpoint_index());
         auto endpointUrl = tempo_utils::Url::fromString(declaredEndpoint.endpoint_url());
 
         auto declaredPortEndpoints = declaredPorts[protocolUrl];
-        if (declaredPortEndpoints.contains(protocolUrl)) {
-            grpc::Status status(grpc::StatusCode::INVALID_ARGUMENT, "duplicate endpoint for declared port");
-            TU_LOG_INFO << "SignCertificates failed: " << status.error_message();
-            reactor->Finish(status);
-            return reactor;
-        }
+        if (declaredPortEndpoints.contains(protocolUrl))
+            return AgentStatus::forCondition(AgentCondition::kInvalidConfiguration,
+                "duplicate endpoint for declared port");
 
         declaredPortEndpoints.insert(endpointUrl);
     }
 
     // respond to CreateMachine request and move machine to 'signing' queue
     auto waiter = std::make_shared<OnAgentSign>(reactor, response);
-    auto requestCertificatesStatus = m_supervisor->requestCertificates(machineUrl, *request, waiter);
-    if (requestCertificatesStatus.notOk()) {
-        grpc::Status status(grpc::StatusCode::INTERNAL, requestCertificatesStatus.toString());
-        TU_LOG_INFO << "SignCertificates failed: " << status.error_message();
-        reactor->Finish(status);
-        return reactor;
-    }
+    TU_RETURN_IF_NOT_OK (m_supervisor->requestCertificates(machineUrl, *request, waiter));
 
-    return reactor;
+    return {};
 }
 
 grpc::ServerUnaryReactor *
-AgentService::RunMachine(
+chord_agent::AgentService::SignCertificates(
+    grpc::CallbackServerContext *context,
+    const chord_invoke::SignCertificatesRequest *request,
+    chord_invoke::SignCertificatesResult *response)
+{
+    TU_LOG_INFO << "SignCertificates request: " << request->DebugString();
+    auto *reactor = context->DefaultReactor();
+    auto status = doSignCertificates(reactor, context, request, response);
+    if (status.notOk()) {
+        reactor->Finish(chord_common::convert_status(status));
+    }
+    return reactor;
+}
+
+tempo_utils::Status
+chord_agent::AgentService::doRunMachine(
+    grpc::ServerUnaryReactor *reactor,
     grpc::CallbackServerContext *context,
     const chord_invoke::RunMachineRequest *request,
     chord_invoke::RunMachineResult *response)
 {
     TU_LOG_INFO << "RunMachine request: " << request->SerializeAsString();
-    auto *reactor = context->DefaultReactor();
 
     // verify machine url is valid
     auto machineUrl = tempo_utils::Url::fromString(request->machine_url());
-    if (!machineUrl.isValid()) {
-        grpc::Status status(grpc::StatusCode::INVALID_ARGUMENT, "invalid parameter machine_url");
-        TU_LOG_INFO << "RunMachine failed: " << status.error_message();
-        reactor->Finish(status);
-        return reactor;
-    }
+    if (!machineUrl.isValid())
+        return AgentStatus::forCondition(AgentCondition::kInvalidConfiguration,
+            "invalid parameter machine_url");
 
     // respond to SignCertificates request and move machine to 'ready' queue
     auto waiter = std::make_shared<OnAgentReady>(reactor, response);
-    auto bindCertificatesStatus = m_supervisor->bindCertificates(machineUrl, *request, waiter);
-    if (bindCertificatesStatus.notOk()) {
-        grpc::Status status(grpc::StatusCode::INTERNAL, bindCertificatesStatus.toString());
-        TU_LOG_INFO << "RunMachine failed: " << status.error_message();
-        reactor->Finish(status);
-        return reactor;
-    }
+    TU_RETURN_IF_NOT_OK (m_supervisor->bindCertificates(machineUrl, *request, waiter));
 
-    return reactor;
+    return {};
 }
 
 grpc::ServerUnaryReactor *
-AgentService::AdvertiseEndpoints(
+chord_agent::AgentService::RunMachine(
+    grpc::CallbackServerContext *context,
+    const chord_invoke::RunMachineRequest *request,
+    chord_invoke::RunMachineResult *response)
+{
+    TU_LOG_INFO << "SignCertificates request: " << request->DebugString();
+    auto *reactor = context->DefaultReactor();
+    auto status = doRunMachine(reactor, context, request, response);
+    if (status.notOk()) {
+        reactor->Finish(chord_common::convert_status(status));
+    }
+    return reactor;
+}
+
+tempo_utils::Status
+chord_agent::AgentService::doAdvertiseEndpoints(
+    grpc::ServerUnaryReactor *reactor,
+    grpc::CallbackServerContext *context,
+    const chord_invoke::AdvertiseEndpointsRequest *request,
+    chord_invoke::AdvertiseEndpointsResult *response)
+{
+    // verify machine url is valid
+    auto machineUrl = tempo_utils::Url::fromString(request->machine_url());
+    if (!machineUrl.isValid())
+        return AgentStatus::forCondition(AgentCondition::kInvalidConfiguration,
+            "invalid parameter machine_url");
+
+    // respond to RunMachine request
+    TU_LOG_INFO << "calling bind()";
+    TU_RETURN_IF_NOT_OK (m_supervisor->startMachine(machineUrl, *request));
+
+    // complete the AdvertiseEndpoints request
+    reactor->Finish(grpc::Status::OK);
+
+    return {};
+}
+
+grpc::ServerUnaryReactor *
+chord_agent::AgentService::AdvertiseEndpoints(
     grpc::CallbackServerContext *context,
     const chord_invoke::AdvertiseEndpointsRequest *request,
     chord_invoke::AdvertiseEndpointsResult *response)
 {
     TU_LOG_INFO << "AdvertiseEndpoints request: " << request->SerializeAsString();
     auto *reactor = context->DefaultReactor();
-
-    // verify machine url is valid
-    auto machineUrl = tempo_utils::Url::fromString(request->machine_url());
-    if (!machineUrl.isValid()) {
-        grpc::Status status(grpc::StatusCode::INVALID_ARGUMENT, "invalid parameter machine_url");
-        TU_LOG_INFO << "AdvertiseEndpoints failed: " << status.error_message();
-        reactor->Finish(status);
-        return reactor;
+    auto status = doAdvertiseEndpoints(reactor, context, request, response);
+    if (status.notOk()) {
+        reactor->Finish(chord_common::convert_status(status));
     }
-
-    // respond to RunMachine request
-    TU_LOG_INFO << "calling bind()";
-    auto startMachineStatus = m_supervisor->startMachine(machineUrl, *request);
-    if (startMachineStatus.notOk()) {
-        grpc::Status status(grpc::StatusCode::INTERNAL, startMachineStatus.toString());
-        TU_LOG_INFO << "AdvertiseEndpoints failed: " << status.error_message();
-        reactor->Finish(status);
-        return reactor;
-    }
-
-    // complete the AdvertiseEndpoints request
-    reactor->Finish(grpc::Status::OK);
     return reactor;
 }
 
+tempo_utils::Status
+chord_agent::AgentService::doDeleteMachine(
+    grpc::ServerUnaryReactor *reactor,
+    grpc::CallbackServerContext *context,
+    const chord_invoke::DeleteMachineRequest *request,
+    chord_invoke::DeleteMachineResult *response)
+{
+    // verify machine url is valid
+    auto machineUrl = tempo_utils::Url::fromString(request->machine_url());
+    if (!machineUrl.isValid())
+        return AgentStatus::forCondition(AgentCondition::kInvalidConfiguration,
+            "invalid parameter machine_url");
+
+    auto waiter = std::make_shared<OnAgentTerminate>(reactor, response);
+    TU_RETURN_IF_NOT_OK (m_supervisor->terminateMachine(machineUrl, waiter));
+
+    return {};
+}
+
 grpc::ServerUnaryReactor *
-AgentService::DeleteMachine(
+chord_agent::AgentService::DeleteMachine(
     grpc::CallbackServerContext *context,
     const chord_invoke::DeleteMachineRequest *request,
     chord_invoke::DeleteMachineResult *response)
 {
     TU_LOG_INFO << "DeleteMachine request: " << request->SerializeAsString();
     auto *reactor = context->DefaultReactor();
-
-    // verify machine url is valid
-    auto machineUrl = tempo_utils::Url::fromString(request->machine_url());
-    if (!machineUrl.isValid()) {
-        grpc::Status status(grpc::StatusCode::INVALID_ARGUMENT, "invalid parameter machine_url");
-        TU_LOG_INFO << "DeleteMachine failed: " << status.error_message();
-        reactor->Finish(status);
-        return reactor;
+    auto status = doDeleteMachine(reactor, context, request, response);
+    if (status.notOk()) {
+        reactor->Finish(chord_common::convert_status(status));
     }
-
-    auto waiter = std::make_shared<OnAgentTerminate>(reactor, response);
-    auto terminateMachineStatus = m_supervisor->terminateMachine(machineUrl, waiter);
-    if (terminateMachineStatus.notOk()) {
-        grpc::Status status(grpc::StatusCode::INTERNAL, terminateMachineStatus.toString());
-        TU_LOG_INFO << "DeleteMachine failed: " << status.error_message();
-        reactor->Finish(status);
-        return reactor;
-    }
-
     return reactor;
 }
 
-OnAgentSpawn::OnAgentSpawn(grpc::ServerUnaryReactor *reactor, chord_invoke::CreateMachineResult *result)
+chord_agent::OnAgentSpawn::OnAgentSpawn(grpc::ServerUnaryReactor *reactor, chord_invoke::CreateMachineResult *result)
     : m_reactor(reactor),
       m_result(result)
 {
@@ -349,7 +347,7 @@ OnAgentSpawn::OnAgentSpawn(grpc::ServerUnaryReactor *reactor, chord_invoke::Crea
 }
 
 void
-OnAgentSpawn::onComplete(
+chord_agent::OnAgentSpawn::onComplete(
     MachineHandle handle,
     const chord_invoke::SignCertificatesRequest &signCertificatesRequest)
 {
@@ -375,13 +373,13 @@ OnAgentSpawn::onComplete(
 }
 
 void
-OnAgentSpawn::onStatus(tempo_utils::Status status)
+chord_agent::OnAgentSpawn::onStatus(tempo_utils::Status status)
 {
     TU_LOG_INFO << "OnAgentSpawn failed: " << status.toString();
     m_reactor->Finish(grpc::Status(grpc::StatusCode::ABORTED, status.toString()));
 }
 
-OnAgentSign::OnAgentSign(grpc::ServerUnaryReactor *reactor, chord_invoke::SignCertificatesResult *result)
+chord_agent::OnAgentSign::OnAgentSign(grpc::ServerUnaryReactor *reactor, chord_invoke::SignCertificatesResult *result)
     : m_reactor(reactor),
       m_result(result)
 {
@@ -390,7 +388,7 @@ OnAgentSign::OnAgentSign(grpc::ServerUnaryReactor *reactor, chord_invoke::SignCe
 }
 
 void
-OnAgentSign::onComplete(MachineHandle handle, const chord_invoke::RunMachineRequest &runMachineRequest)
+chord_agent::OnAgentSign::onComplete(MachineHandle handle, const chord_invoke::RunMachineRequest &runMachineRequest)
 {
     for (const auto &signedEndpoint : runMachineRequest.signed_endpoints()) {
         auto *resultEndpoint = m_result->add_signed_endpoints();
@@ -402,13 +400,13 @@ OnAgentSign::onComplete(MachineHandle handle, const chord_invoke::RunMachineRequ
 }
 
 void
-OnAgentSign::onStatus(tempo_utils::Status status)
+chord_agent::OnAgentSign::onStatus(tempo_utils::Status status)
 {
     TU_LOG_INFO << "OnAgentSign failed: " << status.toString();
     m_reactor->Finish(grpc::Status(grpc::StatusCode::ABORTED, status.toString()));
 }
 
-OnAgentReady::OnAgentReady(grpc::ServerUnaryReactor *reactor, chord_invoke::RunMachineResult *result)
+chord_agent::OnAgentReady::OnAgentReady(grpc::ServerUnaryReactor *reactor, chord_invoke::RunMachineResult *result)
     : m_reactor(reactor),
       m_result(result)
 {
@@ -417,7 +415,7 @@ OnAgentReady::OnAgentReady(grpc::ServerUnaryReactor *reactor, chord_invoke::RunM
 }
 
 void
-OnAgentReady::onComplete(
+chord_agent::OnAgentReady::onComplete(
     MachineHandle handle,
     const chord_invoke::AdvertiseEndpointsRequest &advertiseEndpointsRequest)
 {
@@ -430,13 +428,13 @@ OnAgentReady::onComplete(
 }
 
 void
-OnAgentReady::onStatus(tempo_utils::Status status)
+chord_agent::OnAgentReady::onStatus(tempo_utils::Status status)
 {
     TU_LOG_INFO << "OnAgentReady failed: " << status.toString();
     m_reactor->Finish(grpc::Status(grpc::StatusCode::ABORTED, status.toString()));
 }
 
-OnAgentTerminate::OnAgentTerminate(
+chord_agent::OnAgentTerminate::OnAgentTerminate(
     grpc::ServerUnaryReactor *reactor,
     chord_invoke::DeleteMachineResult *result)
     : m_reactor(reactor),
@@ -447,14 +445,14 @@ OnAgentTerminate::OnAgentTerminate(
 }
 
 void
-OnAgentTerminate::onComplete(ExitStatus exitStatus)
+chord_agent::OnAgentTerminate::onComplete(ExitStatus exitStatus)
 {
     m_result->set_exit_status(exitStatus.status);
     m_reactor->Finish(grpc::Status::OK);
 }
 
 void
-OnAgentTerminate::onStatus(tempo_utils::Status status)
+chord_agent::OnAgentTerminate::onStatus(tempo_utils::Status status)
 {
     TU_LOG_INFO << "OnAgentTerminate failed: " << status.toString();
     m_reactor->Finish(grpc::Status(grpc::StatusCode::ABORTED, status.toString()));

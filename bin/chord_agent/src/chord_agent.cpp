@@ -4,6 +4,7 @@
 #include <uv.h>
 
 #include <chord_agent/agent_service.h>
+#include <chord_agent/chord_agent.h>
 #include <chord_agent/machine_supervisor.h>
 #include <chord_common/transport_location.h>
 #include <tempo_command/command_help.h>
@@ -53,7 +54,7 @@ make_ssl_server_credentials(
 }
 
 tempo_utils::Status
-run_chord_agent(int argc, const char *argv[])
+chord_agent::chord_agent(int argc, const char *argv[])
 {
     char hostname[256];
     memset(hostname, 0, 256);

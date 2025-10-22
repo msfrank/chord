@@ -12,7 +12,7 @@
 #include <tempo_utils/url.h>
 
 tempo_utils::Status
-configure(ChordLocalMachineConfig &chordLocalMachineConfig, int argc, const char *argv[])
+chord_machine::configure(ChordLocalMachineConfig &chordLocalMachineConfig, int argc, const char *argv[])
 {
     tempo_config::PathParser runDirectoryParser(std::filesystem::current_path());
     tempo_config::PathParser packageCacheDirectoryParser;

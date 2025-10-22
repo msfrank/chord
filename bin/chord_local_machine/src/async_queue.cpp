@@ -3,12 +3,12 @@
 
 #include <chord_local_machine/async_queue.h>
 
-BaseAsyncQueue::BaseAsyncQueue()
+chord_machine::BaseAsyncQueue::BaseAsyncQueue()
     : m_async(nullptr)
 {
 }
 
-BaseAsyncQueue::~BaseAsyncQueue()
+chord_machine::BaseAsyncQueue::~BaseAsyncQueue()
 {
     if (m_async) {
         uv_close((uv_handle_t *) m_async, nullptr);
@@ -23,14 +23,14 @@ BaseAsyncQueue::~BaseAsyncQueue()
 }
 
 void
-on_async_queue_receive(uv_async_t *async)
+chord_machine::on_async_queue_receive(uv_async_t *async)
 {
     //auto *queue = static_cast<BaseAsyncQueue *>(async->data);
     uv_stop(async->loop);
 }
 
 tempo_utils::Status
-BaseAsyncQueue::initialize(uv_loop_t *loop)
+chord_machine::BaseAsyncQueue::initialize(uv_loop_t *loop)
 {
     absl::MutexLock locker(&m_lock);
     TU_ASSERT (m_async == nullptr);
@@ -43,14 +43,14 @@ BaseAsyncQueue::initialize(uv_loop_t *loop)
 }
 
 bool
-BaseAsyncQueue::messagesPending()
+chord_machine::BaseAsyncQueue::messagesPending()
 {
     absl::MutexLock locker(&m_lock);
     return !m_queue.empty();
 }
 
 void
-BaseAsyncQueue::sendAbstractMessage(AbstractMessage *message)
+chord_machine::BaseAsyncQueue::sendAbstractMessage(AbstractMessage *message)
 {
     absl::MutexLock locker(&m_lock);
     m_queue.push(message);
@@ -60,8 +60,8 @@ BaseAsyncQueue::sendAbstractMessage(AbstractMessage *message)
     }
 }
 
-AbstractMessage *
-BaseAsyncQueue::waitForAbstractMessage()
+chord_machine::AbstractMessage *
+chord_machine::BaseAsyncQueue::waitForAbstractMessage()
 {
     {
         // grab the lock and check if there is a message already in the queue
@@ -99,8 +99,8 @@ BaseAsyncQueue::waitForAbstractMessage()
     return message;
 }
 
-AbstractMessage *
-BaseAsyncQueue::takeAvailableAbstractMessage()
+chord_machine::AbstractMessage *
+chord_machine::BaseAsyncQueue::takeAvailableAbstractMessage()
 {
     absl::MutexLock locker(&m_lock);
     if (m_queue.empty())

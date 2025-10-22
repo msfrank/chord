@@ -37,7 +37,7 @@ target_include_directories(chord_test PUBLIC
     )
 
 target_compile_definitions(chord_test PRIVATE
-    "CHORD_AGENT_EXECUTABLE=\"${CHORD_RUNTIME_CHORD_AGENT_PATH}\""
+    "CHORD_AGENT_EXECUTABLE=\"${CHORD_BUILD_CHORD_AGENT_PATH}\""
     )
 
 set_target_properties(chord_test PROPERTIES

@@ -32,7 +32,7 @@ protected:
 
 TEST_F(InitializeUtilsTests, MakeInterpreterStateWithNoPackageDirectories)
 {
-    ChordLocalMachineConfig chordLocalMachineConfig;
+    chord_machine::ChordLocalMachineConfig chordLocalMachineConfig;
     chordLocalMachineConfig.mainLocation = zuri_packager::PackageSpecifier::fromString(TEST1_ZPK).toUrl();
     chordLocalMachineConfig.runDirectory = testDirectory->getTempdir();
 
@@ -65,7 +65,7 @@ TEST_F(InitializeUtilsTests, MakeInterpreterStateWithNoPackageDirectories)
 
 TEST_F(InitializeUtilsTests, MakeInterpreterStateWithPackageDirectory)
 {
-    ChordLocalMachineConfig chordLocalMachineConfig;
+    chord_machine::ChordLocalMachineConfig chordLocalMachineConfig;
     chordLocalMachineConfig.mainLocation = zuri_packager::PackageSpecifier::fromString(TEST1_ZPK).toUrl();
     chordLocalMachineConfig.runDirectory = testDirectory->getTempdir();
     auto packageCacheDirectory = testDirectory->getTempdir() / "cache2";
@@ -103,32 +103,32 @@ TEST_F(InitializeUtilsTests, MakeInterpreterStateWithPackageDirectory)
 
 TEST_F(InitializeUtilsTests, MakeLocalMachine)
 {
-    ChordLocalMachineConfig chordLocalMachineConfig;
+    chord_machine::ChordLocalMachineConfig chordLocalMachineConfig;
     chordLocalMachineConfig.mainLocation = zuri_packager::PackageSpecifier::fromString(TEST1_ZPK).toUrl();
     chordLocalMachineConfig.runDirectory = testDirectory->getTempdir();
     chordLocalMachineConfig.machineUrl = tempo_utils::Url::fromString("dev.zuri.machine:xxx");
     chordLocalMachineConfig.startSuspended = true;
 
-    ChordLocalMachineData chordLocalMachineData;
+    chord_machine::ChordLocalMachineData chordLocalMachineData;
     chordLocalMachineData.interpreterState = std::make_shared<MockInterpreterState>();
 
-    AsyncQueue<RunnerReply> processor;
+    chord_machine::AsyncQueue<chord_machine::RunnerReply> processor;
 
     MockComponentConstructor componentConstructor;
     tempo_utils::Url machineUrl;
     bool startSuspended;
     std::shared_ptr<lyric_runtime::InterpreterState> interpreterState;
-    AbstractMessageSender<RunnerReply> *processorPtr;
+    chord_machine::AbstractMessageSender<chord_machine::RunnerReply> *processorPtr;
     EXPECT_CALL (componentConstructor, createLocalMachine(_, _, _, _))
         .WillOnce([&](const auto &machineUrl_, bool startSuspended_, auto &interpreterState_, auto *processorPtr_) -> auto {
             machineUrl = machineUrl_;
             startSuspended = startSuspended_;
             interpreterState = interpreterState_;
             processorPtr = processorPtr_;
-            return std::shared_ptr<LocalMachine>();
+            return std::shared_ptr<chord_machine::LocalMachine>();
         });
 
-    std::shared_ptr<LocalMachine> localMachine;
+    std::shared_ptr<chord_machine::LocalMachine> localMachine;
     ASSERT_THAT (make_local_machine(localMachine, componentConstructor, chordLocalMachineConfig,
         chordLocalMachineData.interpreterState, &processor),
         tempo_test::IsOk());
@@ -141,11 +141,11 @@ TEST_F(InitializeUtilsTests, MakeLocalMachine)
 
 TEST_F(InitializeUtilsTests, MakeInvokeServiceStub)
 {
-    ChordLocalMachineConfig chordLocalMachineConfig;
+    chord_machine::ChordLocalMachineConfig chordLocalMachineConfig;
     chordLocalMachineConfig.runDirectory = testDirectory->getTempdir();
     chordLocalMachineConfig.machineUrl = tempo_utils::Url::fromString("dev.zuri.machine:xxx");
 
-    ChordLocalMachineData chordLocalMachineData;
+    chord_machine::ChordLocalMachineData chordLocalMachineData;
     chordLocalMachineData.customChannel = std::make_shared<MockChannel>();
 
     MockComponentConstructor componentConstructor;
@@ -166,11 +166,11 @@ TEST_F(InitializeUtilsTests, MakeInvokeServiceStub)
 
 TEST_F(InitializeUtilsTests, MakeGrpcBinder)
 {
-    ChordLocalMachineConfig chordLocalMachineConfig;
+    chord_machine::ChordLocalMachineConfig chordLocalMachineConfig;
     chordLocalMachineConfig.runDirectory = testDirectory->getTempdir();
     chordLocalMachineConfig.machineUrl = tempo_utils::Url::fromString("dev.zuri.machine:xxx");
 
-    ChordLocalMachineData chordLocalMachineData;
+    chord_machine::ChordLocalMachineData chordLocalMachineData;
     chordLocalMachineData.csrKeyPair = tempo_security::CSRKeyPair(
         tempo_security::KeyType::ECC, "/key", "/req");
     chordLocalMachineData.invokeStub = std::make_unique<MockInvokeStub>();
@@ -193,10 +193,10 @@ TEST_F(InitializeUtilsTests, MakeGrpcBinder)
             pemPrivateKeyFile = pemPrivateKeyFile_;
             pemRootCABundleFile = pemRootCABundleFile_;
             remotingService = remotingService_;
-            return std::shared_ptr<GrpcBinder>();
+            return std::shared_ptr<chord_machine::GrpcBinder>();
         });
 
-    std::shared_ptr<GrpcBinder> grpcBinder;
+    std::shared_ptr<chord_machine::GrpcBinder> grpcBinder;
     ASSERT_THAT (make_grpc_binder(
         grpcBinder, componentConstructor, chordLocalMachineConfig, chordLocalMachineData.csrKeyPair,
         chordLocalMachineData.invokeStub.get(), chordLocalMachineData.remotingService.get()),

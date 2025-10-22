@@ -5,111 +5,143 @@
 
 #include "machine_supervisor.h"
 
-class AgentService : public chord_invoke::InvokeService::CallbackService {
+namespace chord_agent {
 
-public:
-    AgentService(
-        MachineSupervisor *supervisor,
-        std::string_view agentName,
-        const std::filesystem::path &localMachineExecutable);
+    class AgentService : public chord_invoke::InvokeService::CallbackService {
+    public:
+        AgentService(
+            MachineSupervisor *supervisor,
+            std::string_view agentName,
+            const std::filesystem::path &localMachineExecutable);
 
-    std::string getListenTarget() const;
-    void setListenTarget(const std::string &listenTarget);
+        std::string getListenTarget() const;
+        void setListenTarget(const std::string &listenTarget);
 
-    grpc::ServerUnaryReactor *
-    IdentifyAgent(
-        grpc::CallbackServerContext *context,
-        const chord_invoke::IdentifyAgentRequest *request,
-        chord_invoke::IdentifyAgentResult *response) override;
+        grpc::ServerUnaryReactor *
+        IdentifyAgent(
+            grpc::CallbackServerContext *context,
+            const chord_invoke::IdentifyAgentRequest *request,
+            chord_invoke::IdentifyAgentResult *response) override;
 
-    grpc::ServerUnaryReactor *
-    CreateMachine(
-        grpc::CallbackServerContext *context,
-        const chord_invoke::CreateMachineRequest *request,
-        chord_invoke::CreateMachineResult *response) override;
+        grpc::ServerUnaryReactor *
+        CreateMachine(
+            grpc::CallbackServerContext *context,
+            const chord_invoke::CreateMachineRequest *request,
+            chord_invoke::CreateMachineResult *response) override;
 
-    grpc::ServerUnaryReactor *
-    SignCertificates(
-        grpc::CallbackServerContext *context,
-        const chord_invoke::SignCertificatesRequest *request,
-        chord_invoke::SignCertificatesResult *response) override;
+        grpc::ServerUnaryReactor *
+        SignCertificates(
+            grpc::CallbackServerContext *context,
+            const chord_invoke::SignCertificatesRequest *request,
+            chord_invoke::SignCertificatesResult *response) override;
 
-    grpc::ServerUnaryReactor *
-    RunMachine(
-        grpc::CallbackServerContext *context,
-        const chord_invoke::RunMachineRequest *request,
-        chord_invoke::RunMachineResult *response) override;
+        grpc::ServerUnaryReactor *
+        RunMachine(
+            grpc::CallbackServerContext *context,
+            const chord_invoke::RunMachineRequest *request,
+            chord_invoke::RunMachineResult *response) override;
 
-    grpc::ServerUnaryReactor *
-    AdvertiseEndpoints(
-        grpc::CallbackServerContext *context,
-        const chord_invoke::AdvertiseEndpointsRequest *request,
-        chord_invoke::AdvertiseEndpointsResult *response) override;
+        grpc::ServerUnaryReactor *
+        AdvertiseEndpoints(
+            grpc::CallbackServerContext *context,
+            const chord_invoke::AdvertiseEndpointsRequest *request,
+            chord_invoke::AdvertiseEndpointsResult *response) override;
 
-    grpc::ServerUnaryReactor *
-    DeleteMachine(
-        grpc::CallbackServerContext *context,
-        const chord_invoke::DeleteMachineRequest *request,
-        chord_invoke::DeleteMachineResult *response) override;
+        grpc::ServerUnaryReactor *
+        DeleteMachine(
+            grpc::CallbackServerContext *context,
+            const chord_invoke::DeleteMachineRequest *request,
+            chord_invoke::DeleteMachineResult *response) override;
 
-private:
-    MachineSupervisor *m_supervisor;
-    std::string m_agentName;
-    std::filesystem::path m_localMachineExecutable;
-    tu_uint64 m_uptime;
+    private:
+        MachineSupervisor *m_supervisor;
+        std::string m_agentName;
+        std::filesystem::path m_localMachineExecutable;
+        tu_uint64 m_uptime;
 
-    std::unique_ptr<absl::Mutex> m_lock;
-    std::string m_listenTarget ABSL_GUARDED_BY(m_lock);
-};
+        std::unique_ptr<absl::Mutex> m_lock;
+        std::string m_listenTarget ABSL_GUARDED_BY(m_lock);
 
-class OnAgentSpawn : public OnSupervisorSpawn {
-public:
-    OnAgentSpawn(grpc::ServerUnaryReactor *reactor, chord_invoke::CreateMachineResult *result);
-    void onComplete(
-        MachineHandle handle,
-        const chord_invoke::SignCertificatesRequest &signCertificatesRequest) override;
-    void onStatus(tempo_utils::Status status) override;
+        tempo_utils::Status doCreateMachine(
+            grpc::ServerUnaryReactor *reactor,
+            grpc::CallbackServerContext *context,
+            const chord_invoke::CreateMachineRequest *request,
+            chord_invoke::CreateMachineResult *response);
 
-private:
-    grpc::ServerUnaryReactor *m_reactor;
-    chord_invoke::CreateMachineResult *m_result;
-};
+        tempo_utils::Status doSignCertificates(
+            grpc::ServerUnaryReactor *reactor,
+            grpc::CallbackServerContext *context,
+            const chord_invoke::SignCertificatesRequest *request,
+            chord_invoke::SignCertificatesResult *response);
 
-class OnAgentSign : public OnSupervisorSign {
-public:
-    OnAgentSign(grpc::ServerUnaryReactor *reactor, chord_invoke::SignCertificatesResult *result);
-    void onComplete(
-        MachineHandle handle,
-        const chord_invoke::RunMachineRequest &runMachineRequest) override;
-    void onStatus(tempo_utils::Status status) override;
+        tempo_utils::Status doRunMachine(
+            grpc::ServerUnaryReactor *reactor,
+            grpc::CallbackServerContext *context,
+            const chord_invoke::RunMachineRequest *request,
+            chord_invoke::RunMachineResult *response);
 
-private:
-    grpc::ServerUnaryReactor *m_reactor;
-    chord_invoke::SignCertificatesResult *m_result;
-};
+        tempo_utils::Status doAdvertiseEndpoints(
+            grpc::ServerUnaryReactor *reactor,
+            grpc::CallbackServerContext *context,
+            const chord_invoke::AdvertiseEndpointsRequest *request,
+            chord_invoke::AdvertiseEndpointsResult *response);
 
-class OnAgentReady : public OnSupervisorReady {
-public:
-    OnAgentReady(grpc::ServerUnaryReactor *reactor, chord_invoke::RunMachineResult *result);
-    void onComplete(
-        MachineHandle handle,
-        const chord_invoke::AdvertiseEndpointsRequest &advertiseEndpointsRequest) override;
-    void onStatus(tempo_utils::Status status) override;
+        tempo_utils::Status doDeleteMachine(
+            grpc::ServerUnaryReactor *reactor,
+            grpc::CallbackServerContext *context,
+            const chord_invoke::DeleteMachineRequest *request,
+            chord_invoke::DeleteMachineResult *response);
+    };
 
-private:
-    grpc::ServerUnaryReactor *m_reactor;
-    chord_invoke::RunMachineResult *m_result;
-};
+    class OnAgentSpawn : public OnSupervisorSpawn {
+    public:
+        OnAgentSpawn(grpc::ServerUnaryReactor *reactor, chord_invoke::CreateMachineResult *result);
+        void onComplete(
+            MachineHandle handle,
+            const chord_invoke::SignCertificatesRequest &signCertificatesRequest) override;
+        void onStatus(tempo_utils::Status status) override;
 
-class OnAgentTerminate : public OnSupervisorTerminate {
-public:
-    OnAgentTerminate(grpc::ServerUnaryReactor *reactor, chord_invoke::DeleteMachineResult *result);
-    void onComplete(ExitStatus exitStatus) override;
-    void onStatus(tempo_utils::Status status) override;
+    private:
+        grpc::ServerUnaryReactor *m_reactor;
+        chord_invoke::CreateMachineResult *m_result;
+    };
 
-private:
-    grpc::ServerUnaryReactor *m_reactor;
-    chord_invoke::DeleteMachineResult *m_result;
-};
+    class OnAgentSign : public OnSupervisorSign {
+    public:
+        OnAgentSign(grpc::ServerUnaryReactor *reactor, chord_invoke::SignCertificatesResult *result);
+        void onComplete(
+            MachineHandle handle,
+            const chord_invoke::RunMachineRequest &runMachineRequest) override;
+        void onStatus(tempo_utils::Status status) override;
+
+    private:
+        grpc::ServerUnaryReactor *m_reactor;
+        chord_invoke::SignCertificatesResult *m_result;
+    };
+
+    class OnAgentReady : public OnSupervisorReady {
+    public:
+        OnAgentReady(grpc::ServerUnaryReactor *reactor, chord_invoke::RunMachineResult *result);
+        void onComplete(
+            MachineHandle handle,
+            const chord_invoke::AdvertiseEndpointsRequest &advertiseEndpointsRequest) override;
+        void onStatus(tempo_utils::Status status) override;
+
+    private:
+        grpc::ServerUnaryReactor *m_reactor;
+        chord_invoke::RunMachineResult *m_result;
+    };
+
+    class OnAgentTerminate : public OnSupervisorTerminate {
+    public:
+        OnAgentTerminate(grpc::ServerUnaryReactor *reactor, chord_invoke::DeleteMachineResult *result);
+        void onComplete(ExitStatus exitStatus) override;
+        void onStatus(tempo_utils::Status status) override;
+
+    private:
+        grpc::ServerUnaryReactor *m_reactor;
+        chord_invoke::DeleteMachineResult *m_result;
+    };
+}
 
 #endif // CHORD_AGENT_AGENT_SERVICE_H

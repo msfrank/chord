@@ -215,7 +215,7 @@ public:
 
 };
 
-class MockRemotingService : public RemotingService {
+class MockRemotingService : public chord_machine::RemotingService {
 public:
     MOCK_METHOD (
         tempo_utils::Status,
@@ -238,7 +238,7 @@ public:
         (override));
 };
 
-class MockComponentConstructor : public ComponentConstructor {
+class MockComponentConstructor : public chord_machine::ComponentConstructor {
 public:
     MOCK_METHOD (
         std::shared_ptr<lyric_runtime::InterpreterState>,
@@ -249,12 +249,12 @@ public:
         (const, override));
 
     MOCK_METHOD (
-        std::shared_ptr<LocalMachine>,
+        std::shared_ptr<chord_machine::LocalMachine>,
         createLocalMachine, (
             const tempo_utils::Url &machineUrl,
             bool startSuspended,
             std::shared_ptr<lyric_runtime::InterpreterState> &interpreterState,
-            AbstractMessageSender<RunnerReply> *processor),
+            chord_machine::AbstractMessageSender<chord_machine::RunnerReply> *processor),
         (const, override));
 
     MOCK_METHOD (
@@ -272,15 +272,15 @@ public:
         (const, override));
 
     MOCK_METHOD (
-        std::unique_ptr<RemotingService>,
+        std::unique_ptr<chord_machine::RemotingService>,
         createRemotingService, (
             bool startSuspended,
-            std::shared_ptr<LocalMachine> localMachine,
+            std::shared_ptr<chord_machine::LocalMachine> localMachine,
             uv_async_t *initComplete),
         (const, override));
 
     MOCK_METHOD (
-        std::shared_ptr<GrpcBinder>,
+        std::shared_ptr<chord_machine::GrpcBinder>,
         createGrpcBinder, (
             std::string_view binderEndpoint,
             const lyric_common::RuntimePolicy &runtimePolicy,

@@ -3,6 +3,8 @@
 
 #include <tempo_command/command_result.h>
 
-tempo_utils::Status run_chord_agent(int argc, const char *argv[]);
+namespace chord_agent {
+    tempo_utils::Status chord_agent(int argc, const char *argv[]);
+}
 
 #endif // CHORD_AGENT_CHORD_AGENT_H

@@ -3,12 +3,12 @@
 
 #include <chord_local_machine/async_processor.h>
 
-BaseAsyncProcessor::BaseAsyncProcessor()
+chord_machine::BaseAsyncProcessor::BaseAsyncProcessor()
     : m_async(nullptr)
 {
 }
 
-BaseAsyncProcessor::~BaseAsyncProcessor()
+chord_machine::BaseAsyncProcessor::~BaseAsyncProcessor()
 {
     absl::MutexLock locker(&m_lock);
     if (m_async) {
@@ -24,14 +24,14 @@ BaseAsyncProcessor::~BaseAsyncProcessor()
 }
 
 void
-on_message_receive(uv_async_t *async)
+chord_machine::on_message_receive(uv_async_t *async)
 {
     auto *queue = static_cast<BaseAsyncProcessor *>(async->data);
     queue->processAvailableMessages();
 }
 
 tempo_utils::Status
-BaseAsyncProcessor::initialize(uv_loop_t *loop)
+chord_machine::BaseAsyncProcessor::initialize(uv_loop_t *loop)
 {
     absl::MutexLock locker(&m_lock);
     TU_ASSERT (m_async == nullptr);
@@ -45,7 +45,7 @@ BaseAsyncProcessor::initialize(uv_loop_t *loop)
 }
 
 void
-BaseAsyncProcessor::sendAbstractMessage(AbstractMessage *message)
+chord_machine::BaseAsyncProcessor::sendAbstractMessage(AbstractMessage *message)
 {
     absl::MutexLock locker(&m_lock);
     m_queue.push(message);
@@ -56,7 +56,7 @@ BaseAsyncProcessor::sendAbstractMessage(AbstractMessage *message)
 }
 
 void
-BaseAsyncProcessor::runUntilCancelled()
+chord_machine::BaseAsyncProcessor::runUntilCancelled()
 {
     {
         absl::MutexLock locker(&m_lock);
@@ -66,7 +66,7 @@ BaseAsyncProcessor::runUntilCancelled()
 }
 
 void
-BaseAsyncProcessor::processAvailableMessages()
+chord_machine::BaseAsyncProcessor::processAvailableMessages()
 {
     std::queue<AbstractMessage *> incoming;
 
@@ -83,7 +83,7 @@ BaseAsyncProcessor::processAvailableMessages()
 }
 
 void
-BaseAsyncProcessor::cancelProcessing()
+chord_machine::BaseAsyncProcessor::cancelProcessing()
 {
     uv_stop(m_async->loop);
 }

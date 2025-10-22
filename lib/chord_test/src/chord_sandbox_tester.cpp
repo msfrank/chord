@@ -46,7 +46,7 @@ chord_test::ChordSandboxTester::configure()
     // configure the test runner
     TU_RETURN_IF_NOT_OK (runner->configureBaseTester());
 
-    auto testerDirectory = m_runner->getTesterDirectory();
+    auto testerDirectory = runner->getTesterDirectory();
     auto agentPath = std::filesystem::path(CHORD_AGENT_EXECUTABLE);
     auto caCommonName = absl::StrCat(
         "ca.", tempo_utils::generate_name("XXXXXXXX"), ".test");

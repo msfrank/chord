@@ -12,11 +12,19 @@ set(TEST_CASES
     spawn_utils_tests.cpp
     )
 
+set(TEST1_SPECIFIER "test1-${PROJECT_VERSION}@chord-sandbox-tests")
+set(TEST1_ZPK "${CMAKE_CURRENT_BINARY_DIR}/data/chord-sandbox-tests_test1-${PROJECT_VERSION}.zpk")
+
+add_subdirectory(data)
+
 # define test suite driver
 
 add_executable(chord_sandbox_testsuite ${TEST_CASES})
+add_dependencies(chord_sandbox_testsuite chord-sandbox-test-data)
 target_compile_definitions(chord_sandbox_testsuite PRIVATE
     "CHORD_AGENT_EXECUTABLE=\"${CHORD_BUILD_CHORD_AGENT_PATH}\""
+    "TEST1_SPECIFIER=\"${TEST1_SPECIFIER}\""
+    "TEST1_ZPK=\"${TEST1_ZPK}\""
     "ZURI_INSTALL_CONFIG_DIR=\"${ZURI_INSTALL_CONFIG_DIR}\""
     "ZURI_INSTALL_VENDOR_CONFIG_DIR=\"${ZURI_INSTALL_VENDOR_CONFIG_DIR}\""
     )
@@ -30,8 +38,11 @@ gtest_discover_tests(chord_sandbox_testsuite)
 # define test suite static library
 
 add_library(ChordSandboxTestSuite OBJECT ${TEST_CASES})
+add_dependencies(ChordSandboxTestSuite chord-sandbox-test-data)
 target_compile_definitions(ChordSandboxTestSuite PRIVATE
     "CHORD_AGENT_EXECUTABLE=\"${CHORD_BUILD_CHORD_AGENT_PATH}\""
+    "TEST1_SPECIFIER=\"${TEST1_SPECIFIER}\""
+    "TEST1_ZPK=\"${TEST1_ZPK}\""
     "ZURI_INSTALL_CONFIG_DIR=\"${ZURI_INSTALL_CONFIG_DIR}\""
     "ZURI_INSTALL_VENDOR_CONFIG_DIR=\"${ZURI_INSTALL_VENDOR_CONFIG_DIR}\""
     )

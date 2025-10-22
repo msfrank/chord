@@ -12,8 +12,8 @@ set(TEST_CASES
     local_machine_tests.cpp
 )
 
-set(TEST1_SPECIFIER "test1-${PROJECT_VERSION}@chord-tests")
-set(TEST1_ZPK "${CMAKE_CURRENT_BINARY_DIR}/data/chord-tests_test1-${PROJECT_VERSION}.zpk")
+set(TEST1_SPECIFIER "test1-${PROJECT_VERSION}@chord-local-machine-tests")
+set(TEST1_ZPK "${CMAKE_CURRENT_BINARY_DIR}/data/chord-local-machine-tests_test1-${PROJECT_VERSION}.zpk")
 
 add_subdirectory(data)
 

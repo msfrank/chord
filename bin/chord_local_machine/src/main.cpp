@@ -17,9 +17,8 @@ main(int argc, const char *argv[])
         kill(getpid(), SIGSTOP);
     }
 
-    auto status = run_chord_local_machine(argc, argv);
+    auto status = chord_machine::chord_local_machine(argc, argv);
     if (!status.isOk()) {
-        TU_LOG_V << status;
         tempo_command::display_status_and_exit(status);
     }
     return 0;

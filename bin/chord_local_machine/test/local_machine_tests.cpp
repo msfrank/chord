@@ -51,19 +51,19 @@ TEST_F(LocalMachineTests, Construct)
     TU_ASSIGN_OR_RAISE(state, lyric_runtime::InterpreterState::create(
         systemLoader, applicationLoader, options));
 
-    AsyncQueue<RunnerReply> processor;
+    chord_machine::AsyncQueue<chord_machine::RunnerReply> processor;
     ASSERT_THAT (processor.initialize(&loop), tempo_test::IsOk());
 
     auto machineUrl = tempo_utils::Url::fromString("foo");
-    auto machine = std::make_shared<LocalMachine>(machineUrl, true, state, &processor);
-    ASSERT_EQ (InterpreterRunnerState::INITIAL, machine->getRunnerState());
+    auto machine = std::make_shared<chord_machine::LocalMachine>(machineUrl, true, state, &processor);
+    ASSERT_EQ (chord_machine::InterpreterRunnerState::INITIAL, machine->getRunnerState());
     ASSERT_EQ (machineUrl, machine->getMachineUrl());
 
     // invoke destructor to terminate the runner thread
     machine.reset();
 
     auto *message = processor.waitForMessage();
-    ASSERT_EQ (RunnerReply::MessageType::Cancelled, message->type);
+    ASSERT_EQ (chord_machine::RunnerReply::MessageType::Cancelled, message->type);
     delete message;
 }
 
@@ -98,23 +98,23 @@ TEST_F(LocalMachineTests, Start)
     TU_ASSIGN_OR_RAISE(state, lyric_runtime::InterpreterState::create(
         systemLoader, applicationLoader, options));
 
-    AsyncQueue<RunnerReply> processor;
+    chord_machine::AsyncQueue<chord_machine::RunnerReply> processor;
     ASSERT_THAT (processor.initialize(&loop), tempo_test::IsOk());
 
     auto machineUrl = tempo_utils::Url::fromString("foo");
-    auto machine = std::make_shared<LocalMachine>(machineUrl, true, state, &processor);
+    auto machine = std::make_shared<chord_machine::LocalMachine>(machineUrl, true, state, &processor);
 
     // start the machine and wait for state change
     ASSERT_THAT (machine->resume(), tempo_test::IsOk());
 
     auto *message1 = processor.waitForMessage();
-    ASSERT_EQ (RunnerReply::MessageType::Running, message1->type);
+    ASSERT_EQ (chord_machine::RunnerReply::MessageType::Running, message1->type);
     delete message1;
 
     // // invoke destructor to terminate the runner thread
     // machine.reset();
 
     auto *message2 = processor.waitForMessage();
-    ASSERT_EQ (RunnerReply::MessageType::Completed, message2->type);
+    ASSERT_EQ (chord_machine::RunnerReply::MessageType::Completed, message2->type);
     delete message2;
 }

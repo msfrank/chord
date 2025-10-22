@@ -59,7 +59,7 @@ target_link_libraries(chord_test
     )
 
 # dependencies needed for sandbox testing
-add_dependencies(chord_test chord-agent chord-local-machine)
+add_dependencies(chord_test chord-agent chord-machine)
 
 # create the workspace config file used for unit testing
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/tester.config.in ${TESTER_CONFIG_PATH} @ONLY)

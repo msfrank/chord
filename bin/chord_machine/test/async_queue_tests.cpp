@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
-#include <chord_local_machine/async_queue.h>
-#include <chord_local_machine/interpreter_runner.h>
+#include <chord_machine/async_queue.h>
+#include <chord_machine/interpreter_runner.h>
 
 TEST(AsyncQueue, QueueIsInitiallyEmpty)
 {

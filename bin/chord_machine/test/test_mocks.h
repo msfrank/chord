@@ -1,11 +1,11 @@
-#ifndef CHORD_LOCAL_MACHINE_TEST_MOCKS_H
-#define CHORD_LOCAL_MACHINE_TEST_MOCKS_H
+#ifndef CHORD_MACHINE_TEST_MOCKS_H
+#define CHORD_MACHINE_TEST_MOCKS_H
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include <chord_local_machine/initialize_utils.h>
-#include <chord_local_machine/run_utils.h>
+#include <chord_machine/initialize_utils.h>
+#include <chord_machine/run_utils.h>
 #include <lyric_runtime/chain_loader.h>
 #include <lyric_runtime/abstract_loader.h>
 #include <lyric_bootstrap/bootstrap_loader.h>
@@ -290,4 +290,4 @@ public:
         (const, override));
 };
 
-#endif // CHORD_LOCAL_MACHINE_TEST_MOCKS_H
+#endif // CHORD_MACHINE_TEST_MOCKS_H

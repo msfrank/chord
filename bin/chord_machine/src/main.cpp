@@ -1,7 +1,7 @@
 
 #include <signal.h>
 
-#include <chord_local_machine/chord_local_machine.h>
+#include <chord_machine/chord_machine.h>
 #include <tempo_command/command_help.h>
 
 static const char *SUSPEND_ON_STARTUP = "SUSPEND_ON_STARTUP";
@@ -17,7 +17,7 @@ main(int argc, const char *argv[])
         kill(getpid(), SIGSTOP);
     }
 
-    auto status = chord_machine::chord_local_machine(argc, argv);
+    auto status = chord_machine::chord_machine(argc, argv);
     if (!status.isOk()) {
         tempo_command::display_status_and_exit(status);
     }

@@ -1,5 +1,5 @@
 
-#include <chord_local_machine/component_constructor.h>
+#include <chord_machine/component_constructor.h>
 #include <tempo_security/ecc_private_key_generator.h>
 #include <tempo_security/generate_utils.h>
 

@@ -1,6 +1,6 @@
 
-#include <chord_local_machine/port_socket.h>
-#include <chord_local_machine/run_utils.h>
+#include <chord_machine/port_socket.h>
+#include <chord_machine/run_utils.h>
 #include <tempo_command/command_result.h>
 #include <tempo_utils/file_reader.h>
 #include <tempo_utils/tempfile_maker.h>

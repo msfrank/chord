@@ -1,7 +1,7 @@
 
 #include <grpcpp/security/server_credentials.h>
 
-#include <chord_local_machine/grpc_binder.h>
+#include <chord_machine/grpc_binder.h>
 #include <tempo_utils/file_reader.h>
 #include <tempo_utils/log_stream.h>
 

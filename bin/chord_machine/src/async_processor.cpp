@@ -1,7 +1,7 @@
 
 #include <tempo_utils/log_stream.h>
 
-#include <chord_local_machine/async_processor.h>
+#include <chord_machine/async_processor.h>
 
 chord_machine::BaseAsyncProcessor::BaseAsyncProcessor()
     : m_async(nullptr)

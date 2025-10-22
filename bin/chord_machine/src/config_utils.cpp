@@ -1,5 +1,5 @@
 
-#include <chord_local_machine/config_utils.h>
+#include <chord_machine/config_utils.h>
 #include <lyric_common/common_conversions.h>
 #include <tempo_command/command_help.h>
 #include <tempo_command/command_parser.h>
@@ -19,7 +19,7 @@ chord_machine::configure(ChordLocalMachineConfig &chordLocalMachineConfig, int a
     tempo_config::SeqTParser packageCacheDirectoriesParser(&packageCacheDirectoryParser, {});
     tempo_config::PathParser pemRootCABundleFileParser(std::filesystem::path{});
     tempo_config::PathParser logFileParser(
-        std::filesystem::path(absl::StrCat("chord-local-machine.", getpid(), ".log")));
+        std::filesystem::path(absl::StrCat("chord-machine.", getpid(), ".log")));
     tempo_config::UrlParser expectedPortParser;
     tempo_config::BooleanParser startSuspendedParser(false);
     tempo_config::SetTParser expectedPortsParser(&expectedPortParser, {});
@@ -94,7 +94,7 @@ chord_machine::configure(ChordLocalMachineConfig &chordLocalMachineConfig, int a
             return status;
         switch (commandStatus.getCondition()) {
             case tempo_command::CommandCondition::kHelpRequested:
-                tempo_command::display_help_and_exit({"chord-local-machine"}, "Chord local machine",
+                tempo_command::display_help_and_exit({"chord-machine"}, "Chord machine",
                     {}, groupings, optMappings, argMappings, defaults);
             default:
                 return status;
@@ -165,7 +165,7 @@ chord_machine::configure(ChordLocalMachineConfig &chordLocalMachineConfig, int a
     chordLocalMachineConfig.binderOrganization = "Chord";
 
     // set the binder certificate organizational unit
-    chordLocalMachineConfig.binderOrganizationalUnit = "Chord local machine";
+    chordLocalMachineConfig.binderOrganizationalUnit = "Chord machine";
 
     // set the binder CSR filename stem
     chordLocalMachineConfig.binderCsrFilenameStem = tempo_utils::generate_name("machine-XXXXXXXX");

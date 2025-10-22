@@ -127,7 +127,7 @@ chord_agent::AgentService::doCreateMachine(
     auto configMap = config.toMap();
 
     // construct the unique machine url
-    auto machineName = absl::StrCat(tempo_utils::generate_name("chord-local-machine-XXXXXXXX"), ".test");
+    auto machineName = absl::StrCat(tempo_utils::generate_name("chord-machine-XXXXXXXX"), ".test");
     auto machineUrl = tempo_utils::Url::fromString(absl::StrCat("https://", machineName));
 
     // append builder args based on the config hash

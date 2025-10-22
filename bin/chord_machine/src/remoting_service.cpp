@@ -1,5 +1,5 @@
 
-#include <chord_local_machine/remoting_service.h>
+#include <chord_machine/remoting_service.h>
 #include <tempo_utils/log_stream.h>
 #include <tempo_utils/url.h>
 

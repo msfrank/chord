@@ -43,6 +43,6 @@ The _chord-agent_ software program is licensed separately under the terms of the
 Affero GNU Public License version 3.0 (AGPL-3.0) or later. The text of the license
 is contained in the file `chord_agent/LICENSE.txt`.
 
-The _chord-local-machine_ software program is licensed separately under the terms
+The _chord-machine_ software program is licensed separately under the terms
 of the Affero GNU Public License version 3.0 (AGPL-3.0) or later. The text of the
-license is contained in the file `chord_local_machine/LICENSE.txt`.
+license is contained in the file `chord_machine/LICENSE.txt`.

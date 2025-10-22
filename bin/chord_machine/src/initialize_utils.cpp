@@ -1,6 +1,6 @@
 
-#include <chord_local_machine/initialize_utils.h>
-#include <chord_local_machine/interpreter_runner.h>
+#include <chord_machine/initialize_utils.h>
+#include <chord_machine/interpreter_runner.h>
 #include <chord_invoke/invoke_service.grpc.pb.h>
 #include <tempo_command/command_result.h>
 #include <tempo_security/ecc_private_key_generator.h>

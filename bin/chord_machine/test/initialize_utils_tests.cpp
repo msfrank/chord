@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include <chord_local_machine/initialize_utils.h>
-#include <chord_local_machine/run_utils.h>
+#include <chord_machine/initialize_utils.h>
+#include <chord_machine/run_utils.h>
 #include <lyric_bootstrap/bootstrap_loader.h>
 #include <lyric_common/module_location.h>
 #include <lyric_runtime/chain_loader.h>

@@ -1,5 +1,5 @@
 
-#include <chord_local_machine/interpreter_runner.h>
+#include <chord_machine/interpreter_runner.h>
 
 chord_machine::InterpreterRunner::InterpreterRunner(
     std::unique_ptr<lyric_runtime::BytecodeInterpreter> interp,

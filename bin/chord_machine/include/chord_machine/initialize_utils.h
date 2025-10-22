@@ -11,7 +11,7 @@
 #include <tempo_utils/status.h>
 #include <tempo_utils/url.h>
 
-#include "chord_local_machine.h"
+#include "chord_machine.h"
 #include "component_constructor.h"
 #include "config_utils.h"
 #include "grpc_binder.h"

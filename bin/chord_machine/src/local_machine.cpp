@@ -1,5 +1,5 @@
 
-#include <chord_local_machine/local_machine.h>
+#include <chord_machine/local_machine.h>
 
 static void runner_thread(void *data)
 {

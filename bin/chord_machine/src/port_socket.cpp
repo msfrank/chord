@@ -1,5 +1,5 @@
 
-#include <chord_local_machine/port_socket.h>
+#include <chord_machine/port_socket.h>
 #include <tempo_utils/memory_bytes.h>
 
 chord_machine::PortSocket::PortSocket(std::shared_ptr<lyric_runtime::DuplexPort> port)

@@ -20,7 +20,7 @@ target_include_directories(ChordAgentRuntime PUBLIC
     )
 
 target_compile_definitions(ChordAgentRuntime PRIVATE
-    "CHORD_LOCAL_MACHINE_EXECUTABLE=\"${CHORD_RUNTIME_CHORD_LOCAL_MACHINE_PATH}\""
+    "CHORD_MACHINE_EXECUTABLE=\"${CHORD_RUNTIME_CHORD_MACHINE_PATH}\""
     )
 
 target_link_libraries(ChordAgentRuntime PUBLIC
@@ -37,8 +37,8 @@ target_link_libraries(ChordAgentRuntime PUBLIC
 # build chord-agent program
 add_executable(chord-agent src/main.cpp)
 
-# chord-agent depends on chord-local-machine
-add_dependencies(chord-agent chord-local-machine)
+# chord-agent depends on chord-machine
+add_dependencies(chord-agent chord-machine)
 
 target_include_directories(chord-agent PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

@@ -67,7 +67,7 @@ chord_agent::chord_agent(int argc, const char *argv[])
     tempo_config::StringParser listenEndpointParser(std::string{});
     chord_common::TransportTypeParser listenTransportParser(chord_common::TransportType::Unix);
     tempo_config::PathParser processRunDirectoryParser(cwd);
-    tempo_config::PathParser localMachineExecutableParser(std::filesystem::path(CHORD_LOCAL_MACHINE_EXECUTABLE));
+    tempo_config::PathParser localMachineExecutableParser(std::filesystem::path(CHORD_MACHINE_EXECUTABLE));
     tempo_config::PathParser pemCertificateFileParser(cwd / "agent.crt");
     tempo_config::PathParser pemPrivateKeyFileParser(cwd / "agent.key");
     tempo_config::PathParser pemRootCABundleFileParser(cwd / "rootca.crt");

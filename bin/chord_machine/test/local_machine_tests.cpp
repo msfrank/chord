@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include <chord_local_machine/local_machine.h>
+#include <chord_machine/local_machine.h>
 #include <lyric_bootstrap/bootstrap_loader.h>
 #include <lyric_runtime/static_loader.h>
 #include <tempo_test/status_matchers.h>

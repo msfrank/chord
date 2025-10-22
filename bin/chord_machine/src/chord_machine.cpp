@@ -1,7 +1,7 @@
 
-#include <chord_local_machine/grpc_binder.h>
-#include <chord_local_machine/local_machine.h>
-#include <chord_local_machine/run_protocol_socket.h>
+#include <chord_machine/grpc_binder.h>
+#include <chord_machine/local_machine.h>
+#include <chord_machine/run_protocol_socket.h>
 #include <tempo_command/command_result.h>
 #include <tempo_utils/file_utilities.h>
 #include <tempo_utils/log_sink.h>
@@ -9,11 +9,11 @@
 #include <tempo_utils/posix_result.h>
 #include <tempo_utils/url.h>
 
-#include <chord_local_machine/async_processor.h>
-#include <chord_local_machine/config_utils.h>
-#include <chord_local_machine/initialize_utils.h>
-#include <chord_local_machine/run_utils.h>
-#include <chord_local_machine/chord_local_machine.h>
+#include <chord_machine/async_processor.h>
+#include <chord_machine/config_utils.h>
+#include <chord_machine/initialize_utils.h>
+#include <chord_machine/run_utils.h>
+#include <chord_machine/chord_machine.h>
 
 static void
 on_signal(uv_signal_t *handle, int signum)
@@ -86,7 +86,7 @@ on_runner_reply(chord_machine::RunnerReply *message, void *data)
 }
 
 tempo_utils::Status
-chord_machine::chord_local_machine(int argc, const char *argv[])
+chord_machine::chord_machine(int argc, const char *argv[])
 {
     ChordLocalMachineConfig chordLocalMachineConfig;
     TU_RETURN_IF_NOT_OK (configure(chordLocalMachineConfig, argc, argv));

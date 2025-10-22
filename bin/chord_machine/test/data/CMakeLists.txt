@@ -13,9 +13,9 @@ add_custom_command (
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     DEPENDS zuri::zuri-build
 )
-add_custom_target(chord-local-machine-test1 DEPENDS ${TEST1_ZPK})
+add_custom_target(chord-machine-test1 DEPENDS ${TEST1_ZPK})
 
 
-add_custom_target(chord-local-machine-test-data DEPENDS
-    chord-local-machine-test1
+add_custom_target(chord-machine-test-data DEPENDS
+    chord-machine-test1
     )

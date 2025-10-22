@@ -252,7 +252,7 @@ set(CONFIG_DIR_PREFIX                           "${ZURI_CONFIG_DIR_PREFIX}")
 set(VENDOR_CONFIG_DIR_PREFIX                    "${ZURI_VENDOR_CONFIG_DIR_PREFIX}")
 
 # install paths
-set(CHORD_LOCAL_MACHINE_PATH_PREFIX             "${CMAKE_INSTALL_BINDIR}/chord-local-machine")
+set(CHORD_MACHINE_PATH_PREFIX                   "${CMAKE_INSTALL_BINDIR}/chord-machine")
 set(CHORD_AGENT_PATH_PREFIX                     "${CMAKE_INSTALL_BINDIR}/chord-agent")
 
 # build paths
@@ -263,7 +263,7 @@ set(CHORD_BUILD_PACKAGES_DIR                    "${CHORD_BUILD_OUTPUT_ROOT}/${PA
 set(CHORD_BUILD_DOC_DIR                         "${CHORD_BUILD_OUTPUT_ROOT}/${DOC_DIR_PREFIX}")
 set(CHORD_BUILD_CONFIG_DIR                      "${CHORD_BUILD_OUTPUT_ROOT}/${CONFIG_DIR_PREFIX}")
 set(CHORD_BUILD_VENDOR_CONFIG_DIR               "${CHORD_BUILD_OUTPUT_ROOT}/${VENDOR_CONFIG_DIR_PREFIX}")
-set(CHORD_BUILD_CHORD_LOCAL_MACHINE_PATH        "${CHORD_BUILD_OUTPUT_ROOT}/${CHORD_LOCAL_MACHINE_PATH_PREFIX}")
+set(CHORD_BUILD_CHORD_MACHINE_PATH              "${CHORD_BUILD_OUTPUT_ROOT}/${CHORD_MACHINE_PATH_PREFIX}")
 set(CHORD_BUILD_CHORD_AGENT_PATH                "${CHORD_BUILD_OUTPUT_ROOT}/${CHORD_AGENT_PATH_PREFIX}")
 
 # runtime paths
@@ -271,7 +271,7 @@ set(CHORD_RUNTIME_DISTRIBUTION_ROOT             "${CMAKE_INSTALL_PREFIX}")
 set(CHORD_RUNTIME_PACKAGES_DIR                  "${CMAKE_INSTALL_PREFIX}/${PACKAGES_DIR_PREFIX}")
 set(CHORD_RUNTIME_CONFIG_DIR                    "${CMAKE_INSTALL_PREFIX}/${CONFIG_DIR_PREFIX}")
 set(CHORD_RUNTIME_VENDOR_CONFIG_DIR             "${CMAKE_INSTALL_PREFIX}/${VENDOR_CONFIG_DIR_PREFIX}")
-set(CHORD_RUNTIME_CHORD_LOCAL_MACHINE_PATH      "${CMAKE_INSTALL_PREFIX}/${CHORD_LOCAL_MACHINE_EXE_PREFIX}")
+set(CHORD_RUNTIME_CHORD_MACHINE_PATH            "${CMAKE_INSTALL_PREFIX}/${CHORD_MACHINE_EXE_PREFIX}")
 set(CHORD_RUNTIME_CHORD_AGENT_PATH              "${CMAKE_INSTALL_PREFIX}/${CHORD_AGENT_EXE_PREFIX}")
 
 # used by chord_test to initialize sandbox tester
@@ -315,7 +315,8 @@ add_executable(chord_testsuite ${EMPTY_CPP})
 target_link_libraries(chord_testsuite
     PUBLIC gtest::gtest
     PRIVATE
-    ChordLocalMachineTestSuite
+    ChordAgentTestSuite
+    ChordMachineTestSuite
     ChordSandboxTestSuite
 )
 gtest_discover_tests(chord_testsuite)
@@ -332,7 +333,7 @@ configure_package_config_file(
     chord-config.cmake
     INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/chord"
     PATH_VARS
-        CHORD_LOCAL_MACHINE_PATH_PREFIX
+        CHORD_MACHINE_PATH_PREFIX
         CHORD_AGENT_PATH_PREFIX
         PACKAGES_DIR_PREFIX
         DOC_DIR_PREFIX

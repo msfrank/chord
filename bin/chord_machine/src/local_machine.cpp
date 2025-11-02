@@ -14,14 +14,14 @@ static void runner_thread(void *data)
 }
 
 chord_machine::LocalMachine::LocalMachine(
-    const tempo_utils::Url &machineUrl,
+    const std::string &machineName,
     bool startSuspended,
     std::shared_ptr<lyric_runtime::InterpreterState> interpreterState,
     AbstractMessageSender<RunnerReply> *processor)
-    : m_machineUrl(machineUrl),
+    : m_machineName(machineName),
       m_startSuspended(startSuspended)
 {
-    TU_ASSERT (m_machineUrl.isValid());
+    TU_ASSERT (!m_machineName.empty());
     TU_ASSERT (interpreterState != nullptr);
     TU_ASSERT (processor != nullptr);
 
@@ -37,10 +37,10 @@ chord_machine::LocalMachine::~LocalMachine()
     uv_thread_join(&m_tid);
 }
 
-tempo_utils::Url
-chord_machine::LocalMachine::getMachineUrl() const
+std::string
+chord_machine::LocalMachine::getMachineName() const
 {
-    return m_machineUrl;
+    return m_machineName;
 }
 
 chord_machine::InterpreterRunnerState

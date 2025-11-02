@@ -3,24 +3,26 @@
 #include <chord_agent/machine_supervisor.h>
 #include <tempo_utils/log_stream.h>
 
+#include "chord_agent/agent_result.h"
+
 chord_agent::MachineProcess::MachineProcess(
-    const tempo_utils::Url &machineUrl,
+    const std::string &machineName,
     const tempo_utils::ProcessInvoker &invoker,
     MachineSupervisor *supervisor)
-    : m_machineUrl(machineUrl),
+    : m_machineName(machineName),
       m_invoker(invoker),
       m_supervisor(supervisor),
       m_state(MachineState::Initial),
       m_exitStatus(-1)
 {
-    TU_ASSERT (m_machineUrl.isValid());
+    TU_ASSERT (!m_machineName.empty());
     TU_ASSERT (m_invoker.isValid());
     TU_ASSERT (m_supervisor != nullptr);
 
     m_lock = new absl::Mutex();
     memset(&m_process, 0, sizeof(uv_process_t));
     m_process.data = this;
-    m_logger = std::make_unique<MachineLogger>(m_machineUrl, m_supervisor->getLoop());
+    m_logger = std::make_unique<MachineLogger>(m_machineName, m_supervisor->getLoop());
 }
 
 chord_agent::MachineProcess::~MachineProcess()
@@ -28,15 +30,70 @@ chord_agent::MachineProcess::~MachineProcess()
     delete m_lock;
 }
 
-/**
- * Returns the url associated with the machine.
- *
- * @return The machine url.
- */
-tempo_utils::Url
-chord_agent::MachineProcess::getMachineUrl() const
+tempo_utils::Result<std::shared_ptr<chord_agent::MachineProcess>>
+chord_agent::MachineProcess::create(
+    std::string_view machineName,
+    const zuri_packager::PackageSpecifier &mainPackage,
+    const chord_common::TransportLocation &supervisorEndpoint,
+    MachineSupervisor *supervisor,
+    const MachineOptions &options)
 {
-    return m_machineUrl;
+    TU_ASSERT (!machineName.empty());
+    TU_ASSERT (supervisorEndpoint.isValid());
+
+    std::filesystem::path machineExecutable;
+    if (!options.machineExecutable.empty()) {
+        machineExecutable = options.machineExecutable;
+    } else {
+        machineExecutable = CHORD_MACHINE_EXECUTABLE;
+    }
+
+    // append builder args based on the config hash
+    tempo_utils::ProcessBuilder builder(machineExecutable);
+    builder.appendArg("-n", machineName);
+    builder.appendArg("--supervisor-endpoint", supervisorEndpoint.toString());
+
+    // determine the run directory
+    if (!options.runDirectory.empty()) {
+        builder.appendArg("--run-directory", options.runDirectory.string());
+    }
+
+    // determine the package directories
+    for (const auto &packageDirectory : options.packageCacheDirectories) {
+        builder.appendArg("--package-directory", packageDirectory.string());
+    }
+
+    // determine the pem root CA bundle file
+    builder.appendArg("--ca-bundle", options.pemRootCABundleFile.string());
+
+    // append start-suspended flag
+    if (options.startSuspended) {
+        builder.appendArg("--start-suspended");
+    }
+
+    // append main package specifier argument
+    builder.appendArg(mainPackage.toString());
+
+    // append main arguments
+    for (const auto &arg : options.mainArguments) {
+        builder.appendArg(arg);
+    }
+
+    auto invoker = builder.toInvoker();
+
+    return std::shared_ptr<MachineProcess>(new MachineProcess(
+        std::string(machineName), invoker, supervisor));
+}
+
+/**
+ * Returns the machine name.
+ *
+ * @return The machine name.
+ */
+std::string
+chord_agent::MachineProcess::getMachineName() const
+{
+    return m_machineName;
 }
 
 /**
@@ -86,14 +143,13 @@ chord_agent::on_process_exit(uv_process_t *child, int64_t status, int signal)
  * @return Ok status if the process was spawned successfully, otherwise notOk status.
  */
 tempo_utils::Status
-chord_agent::MachineProcess::spawn(const std::filesystem::path &cwd)
+chord_agent::MachineProcess::spawn(const std::filesystem::path &runDirectory)
 {
     absl::MutexLock locker(m_lock);
 
     if (m_state != MachineState::Initial)
-        return tempo_utils::GenericStatus::forCondition(
-            tempo_utils::GenericCondition::kInternalViolation,
-            "cannot spawn process for machine {}: invalid machine state", m_machineUrl.toString());
+        return AgentStatus::forCondition(AgentCondition::kAgentInvariant,
+            "cannot spawn process for machine {}: invalid machine state", m_machineName);
 
     //
     TU_RETURN_IF_NOT_OK (m_logger->initialize());
@@ -105,10 +161,11 @@ chord_agent::MachineProcess::spawn(const std::filesystem::path &cwd)
     memset(&processOptions, 0, sizeof(uv_process_options_t));
     processOptions.file = m_invoker.getExecutable();
     processOptions.args = m_invoker.getArgv();
-    processOptions.cwd = cwd.c_str();
     processOptions.exit_cb = on_process_exit;
+    if (!runDirectory.empty()) {
+        processOptions.cwd = runDirectory.c_str();
+    }
     TU_LOG_V << "process invocation: " << m_invoker;
-    TU_LOG_V << "process cwd: " << processOptions.cwd;
 
     // configure child process IO
     uv_stdio_container_t processStdio[3];
@@ -123,16 +180,15 @@ chord_agent::MachineProcess::spawn(const std::filesystem::path &cwd)
     // supervisor forks a child process and executes the interpreter helper
     auto ret = uv_spawn(loop, &m_process, &processOptions);
     if (ret < 0)
-        return tempo_utils::GenericStatus::forCondition(
-            tempo_utils::GenericCondition::kInternalViolation,
+        return AgentStatus::forCondition(AgentCondition::kAgentInvariant,
             "failed to spawn child process: {} ({})", uv_strerror(ret), uv_err_name(ret));
 
     // update the machine status
     m_state = MachineState::Created;
 
-    TU_LOG_INFO << "spawned machine process " << m_machineUrl << " with pid " << m_process.pid;
+    TU_LOG_INFO << "spawned machine process " << m_machineName << " with pid " << m_process.pid;
 
-    return tempo_utils::Status();
+    return {};
 }
 
 /**
@@ -146,9 +202,8 @@ chord_agent::MachineProcess::terminate(int signal)
     absl::MutexLock locker(m_lock);
 
     if (m_state == MachineState::Exited)
-        return tempo_utils::GenericStatus::forCondition(
-            tempo_utils::GenericCondition::kInternalViolation,
-            "cannot terminate process for machine {}: invalid machine state", m_machineUrl.toString());
+        return AgentStatus::forCondition(AgentCondition::kAgentInvariant,
+            "cannot terminate process for machine {}: invalid machine state", m_machineName);
 
     // if signal number was not specified, then use the default termination signal
     if (signal < 0) {
@@ -158,14 +213,13 @@ chord_agent::MachineProcess::terminate(int signal)
     // send the termination signal
     auto ret = uv_kill(m_process.pid, signal);
     if (ret < 0)
-        return tempo_utils::GenericStatus::forCondition(
-            tempo_utils::GenericCondition::kInternalViolation,
+        return AgentStatus::forCondition(AgentCondition::kAgentInvariant,
             "failed to terminate child process: {} ({})", uv_strerror(ret), uv_err_name(ret));
 
     // update the machine status
     m_state = MachineState::Terminating;
 
-    return tempo_utils::Status();
+    return {};
 }
 
 /**
@@ -186,6 +240,6 @@ chord_agent::MachineProcess::release(tu_int64 status, int signal)
     }
 
     // signal the supervisor to release after releasing the lock
-    auto status_ = m_supervisor->release(m_machineUrl, status, signal);
-    TU_LOG_WARN_IF(status_.notOk()) << "failed to release machine " << m_machineUrl << ": " << status_;
+    auto status_ = m_supervisor->release(m_machineName, status, signal);
+    TU_LOG_WARN_IF(status_.notOk()) << "failed to release machine " << m_machineName << ": " << status_;
 }

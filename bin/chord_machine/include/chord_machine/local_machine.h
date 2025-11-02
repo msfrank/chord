@@ -14,13 +14,13 @@ namespace chord_machine {
     class LocalMachine {
     public:
         LocalMachine(
-            const tempo_utils::Url &machineUrl,
+            const std::string &machineName,
             bool startSuspended,
             std::shared_ptr<lyric_runtime::InterpreterState> interpreterState,
             AbstractMessageSender<RunnerReply> *processor);
         virtual ~LocalMachine();
 
-        tempo_utils::Url getMachineUrl() const;
+        std::string getMachineName() const;
         InterpreterRunnerState getRunnerState() const;
 
         tempo_utils::Status notifyInitComplete();
@@ -29,7 +29,7 @@ namespace chord_machine {
         tempo_utils::Status terminate();
 
     private:
-        tempo_utils::Url m_machineUrl;
+        std::string m_machineName;
         bool m_startSuspended;
         std::unique_ptr<InterpreterRunner> m_runner;
         AbstractMessageSender<RunnerRequest> *m_commandQueue;

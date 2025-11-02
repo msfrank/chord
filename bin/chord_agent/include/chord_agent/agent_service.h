@@ -3,19 +3,17 @@
 
 #include <chord_invoke/invoke_service.grpc.pb.h>
 
+#include "agent_config.h"
 #include "machine_supervisor.h"
 
 namespace chord_agent {
 
     class AgentService : public chord_invoke::InvokeService::CallbackService {
     public:
-        AgentService(
-            MachineSupervisor *supervisor,
-            std::string_view agentName,
-            const std::filesystem::path &localMachineExecutable);
+        AgentService(const AgentConfig &agentConfig, uv_loop_t *loop);
 
-        std::string getListenTarget() const;
-        void setListenTarget(const std::string &listenTarget);
+        tempo_utils::Status initialize(const chord_common::TransportLocation &supervisorEndpoint);
+        tempo_utils::Status shutdown();
 
         grpc::ServerUnaryReactor *
         IdentifyAgent(
@@ -54,13 +52,12 @@ namespace chord_agent {
             chord_invoke::DeleteMachineResult *response) override;
 
     private:
-        MachineSupervisor *m_supervisor;
-        std::string m_agentName;
-        std::filesystem::path m_localMachineExecutable;
+        const AgentConfig &m_agentConfig;
+        uv_loop_t *m_loop;
         tu_uint64 m_uptime;
 
         std::unique_ptr<absl::Mutex> m_lock;
-        std::string m_listenTarget ABSL_GUARDED_BY(m_lock);
+        std::unique_ptr<MachineSupervisor> m_supervisor ABSL_GUARDED_BY(m_lock);
 
         tempo_utils::Status doCreateMachine(
             grpc::ServerUnaryReactor *reactor,

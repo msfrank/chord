@@ -10,46 +10,48 @@
 #include <tempo_utils/posix_result.h>
 #include <tempo_utils/tempfile_maker.h>
 #include <tempo_utils/url.h>
+#include <zuri_packager/package_reader.h>
+#include <zuri_packager/packaging_conversions.h>
+
+#include "chord_common/common_conversions.h"
 
 tempo_utils::Status
 chord_machine::configure(ChordLocalMachineConfig &chordLocalMachineConfig, int argc, const char *argv[])
 {
+    tempo_config::StringParser machineNameParser(std::string{});
     tempo_config::PathParser runDirectoryParser(std::filesystem::current_path());
+    chord_common::TransportLocationParser supervisorEndpointParser;
     tempo_config::PathParser packageCacheDirectoryParser;
     tempo_config::SeqTParser packageCacheDirectoriesParser(&packageCacheDirectoryParser, {});
-    tempo_config::PathParser pemRootCABundleFileParser(std::filesystem::path{});
-    tempo_config::PathParser logFileParser(
-        std::filesystem::path(absl::StrCat("chord-machine.", getpid(), ".log")));
     tempo_config::UrlParser expectedPortParser;
-    tempo_config::BooleanParser startSuspendedParser(false);
     tempo_config::SetTParser expectedPortsParser(&expectedPortParser, {});
-    tempo_config::UrlParser supervisorUrlParser;
-    tempo_config::StringParser supervisorNameOverrideParser(std::string{});
-    tempo_config::UrlParser machineUrlParser;
-    tempo_config::StringParser machineNameOverrideParser(std::string{});
-    tempo_config::UrlParser mainLocationParser;
+    tempo_config::BooleanParser startSuspendedParser(false);
+    tempo_config::PathParser pemRootCABundleFileParser(std::filesystem::path{});
+    tempo_config::PathParser logFileParser(std::filesystem::path{});
+    zuri_packager::PackageSpecifierParser mainPackageParser;
+    tempo_config::StringParser mainArgParser;
+    tempo_config::SeqTParser mainArgumentsParser(&mainArgParser);
 
     std::vector<tempo_command::Default> defaults = {
-        {"runDirectory", {}, "run directory", "DIR"},
+        {"machineName", {}, "the machine url used for registration", "MACHINE-URL"},
+        {"runDirectory", {}, "run the machine in the specified directory", "DIR"},
+        {"supervisorEndpoint", {}, "register machine using the specified endpoint", "ENDPOINT"},
         {"packageCacheDirectories", {}, "package cache", "DIR"},
         {"expectedPorts", {}, "expected port", "PROTOCOL-URL"},
         {"startSuspended", {}, "start machine in suspended state"},
-        {"supervisorUrl", {}, "register interpreter using the specified uri", "SUPERVISOR-URL"},
-        {"supervisorNameOverride", {}, "the SSL server name of the supervisor", "SERVER-NAME"},
-        {"machineUrl", {}, "the machine url used for registration", "MACHINE-URL"},
-        {"machineNameOverride", {}, "the SSL server name of the machine", "SERVER-NAME"},
         {"pemRootCABundleFile", {}, "the root CA certificate bundle used by gRPC", "FILE"},
         {"logFile", {}, "path to log file", "FILE"},
-        {"mainLocation", {}, "the location of the main module", "LOCATION"},
+        {"mainPackage", {}, "Main package", "SPECIFIER"},
+        {"mainArgs", {}, "List of arguments to pass to the program", "ARGS"},
     };
 
     std::vector<tempo_command::Grouping> groupings = {
+        {"machineName", {"-n", "--machine-name"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
+        {"supervisorEndpoint", {"--supervisor-endpoint"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"runDirectory", {"--run-directory"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
-        {"packageCacheDirectories", {"--package-cache"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
+        {"packageCacheDirectories", {"-P", "--package-cache"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"expectedPorts", {"--expected-port"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"startSuspended", {"--start-suspended"}, tempo_command::GroupingType::NO_ARGUMENT},
-        {"supervisorNameOverride", {"--supervisor-server-name"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
-        {"machineNameOverride", {"--machine-server-name"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"pemRootCABundleFile", {"--ca-bundle"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"logFile", {"--log-file"}, tempo_command::GroupingType::SINGLE_ARGUMENT},
         {"help", {"-h", "--help"}, tempo_command::GroupingType::HELP_FLAG},
@@ -57,22 +59,19 @@ chord_machine::configure(ChordLocalMachineConfig &chordLocalMachineConfig, int a
     };
 
     std::vector<tempo_command::Mapping> optMappings = {
+        {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "machineName"},
         {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "runDirectory"},
+        {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "supervisorEndpoint"},
         {tempo_command::MappingType::ANY_INSTANCES, "packageCacheDirectories"},
         {tempo_command::MappingType::ANY_INSTANCES, "expectedPorts"},
         {tempo_command::MappingType::TRUE_IF_INSTANCE, "startSuspended"},
-        {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "supervisorUrl"},
-        {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "machineUrl"},
-        {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "supervisorNameOverride"},
-        {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "machineNameOverride"},
         {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "pemRootCABundleFile"},
         {tempo_command::MappingType::ZERO_OR_ONE_INSTANCE, "logFile"},
     };
 
     std::vector<tempo_command::Mapping> argMappings = {
-        {tempo_command::MappingType::ONE_INSTANCE, "supervisorUrl"},
-        {tempo_command::MappingType::ONE_INSTANCE, "mainLocation"},
-        {tempo_command::MappingType::ONE_INSTANCE, "machineUrl"},
+        {tempo_command::MappingType::ONE_INSTANCE, "mainPackage"},
+        {tempo_command::MappingType::ANY_INSTANCES, "mainArgs"},
     };
 
     tempo_command::OptionsHash options;
@@ -112,9 +111,17 @@ chord_machine::configure(ChordLocalMachineConfig &chordLocalMachineConfig, int a
 
     TU_LOG_V << "command config:\n" << tempo_command::command_config_to_string(commandConfig);
 
+    // determine the machine name
+    TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.machineName,
+        machineNameParser, commandConfig, "machineName"));
+
     // determine the run directory
     TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.runDirectory,
         runDirectoryParser, commandConfig, "runDirectory"));
+
+    // determine the supervisor endpoint
+    TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.supervisorEndpoint,
+        supervisorEndpointParser, commandConfig, "supervisorEndpoint"));
 
     // determine the package directories
     TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.packageCacheDirectories,
@@ -128,22 +135,6 @@ chord_machine::configure(ChordLocalMachineConfig &chordLocalMachineConfig, int a
     TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.startSuspended,
         startSuspendedParser, commandConfig, "startSuspended"));
 
-    // determine the supervisor uri
-    TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.supervisorUrl,
-        supervisorUrlParser, commandConfig, "supervisorUrl"));
-
-    // determine the SSL server name of the supervisor
-    TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.supervisorNameOverride,
-        supervisorNameOverrideParser, commandConfig, "supervisorNameOverride"));
-
-    // determine the machine uri
-    TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.machineUrl,
-        machineUrlParser, commandConfig, "machineUrl"));
-
-    // determine the SSL server name of the supervisor
-    TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.machineNameOverride,
-        machineNameOverrideParser, commandConfig, "machineNameOverride"));
-
     // determine the pem root CA bundle file
     TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.pemRootCABundleFile,
         pemRootCABundleFileParser, commandConfig, "pemRootCABundleFile"));
@@ -152,12 +143,17 @@ chord_machine::configure(ChordLocalMachineConfig &chordLocalMachineConfig, int a
     TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.logFile,
         logFileParser, commandConfig, "logFile"));
 
-    // determine the location of the main assembly
-    TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.mainLocation,
-        mainLocationParser, commandConfig, "mainLocation"));
+    // determine the main package
+    TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.mainPackage,
+        mainPackageParser, commandConfig, "mainPackage"));
+
+    // determine the main arguments
+    TU_RETURN_IF_NOT_OK(tempo_command::parse_command_config(chordLocalMachineConfig.mainArguments,
+        mainArgumentsParser, commandConfig, "mainArguments"));
 
     // set the binder endpoint
     auto binderSocketPath = chordLocalMachineConfig.runDirectory / "cap.sock";
+    chordLocalMachineConfig.binderEndpoint = chord_common::TransportLocation::forUnix()
     chordLocalMachineConfig.binderEndpoint = absl::StrCat(
         "unix://", std::filesystem::absolute(binderSocketPath).c_str());
 

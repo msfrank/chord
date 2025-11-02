@@ -9,35 +9,37 @@
 #include <tempo_config/parse_config.h>
 #include <tempo_utils/file_utilities.h>
 
-chord_agent::AgentService::AgentService(
-    MachineSupervisor *supervisor,
-    std::string_view agentName,
-    const std::filesystem::path &localMachineExecutable)
-    : m_supervisor(supervisor),
-      m_agentName(agentName),
-      m_localMachineExecutable(localMachineExecutable)
+#include "chord_common/common_types.h"
+
+chord_agent::AgentService::AgentService(const AgentConfig &agentConfig, uv_loop_t *loop)
+    : m_agentConfig(agentConfig),
+      m_loop(loop)
 {
-    TU_ASSERT (m_supervisor != nullptr);
-    TU_ASSERT (!m_agentName.empty());
-    TU_ASSERT (!m_localMachineExecutable.empty());
+    TU_ASSERT (m_loop != nullptr);
     uv_timeval64_t tv;
     uv_gettimeofday(&tv);
     m_uptime = tv.tv_sec;
     m_lock = std::make_unique<absl::Mutex>();
 }
 
-std::string
-chord_agent::AgentService::getListenTarget() const
+tempo_utils::Status
+chord_agent::AgentService::initialize(const chord_common::TransportLocation &supervisorEndpoint)
 {
     absl::MutexLock lock(m_lock.get());
-    return m_listenTarget;
+    if (m_supervisor != nullptr)
+        return AgentStatus::forCondition(AgentCondition::kAgentInvariant,
+            "AgentService is already initialized");
+    m_supervisor = std::make_unique<MachineSupervisor>(m_agentConfig, supervisorEndpoint, m_loop);
+    return {};
 }
 
-void
-chord_agent::AgentService::setListenTarget(const std::string &listenTarget)
+tempo_utils::Status
+chord_agent::AgentService::shutdown()
 {
     absl::MutexLock lock(m_lock.get());
-    m_listenTarget = listenTarget;
+    if (m_supervisor == nullptr)
+        return {};
+    return m_supervisor->shutdown();
 }
 
 grpc::ServerUnaryReactor *
@@ -48,67 +50,11 @@ chord_agent::AgentService::IdentifyAgent(
 {
     uv_timeval64_t tv;
     uv_gettimeofday(&tv);
-    response->set_agent_name(m_agentName);
+    response->set_agent_name(m_agentConfig.sessionName);
     response->set_uptime_millis(tv.tv_sec - m_uptime);
     auto *reactor = context->DefaultReactor();
     reactor->Finish(grpc::Status::OK);
     return reactor;
-}
-
-static tempo_utils::Status
-parse_config_hash(
-    tempo_utils::ProcessBuilder &builder,
-    const tempo_config::ConfigMap &config,
-    const std::string &defaultAgentName)
-{
-    tempo_config::PathParser runDirectoryParser(std::filesystem::current_path());
-    tempo_config::PathParser installDirectoryParser(std::filesystem::path{});
-    tempo_config::PathParser packageDirectoryParser;
-    tempo_config::SeqTParser packageDirectoriesParser(&packageDirectoryParser, {});
-    tempo_config::StringParser agentServerNameParser(defaultAgentName);
-    tempo_config::PathParser pemRootCABundleFileParser;
-    tempo_config::PathParser pemCertificateFileParser(std::filesystem::path{});
-    tempo_config::PathParser pemPrivateKeyFileParser(std::filesystem::path{});
-
-    // determine the run directory
-    std::filesystem::path runDirectory;
-    TU_RETURN_IF_NOT_OK(tempo_config::parse_config(runDirectory, runDirectoryParser,
-        config, "runDirectory"));
-    if (!runDirectory.empty()) {
-        builder.appendArg("--run-directory", runDirectory.string());
-    }
-
-    // determine the install directory
-    std::filesystem::path installDirectory;
-    TU_RETURN_IF_NOT_OK(tempo_config::parse_config(installDirectory, installDirectoryParser,
-        config, "installDirectory"));
-    if (!installDirectory.empty()) {
-        builder.appendArg("--install-directory", installDirectory.string());
-    }
-
-    // determine the package directories
-    std::vector<std::filesystem::path> packageDirectories;
-    TU_RETURN_IF_NOT_OK(tempo_config::parse_config(packageDirectories, packageDirectoriesParser,
-        config, "packageDirectories"));
-    for (const auto &packageDirectory : packageDirectories) {
-        builder.appendArg("--package-directory", packageDirectory.string());
-    }
-
-    // determine the agent server name
-    std::string agentServerName;
-    TU_RETURN_IF_NOT_OK(tempo_config::parse_config(agentServerName, agentServerNameParser,
-        config, "agentServerName"));
-    if (!agentServerName.empty()) {
-        builder.appendArg("--supervisor-server-name", agentServerName);
-    }
-
-    // determine the pem root CA bundle file
-    std::filesystem::path pemRootCABundleFile;
-    TU_RETURN_IF_NOT_OK(tempo_config::parse_config(pemRootCABundleFile, pemRootCABundleFileParser,
-        config, "pemRootCABundleFile"));
-    builder.appendArg("--ca-bundle", pemRootCABundleFile.string());
-
-    return {};
 }
 
 tempo_utils::Status
@@ -118,40 +64,61 @@ chord_agent::AgentService::doCreateMachine(
     const chord_invoke::CreateMachineRequest *request,
     chord_invoke::CreateMachineResult *response)
 {
-    tempo_config::ConfigNode config;
-    TU_ASSIGN_OR_RETURN (config, tempo_config::read_config_string(request->config_hash()));
+    auto &machineName = request->machine_name();
+    auto mainPackage = zuri_packager::PackageSpecifier::fromString(request->main_package());
+    MachineOptions options;
 
-    if (config.getNodeType() != tempo_config::ConfigNodeType::kMap)
-        return AgentStatus::forCondition(AgentCondition::kInvalidConfiguration,
-            "invalid config hash");
-    auto configMap = config.toMap();
-
-    // construct the unique machine url
-    auto machineName = absl::StrCat(tempo_utils::generate_name("chord-machine-XXXXXXXX"), ".test");
-    auto machineUrl = tempo_utils::Url::fromString(absl::StrCat("https://", machineName));
-
-    // append builder args based on the config hash
-    tempo_utils::ProcessBuilder builder(m_localMachineExecutable);
-    TU_RETURN_IF_NOT_OK (parse_config_hash(builder, configMap, m_agentName));
-
-    // append expected port args
+    // build list of requested ports
     for (const auto &requestedPort : request->requested_ports()) {
-        builder.appendArg("--expected-port", requestedPort.protocol_url());
+        auto protocolUrl = tempo_utils::Url::fromString(requestedPort.protocol_url());
+        if (!protocolUrl.isValid())
+            return AgentStatus::forCondition(AgentCondition::kInvalidConfiguration,
+                "invalid protocol url '{}'", requestedPort.protocol_url());
+
+        chord_common::PortType portType;
+        switch (requestedPort.port_type()) {
+            case chord_invoke::Streaming:
+                portType = chord_common::PortType::Streaming;
+                break;
+            case chord_invoke::OneShot:
+                portType = chord_common::PortType::OneShot;
+                break;
+            default:
+                return AgentStatus::forCondition(AgentCondition::kInvalidConfiguration,
+                    "invalid port type for protocol '{}'", protocolUrl.toString());
+        }
+
+        chord_common::PortDirection portDirection;
+        switch (requestedPort.port_direction()) {
+            case chord_invoke::Client:
+                portDirection = chord_common::PortDirection::Client;
+                break;
+            case chord_invoke::Server:
+                portDirection = chord_common::PortDirection::Server;
+                break;
+            case chord_invoke::BiDirectional:
+                portDirection = chord_common::PortDirection::BiDirectional;
+                break;
+            default:
+                return AgentStatus::forCondition(AgentCondition::kInvalidConfiguration,
+                    "invalid port direction for protocol '{}'", protocolUrl.toString());
+        }
+
+        options.requestedPorts.emplace_back(protocolUrl, portType, portDirection);
     }
 
-    // append start-suspended flag
-    if (request->start_suspended()) {
-        builder.appendArg("--start-suspended");
-    }
+    options.enableMonitoring = request->requested_control();
+    options.startSuspended = request->start_suspended();
 
-    // append the final required builder args
-    builder.appendArg(m_listenTarget);
-    builder.appendArg(request->execution_url());
-    builder.appendArg(machineUrl.toString());
+    // acquire mutex and ensure that the service is initialized
+    absl::MutexLock lock(m_lock.get());
+    if (m_supervisor == nullptr)
+        return AgentStatus::forCondition(AgentCondition::kAgentInvariant,
+            "service is not initialized");
 
     // spawn the helper process and move machine to 'spawning' queue
     auto waiter = std::make_shared<OnAgentSpawn>(reactor, response);
-    auto spawnMachineStatus = m_supervisor->spawnMachine(machineUrl, builder.toInvoker(), waiter);
+    auto spawnMachineStatus = m_supervisor->spawnMachine(machineName, mainPackage, options, waiter);
     if (spawnMachineStatus.notOk()) {
         waiter->onStatus(spawnMachineStatus);
     }
@@ -181,11 +148,7 @@ chord_agent::AgentService::doSignCertificates(
     const chord_invoke::SignCertificatesRequest *request,
     chord_invoke::SignCertificatesResult *response)
 {
-    // verify machine url is valid
-    auto machineUrl = tempo_utils::Url::fromString(request->machine_url());
-    if (!machineUrl.isValid())
-        return AgentStatus::forCondition(AgentCondition::kInvalidConfiguration,
-            "invalid parameter machine_url");
+    auto &machineName = request->machine_name();
 
     // verify any duplicate declared ports each have a unique endpoint
     absl::flat_hash_map<tempo_utils::Url, absl::flat_hash_set<tempo_utils::Url>> declaredPorts;
@@ -207,9 +170,15 @@ chord_agent::AgentService::doSignCertificates(
         declaredPortEndpoints.insert(endpointUrl);
     }
 
+    // acquire mutex and ensure that the service is initialized
+    absl::MutexLock lock(m_lock.get());
+    if (m_supervisor == nullptr)
+        return AgentStatus::forCondition(AgentCondition::kAgentInvariant,
+            "service is not initialized");
+
     // respond to CreateMachine request and move machine to 'signing' queue
     auto waiter = std::make_shared<OnAgentSign>(reactor, response);
-    TU_RETURN_IF_NOT_OK (m_supervisor->requestCertificates(machineUrl, *request, waiter));
+    TU_RETURN_IF_NOT_OK (m_supervisor->requestCertificates(machineName, *request, waiter));
 
     return {};
 }
@@ -236,17 +205,17 @@ chord_agent::AgentService::doRunMachine(
     const chord_invoke::RunMachineRequest *request,
     chord_invoke::RunMachineResult *response)
 {
-    TU_LOG_INFO << "RunMachine request: " << request->SerializeAsString();
+    auto &machineName = request->machine_name();
 
-    // verify machine url is valid
-    auto machineUrl = tempo_utils::Url::fromString(request->machine_url());
-    if (!machineUrl.isValid())
-        return AgentStatus::forCondition(AgentCondition::kInvalidConfiguration,
-            "invalid parameter machine_url");
+    // acquire mutex and ensure that the service is initialized
+    absl::MutexLock lock(m_lock.get());
+    if (m_supervisor == nullptr)
+        return AgentStatus::forCondition(AgentCondition::kAgentInvariant,
+            "service is not initialized");
 
     // respond to SignCertificates request and move machine to 'ready' queue
     auto waiter = std::make_shared<OnAgentReady>(reactor, response);
-    TU_RETURN_IF_NOT_OK (m_supervisor->bindCertificates(machineUrl, *request, waiter));
+    TU_RETURN_IF_NOT_OK (m_supervisor->bindCertificates(machineName, *request, waiter));
 
     return {};
 }
@@ -257,7 +226,7 @@ chord_agent::AgentService::RunMachine(
     const chord_invoke::RunMachineRequest *request,
     chord_invoke::RunMachineResult *response)
 {
-    TU_LOG_INFO << "SignCertificates request: " << request->DebugString();
+    TU_LOG_INFO << "RunMachine request: " << request->DebugString();
     auto *reactor = context->DefaultReactor();
     auto status = doRunMachine(reactor, context, request, response);
     if (status.notOk()) {
@@ -273,15 +242,16 @@ chord_agent::AgentService::doAdvertiseEndpoints(
     const chord_invoke::AdvertiseEndpointsRequest *request,
     chord_invoke::AdvertiseEndpointsResult *response)
 {
-    // verify machine url is valid
-    auto machineUrl = tempo_utils::Url::fromString(request->machine_url());
-    if (!machineUrl.isValid())
-        return AgentStatus::forCondition(AgentCondition::kInvalidConfiguration,
-            "invalid parameter machine_url");
+    auto &machineName = request->machine_name();
+
+    // acquire mutex and ensure that the service is initialized
+    absl::MutexLock lock(m_lock.get());
+    if (m_supervisor == nullptr)
+        return AgentStatus::forCondition(AgentCondition::kAgentInvariant,
+            "service is not initialized");
 
     // respond to RunMachine request
-    TU_LOG_INFO << "calling bind()";
-    TU_RETURN_IF_NOT_OK (m_supervisor->startMachine(machineUrl, *request));
+    TU_RETURN_IF_NOT_OK (m_supervisor->startMachine(machineName, *request));
 
     // complete the AdvertiseEndpoints request
     reactor->Finish(grpc::Status::OK);
@@ -311,14 +281,16 @@ chord_agent::AgentService::doDeleteMachine(
     const chord_invoke::DeleteMachineRequest *request,
     chord_invoke::DeleteMachineResult *response)
 {
-    // verify machine url is valid
-    auto machineUrl = tempo_utils::Url::fromString(request->machine_url());
-    if (!machineUrl.isValid())
-        return AgentStatus::forCondition(AgentCondition::kInvalidConfiguration,
-            "invalid parameter machine_url");
+    auto &machineName = request->machine_name();
+
+    // acquire mutex and ensure that the service is initialized
+    absl::MutexLock lock(m_lock.get());
+    if (m_supervisor == nullptr)
+        return AgentStatus::forCondition(AgentCondition::kAgentInvariant,
+            "service is not initialized");
 
     auto waiter = std::make_shared<OnAgentTerminate>(reactor, response);
-    TU_RETURN_IF_NOT_OK (m_supervisor->terminateMachine(machineUrl, waiter));
+    TU_RETURN_IF_NOT_OK (m_supervisor->terminateMachine(machineName, waiter));
 
     return {};
 }
@@ -351,8 +323,6 @@ chord_agent::OnAgentSpawn::onComplete(
     MachineHandle handle,
     const chord_invoke::SignCertificatesRequest &signCertificatesRequest)
 {
-    m_result->set_machine_url(handle.url.toString());
-
     // forward declared ports
     for (const auto &declaredPort : signCertificatesRequest.declared_ports()) {
         auto *resultPort = m_result->add_declared_ports();

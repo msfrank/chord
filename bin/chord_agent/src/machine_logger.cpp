@@ -2,11 +2,11 @@
 #include <chord_agent/machine_logger.h>
 #include <tempo_utils/log_stream.h>
 
-chord_agent::MachineLogger::MachineLogger(const tempo_utils::Url &machineUrl, uv_loop_t *loop)
-    : m_machineUrl(machineUrl),
+chord_agent::MachineLogger::MachineLogger(const std::string &machineName, uv_loop_t *loop)
+    : m_machineName(machineName),
       m_loop(loop)
 {
-    TU_ASSERT (m_machineUrl.isValid());
+    TU_ASSERT (!m_machineName.empty());
     TU_ASSERT (m_loop != nullptr);
     memset(&m_out, 0, sizeof(uv_pipe_t));
     memset(&m_err, 0, sizeof(uv_pipe_t));
@@ -85,11 +85,11 @@ chord_agent::on_pipe_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 
     // log the contents
     if (stream == (uv_stream_t *) &logger->m_err) {
-        TU_LOG_INFO << "machine " << logger->m_machineUrl << " ERR ctx " << stream->data << ": " << s;
+        TU_LOG_INFO << "machine " << logger->m_machineName << " ERR ctx " << stream->data << ": " << s;
     } else if (stream == (uv_stream_t *) &logger->m_out) {
-        TU_LOG_INFO << "machine " << logger->m_machineUrl << " OUT ctx " << stream->data << ": " << s;
+        TU_LOG_INFO << "machine " << logger->m_machineName << " OUT ctx " << stream->data << ": " << s;
     } else {
-        TU_LOG_INFO << "machine " << logger->m_machineUrl << " UNKNOWN ctx " << stream->data << ": " << s;
+        TU_LOG_INFO << "machine " << logger->m_machineName << " UNKNOWN ctx " << stream->data << ": " << s;
     }
 }
 

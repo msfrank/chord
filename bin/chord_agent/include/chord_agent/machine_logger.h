@@ -10,7 +10,7 @@ namespace chord_agent {
 
     class MachineLogger {
     public:
-        MachineLogger(const tempo_utils::Url &machineUrl, uv_loop_t *loop);
+        MachineLogger(const std::string &machineName, uv_loop_t *loop);
         ~MachineLogger();
 
         tempo_utils::Status initialize();
@@ -23,7 +23,7 @@ namespace chord_agent {
         uv_stream_t *getError() const;
 
     private:
-        tempo_utils::Url m_machineUrl;
+        std::string m_machineName;
         uv_loop_t *m_loop;
         uv_pipe_t m_out;
         uv_pipe_t m_err;

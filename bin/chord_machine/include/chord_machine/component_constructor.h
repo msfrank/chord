@@ -23,7 +23,7 @@ namespace chord_machine {
             const lyric_runtime::InterpreterStateOptions &interpreterOptions) const;
 
         virtual std::shared_ptr<LocalMachine> createLocalMachine(
-            const tempo_utils::Url &machineUrl,
+            const std::string &machineName,
             bool startSuspended,
             std::shared_ptr<lyric_runtime::InterpreterState> &interpreterState,
             AbstractMessageSender<RunnerReply> *processor) const;

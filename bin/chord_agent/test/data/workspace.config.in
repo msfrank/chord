@@ -1,0 +1,24 @@
+{
+    "zuri": {
+        "build": {
+            "settings": {
+                "global": {
+                    "sourceBasePath": "/"
+                }
+            }
+        },
+        "imports": {
+            "std@zuri.dev": {
+                "type": "Path",
+                "path": "@ZURI_INSTALL_PACKAGES_DIR@/@ZURI_STD_PACKAGE_ZPK@"
+            }
+        },
+        "targets": {
+            "test1": {
+                "type": "Program",
+                "specifier": "@TEST1_SPECIFIER@",
+                "programMain": "/test1"
+            }
+        }
+    }
+}

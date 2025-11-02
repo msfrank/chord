@@ -8,9 +8,12 @@
 #include <tempo_security/x509_certificate_signing_request.h>
 #include <tempo_utils/file_reader.h>
 #include <tempo_utils/tempfile_maker.h>
-#include <zuri_distributor/package_cache_loader.h>
 #include <lyric_runtime/chain_loader.h>
 #include <lyric_bootstrap/bootstrap_loader.h>
+#include <zuri_distributor/package_cache_loader.h>
+#include <zuri_distributor/tiered_package_cache.h>
+
+#include "chord_machine/machine_result.h"
 
 tempo_utils::Status
 chord_machine::make_interpreter_state(
@@ -20,28 +23,49 @@ chord_machine::make_interpreter_state(
 {
     lyric_runtime::InterpreterStateOptions interpreterOptions;
 
-    interpreterOptions.mainLocation = lyric_common::ModuleLocation::fromUrl(chordLocalMachineConfig.mainLocation);
-
     auto systemLoader = std::make_shared<lyric_bootstrap::BootstrapLoader>();
 
-    // create the list of package cache loaders with the run cache loader in front
-    std::vector<std::shared_ptr<lyric_runtime::AbstractLoader>> loaderChain;
+    // create the list of package caches with the run cache in front
+    std::vector<std::shared_ptr<zuri_distributor::AbstractReadonlyPackageCache>> packageCaches;
 
-    // if install directory was specified then append directory loader
+    // open or create the run cache
     std::shared_ptr<zuri_distributor::PackageCache> runCache;
     TU_ASSIGN_OR_RETURN (runCache, zuri_distributor::PackageCache::openOrCreate(
         chordLocalMachineConfig.runDirectory, "cache"));
-    loaderChain.push_back(std::make_shared<zuri_distributor::PackageCacheLoader>(runCache));
+    packageCaches.push_back(runCache);
 
     // append loader for each package cache directory
     for (const auto &cacheDirectory : chordLocalMachineConfig.packageCacheDirectories) {
         std::shared_ptr<zuri_distributor::PackageCache> packageCache;
         TU_ASSIGN_OR_RETURN (packageCache, zuri_distributor::PackageCache::open(cacheDirectory));
-        loaderChain.push_back(std::make_shared<zuri_distributor::PackageCacheLoader>(packageCache));
+        packageCaches.push_back(packageCache);
     }
 
-    // construct the loader chain
-    auto applicationLoader = std::make_shared<lyric_runtime::ChainLoader>(loaderChain);
+    auto tieredCache = std::make_shared<zuri_distributor::TieredPackageCache>(packageCaches);
+
+    // resolve the package
+    Option<std::filesystem::path> mainPackagePathOption;
+    TU_ASSIGN_OR_RETURN (mainPackagePathOption, tieredCache->resolvePackage(chordLocalMachineConfig.mainPackage));
+    if (mainPackagePathOption.isEmpty())
+        return MachineStatus::forCondition(MachineCondition::kInvalidConfiguration,
+            "package {} not found", chordLocalMachineConfig.mainPackage.toString());
+    auto mainPackagePath = mainPackagePathOption.getValue();
+
+    // open the package
+    std::shared_ptr<zuri_packager::PackageReader> reader;
+    TU_ASSIGN_OR_RETURN (reader, zuri_packager::PackageReader::open(mainPackagePath));
+
+    // determine the entry point
+    zuri_packager::PackageSpecifier mainSpecifier;
+    TU_ASSIGN_OR_RETURN (mainSpecifier, reader->readPackageSpecifier());
+    lyric_common::ModuleLocation programMain;
+    TU_ASSIGN_OR_RETURN (programMain, reader->readProgramMain());
+    auto mainLocation = lyric_common::ModuleLocation::fromUrl(
+        mainSpecifier.toUrl()
+            .resolve(programMain.getPath()));
+    interpreterOptions.mainLocation = mainLocation;
+
+    auto applicationLoader = std::make_shared<zuri_distributor::PackageCacheLoader>(tieredCache);
 
     // construct the interpreter state
     interpreterState = componentConstructor.createInterpreterState(
@@ -58,7 +82,7 @@ chord_machine::make_local_machine(
     AbstractMessageSender<RunnerReply> *processor)
 {
     localMachine = componentConstructor.createLocalMachine(
-        chordLocalMachineConfig.machineUrl, chordLocalMachineConfig.startSuspended, interpreterState, processor);
+        chordLocalMachineConfig.machineName, chordLocalMachineConfig.startSuspended, interpreterState, processor);
     return {};
 }
 
@@ -91,14 +115,10 @@ chord_machine::make_custom_channel(
     auto credentials = grpc::SslCredentials(options);
 
     grpc::ChannelArguments channelArguments;
-    if (!chordLocalMachineConfig.supervisorNameOverride.empty()) {
-        TU_LOG_INFO << "using target name override " << chordLocalMachineConfig.supervisorNameOverride
-            << " for supervisor endpoint " << chordLocalMachineConfig.supervisorUrl;
-        channelArguments.SetSslTargetNameOverride(chordLocalMachineConfig.supervisorNameOverride);
-    }
+    channelArguments.SetSslTargetNameOverride(chordLocalMachineConfig.supervisorEndpoint.getServerName());
 
     channel = componentConstructor.createCustomChannel(
-        chordLocalMachineConfig.supervisorUrl.toString(), credentials, channelArguments);
+        chordLocalMachineConfig.supervisorEndpoint.toGrpcTarget(), credentials, channelArguments);
     return {};
 }
 
@@ -119,12 +139,8 @@ chord_machine::make_csr_key_pair(
     const ComponentConstructor &componentConstructor,
     const ChordLocalMachineConfig &chordLocalMachineConfig)
 {
-    tempo_security::ECCPrivateKeyGenerator keygen(NID_X9_62_prime256v1);
+    tempo_security::ECCPrivateKeyGenerator keygen(tempo_security::ECCurveId::Prime256v1);
 
-//    auto commonName = chordLocalMachineConfig.machineUrl.toString();
-//    if (!chordLocalMachineConfig.machineNameOverride.empty()) {
-//        commonName = chordLocalMachineConfig.machineNameOverride;
-//    }
     TU_LOG_INFO << "machine url: " << chordLocalMachineConfig.machineUrl;
     TU_LOG_INFO << "machine host: " << chordLocalMachineConfig.machineUrl.getHost();
     TU_LOG_INFO << "machine host and port: " << chordLocalMachineConfig.machineUrl.getHostAndPort();

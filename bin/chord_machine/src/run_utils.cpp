@@ -10,6 +10,7 @@ chord_machine::sign_certificates(
     const ChordLocalMachineConfig &chordLocalMachineConfig,
     ChordLocalMachineData &chordLocalMachineData)
 {
+    auto &machineName = chordLocalMachineConfig.machineName;
     auto pemRequestFile = chordLocalMachineData.csrKeyPair.getPemRequestFile();
 
     // read the CSR
@@ -24,7 +25,7 @@ chord_machine::sign_certificates(
     chord_invoke::SignCertificatesResult signCertificatesResult;
 
     //
-    signCertificatesRequest.set_machine_url(chordLocalMachineConfig.machineUrl.toString());
+    signCertificatesRequest.set_machine_name(machineName);
 
     //
     auto *declaredEndpoint = signCertificatesRequest.add_declared_endpoints();
@@ -39,7 +40,7 @@ chord_machine::sign_certificates(
     }
 
     //
-    TU_LOG_INFO << "requesting certificate signing for " << chordLocalMachineConfig.machineUrl;
+    TU_LOG_INFO << "requesting certificate signing for " << machineName;
     auto signCertificatesStatus = chordLocalMachineData.invokeStub->SignCertificates(
         &signCertificatesContext, signCertificatesRequest, &signCertificatesResult);
     TU_LOG_ERROR_IF(!signCertificatesStatus.ok()) << "SignCertificates failed: "
@@ -108,12 +109,12 @@ chord_machine::advertise_endpoints(
     chord_invoke::AdvertiseEndpointsRequest advertiseEndpointsRequest;
     chord_invoke::AdvertiseEndpointsResult advertiseEndpointsResult;
 
-    auto machineUrl = chordLocalMachineData.localMachine->getMachineUrl();
-    advertiseEndpointsRequest.set_machine_url(machineUrl.toString());
+    auto &machineName = chordLocalMachineConfig.machineName;
+    advertiseEndpointsRequest.set_machine_name(machineName);
     auto *boundEndpoint = advertiseEndpointsRequest.add_bound_endpoints();
     boundEndpoint->set_endpoint_url(chordLocalMachineConfig.binderEndpoint);
 
-    TU_LOG_INFO << "advertising endpoint for " << machineUrl;
+    TU_LOG_INFO << "advertising endpoint for " << machineName;
     auto advertiseEndpointsStatus = chordLocalMachineData.invokeStub->AdvertiseEndpoints(&advertiseEndpointsContext,
         advertiseEndpointsRequest, &advertiseEndpointsResult);
     TU_LOG_ERROR_IF(!advertiseEndpointsStatus.ok()) << "AdvertiseEndpoints failed: "

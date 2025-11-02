@@ -19,6 +19,8 @@ add_library(ChordMachineRuntime STATIC
     include/chord_machine/interpreter_runner.h
     src/local_machine.cpp
     include/chord_machine/local_machine.h
+    src/machine_result.cpp
+    include/chord_machine/machine_result.h
     src/port_socket.cpp
     include/chord_machine/port_socket.h
     src/remoting_service.cpp

@@ -20,15 +20,15 @@ chord_machine::ComponentConstructor::createInterpreterState(
 
 std::shared_ptr<chord_machine::LocalMachine>
 chord_machine::ComponentConstructor::createLocalMachine(
-    const tempo_utils::Url &machineUrl,
+    const std::string &machineName,
     bool startSuspended,
     std::shared_ptr<lyric_runtime::InterpreterState> &interpreterState,
     AbstractMessageSender<RunnerReply> *processor) const
 {
-    TU_ASSERT (machineUrl.isValid());
+    TU_ASSERT (!machineName.empty());
     TU_ASSERT (interpreterState != nullptr);
     TU_ASSERT (processor != nullptr);
-    return std::make_shared<LocalMachine>(machineUrl, startSuspended, interpreterState, processor);
+    return std::make_shared<LocalMachine>(machineName, startSuspended, interpreterState, processor);
 }
 
 std::unique_ptr<chord_machine::RemotingService>

@@ -24,7 +24,7 @@ chord_sandbox::internal::prepare_session(
     prepareSessionResult.sessionId = sessionId;
     auto commonName = absl::StrCat(prepareSessionResult.sessionId, ".session.chord.alt");
     prepareSessionResult.commonName = commonName;
-    auto sessionUrl =tempo_utils::Url::fromAbsolute("chord+session", commonName);
+    auto sessionUrl = tempo_utils::Url::fromAbsolute("chord+session", commonName);
 
     // write the sid file
     tempo_utils::FileWriter sidWriter(

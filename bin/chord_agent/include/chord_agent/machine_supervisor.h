@@ -12,6 +12,7 @@
 #include <tempo_utils/process_builder.h>
 #include <tempo_utils/url.h>
 
+#include "agent_config.h"
 #include "machine_logger.h"
 #include "machine_process.h"
 
@@ -21,11 +22,11 @@ namespace chord_agent {
     class MachineSupervisor;
 
     struct MachineHandle {
-        tempo_utils::Url url;
+        std::string machineName;
     };
 
     struct ExitStatus {
-        tempo_utils::Url url;
+        std::string machineName;
         tu_int64 status;
         int signal;
     };
@@ -65,21 +66,21 @@ namespace chord_agent {
     };
 
     struct SpawningContext {
-        tempo_utils::Url url;
+        std::string machineName;
         uv_timer_t timeout;
         std::shared_ptr<OnSupervisorSpawn> waiter;
         MachineSupervisor *supervisor;
     };
 
     struct SigningContext {
-        tempo_utils::Url url;
+        std::string machineName;
         uv_timer_t timeout;
         std::shared_ptr<OnSupervisorSign> waiter;
         MachineSupervisor *supervisor;
     };
 
     struct ReadyContext {
-        tempo_utils::Url url;
+        std::string machineName;
         uv_timer_t timeout;
         std::shared_ptr<OnSupervisorReady> waiter;
         MachineSupervisor *supervisor;
@@ -92,10 +93,9 @@ namespace chord_agent {
     class MachineSupervisor {
     public:
         MachineSupervisor(
-            uv_loop_t *loop,
-            const std::filesystem::path &processRunDirectory,
-            int idleTimeoutSeconds,
-            int registrationTimeoutSeconds);
+            const AgentConfig &agentConfig,
+            const chord_common::TransportLocation &supervisorEndpoint,
+            uv_loop_t *loop);
         ~MachineSupervisor();
 
         tempo_utils::Status initialize();
@@ -104,47 +104,48 @@ namespace chord_agent {
         uv_loop_t *getLoop() const;
 
         tempo_utils::Status spawnMachine(
-            const tempo_utils::Url &machineUrl,
-            const tempo_utils::ProcessInvoker &invoker,
+            std::string_view machineName,
+            const zuri_packager::PackageSpecifier &mainPackage,
+            const MachineOptions &options,
             std::shared_ptr<OnSupervisorSpawn> waiter);
 
         tempo_utils::Status requestCertificates(
-            const tempo_utils::Url &machineUrl,
+            std::string_view machineName,
             const chord_invoke::SignCertificatesRequest &signCertificatesRequest,
             std::shared_ptr<OnSupervisorSign> waiter);
 
         tempo_utils::Status bindCertificates(
-            const tempo_utils::Url &machineUrl,
+            std::string_view machineName,
             const chord_invoke::RunMachineRequest &runMachineRequest,
             std::shared_ptr<OnSupervisorReady> waiter);
 
         tempo_utils::Status startMachine(
-            const tempo_utils::Url &machineUrl,
+            std::string_view machineName,
             const chord_invoke::AdvertiseEndpointsRequest &advertiseEndpointsRequest);
 
         tempo_utils::Status terminateMachine(
-            const tempo_utils::Url &machineUrl,
+            std::string_view machineName,
             std::shared_ptr<OnSupervisorTerminate> waiter);
 
         tempo_utils::Status shutdown();
 
     private:
+        const AgentConfig &m_agentConfig;
+        chord_common::TransportLocation m_supervisorEndpoint;
         uv_loop_t *m_loop;
-        std::filesystem::path m_processRunDirectory;
-        int m_idleTimeoutSeconds;
-        int m_registrationTimeoutSeconds;
-        absl::Mutex m_lock;
         uv_timer_t m_idle;
-        absl::flat_hash_map<tempo_utils::Url, std::unique_ptr<MachineProcess>> m_machines;
-        absl::flat_hash_map<tempo_utils::Url, std::unique_ptr<SpawningContext>> m_spawning;
-        absl::flat_hash_map<tempo_utils::Url, std::unique_ptr<SigningContext>> m_signing;
-        absl::flat_hash_map<tempo_utils::Url, std::unique_ptr<ReadyContext>> m_ready;
-        absl::flat_hash_map<tempo_utils::Url, std::unique_ptr<WaitingContext>> m_waiting;
+
+        absl::Mutex m_lock;
+        absl::flat_hash_map<std::string, std::shared_ptr<MachineProcess>> m_machines;
+        absl::flat_hash_map<std::string, std::unique_ptr<SpawningContext>> m_spawning;
+        absl::flat_hash_map<std::string, std::unique_ptr<SigningContext>> m_signing;
+        absl::flat_hash_map<std::string, std::unique_ptr<ReadyContext>> m_ready;
+        absl::flat_hash_map<std::string, std::unique_ptr<WaitingContext>> m_waiting;
         bool m_shuttingDown;
 
-        tempo_utils::Status release(const tempo_utils::Url &processUrl, tu_int64 status, int signal);
-        tempo_utils::Status abandon(const tempo_utils::Url &processUrl);
-        tempo_utils::Status reap(const tempo_utils::Url &processUrl);
+        tempo_utils::Status release(std::string_view processName, tu_int64 status, int signal);
+        tempo_utils::Status abandon(std::string_view processName);
+        tempo_utils::Status reap(std::string_view processName);
 
         friend class MachineProcess;
         friend void on_spawning_timeout(uv_timer_t *timer);

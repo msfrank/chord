@@ -44,7 +44,7 @@ chord_run::chord_run(int argc, const char *argv[])
             "Display warnings and errors only (specify twice for errors only)"},
         {"silent", silentParser.getDefault(),
             "Suppress all output"},
-        {"packageSpecifier", {}, "Main package", "Specifier"},
+        {"packageSpecifier", {}, "Main package", "SPECIFIER"},
         {"mainArgs", {}, "List of arguments to pass to the program", "ARGS"},
     };
 

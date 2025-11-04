@@ -9,7 +9,15 @@
 #include <tempo_utils/bytes_appender.h>
 #include <tempo_utils/result.h>
 
+#include "message.h"
+
 namespace chord_mesh {
+
+    enum class StreamState {
+        Initial,
+        Active,
+        Closed,
+    };
 
     struct StreamOps {
         void (*receive)(std::shared_ptr<const tempo_utils::ImmutableBytes>, void *) = nullptr;
@@ -21,22 +29,23 @@ namespace chord_mesh {
         Stream(uv_loop_t *loop, uv_stream_t *stream);
         virtual ~Stream();
 
-        bool isOk() const;
-        tempo_utils::Status getStatus() const;
+        StreamState getStreamState() const;
 
         tempo_utils::Status start(const StreamOps &ops, void *data = nullptr);
         tempo_utils::Status send(std::shared_ptr<const tempo_utils::ImmutableBytes> message);
         void shutdown();
 
+        bool isOk() const;
+        tempo_utils::Status getStatus() const;
+
     private:
         uv_loop_t *m_loop;
         uv_stream_t *m_stream;
 
-        bool m_configured;
+        StreamState m_state;
         StreamOps m_ops;
         void *m_data;
-        tempo_utils::BytesAppender m_incoming;
-        tu_uint32 m_msgsize;
+        MessageParser m_parser;
         uv_write_t m_req;
         uv_buf_t m_buf;
         std::queue<std::shared_ptr<const tempo_utils::ImmutableBytes>> m_outgoing;

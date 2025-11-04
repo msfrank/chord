@@ -6,7 +6,7 @@
 chord_mesh::Stream::Stream(uv_loop_t *loop, uv_stream_t *stream)
     : m_loop(loop),
       m_stream(stream),
-      m_configured(false),
+      m_state(StreamState::Initial),
       m_data(nullptr),
       m_writable(false)
 {
@@ -19,16 +19,10 @@ chord_mesh::Stream::~Stream()
     shutdown();
 }
 
-bool
-chord_mesh::Stream::isOk() const
+chord_mesh::StreamState
+chord_mesh::Stream::getStreamState() const
 {
-    return m_status.isOk();
-}
-
-tempo_utils::Status
-chord_mesh::Stream::getStatus() const
-{
-    return m_status;
+    return m_state;
 }
 
 void
@@ -46,43 +40,28 @@ chord_mesh::perform_read(uv_stream_t *s, ssize_t nread, const uv_buf_t *buf)
 
     if (nread == 0 || buf == nullptr || buf->len < nread)
         return;
-    auto &incoming = stream->m_incoming;
-    auto &msgsize = stream->m_msgsize;
+    auto &parser = stream->m_parser;
 
-    incoming.appendBytes(std::span((const tu_uint8 *) buf->base, buf->len));
+    auto messageReady = parser.appendBytes(std::span((const tu_uint8 *) buf->base, buf->len));
     std::free(buf->base);
 
-    if (msgsize == 0) {
-        if (incoming.getSize() >= 4) {
-            msgsize = tempo_utils::read_u32(incoming.getData());
-        }
-    }
+    if (!messageReady)
+        return;
 
-    std::shared_ptr<const tempo_utils::ImmutableBytes> message;
-    if (incoming.getSize() >= msgsize) {
-        auto bytes = incoming.finish();
-        auto slice = bytes->toSlice();
-        message = slice.slice(0, msgsize).toImmutableBytes();
-        auto remainder = slice.slice(msgsize, bytes->getSize() - msgsize);
-        incoming.appendBytes(remainder.sliceView());
-        msgsize = 0;
+    auto &ops = stream->m_ops;
+    auto data = stream->m_data;
+    do {
+        ops.receive(parser.takeMessage(), data);
     }
-
-    if (message != nullptr) {
-        auto &ops = stream->m_ops;
-        ops.receive(message, stream->m_data);
-    }
+    while (parser.hasMessage());
 }
 
 tempo_utils::Status
 chord_mesh::Stream::start(const StreamOps &ops, void *data)
 {
-    if (m_loop == nullptr)
+    if (m_state != StreamState::Initial)
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
-            "stream has been shut down");
-    if (m_configured)
-        return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
-            "stream is already started");
+            "invalid stream state");
 
     m_stream->data = this;
 
@@ -91,9 +70,13 @@ chord_mesh::Stream::start(const StreamOps &ops, void *data)
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
             "uv_read_start error: {}", uv_strerror(ret));
 
-    m_configured = true;
+    m_state = StreamState::Active;
     m_ops = ops;
     m_data = data;
+
+    if (!m_outgoing.empty()) {
+        performWrite();
+    }
 
     return {};
 }
@@ -127,6 +110,9 @@ tempo_utils::Status
 chord_mesh::Stream::send(std::shared_ptr<const tempo_utils::ImmutableBytes> message)
 {
     TU_ASSERT (message != nullptr);
+    if (m_state == StreamState::Closed)
+        return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+            "stream is closed");
     bool ready = m_outgoing.empty();
     m_outgoing.push(message);
     if (ready)
@@ -140,16 +126,48 @@ free_stream(uv_handle_t *stream)
     std::free(stream);
 }
 
+static void
+shutdown_stream(uv_shutdown_t *req, int status)
+{
+    uv_close((uv_handle_t *) req->handle, free_stream);
+    std::free(req);
+}
+
 void
 chord_mesh::Stream::shutdown()
 {
-    if (m_loop == nullptr)
-        return;
-    m_loop = nullptr;
+    switch (m_state) {
+        case StreamState::Initial: {
+            uv_close((uv_handle_t *) m_stream, free_stream);
+            break;
+        }
+        case StreamState::Active: {
+            auto *req = (uv_shutdown_t *) std::malloc(sizeof(uv_shutdown_t));
+            memset(req, 0, sizeof(uv_shutdown_t));
+            uv_shutdown(req, m_stream, shutdown_stream);
+            break;
+        }
 
-    uv_close((uv_handle_t *) m_stream, free_stream);
+        //
+        default:
+            return;
+    }
+
+    m_state = StreamState::Closed;
 
     if (m_ops.cleanup != nullptr) {
         m_ops.cleanup(m_data);
     }
+}
+
+bool
+chord_mesh::Stream::isOk() const
+{
+    return m_status.isOk();
+}
+
+tempo_utils::Status
+chord_mesh::Stream::getStatus() const
+{
+    return m_status;
 }

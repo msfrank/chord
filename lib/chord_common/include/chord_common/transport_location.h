@@ -37,6 +37,9 @@ namespace chord_common {
         std::string toGrpcTarget() const;
         std::string toString() const;
 
+        bool operator==(const TransportLocation &other) const;
+        bool operator!=(const TransportLocation &other) const;
+
         static TransportLocation forUnix(
             const std::string &serverName,
             const std::filesystem::path &unixPath);
@@ -46,6 +49,14 @@ namespace chord_common {
             tu_uint16 tcpPort = 0);
 
         static TransportLocation fromString(std::string_view s);
+
+        template <typename H>
+        friend H AbslHashValue(H h, const TransportLocation &location) {
+            if (!location.isValid())
+                return H::combine(std::move(h), TransportType::Invalid);
+            auto &priv = location.m_priv;
+            return H::combine(std::move(h), priv->serverName, priv->endpointTarget, priv->type);
+        }
 
     private:
         struct Priv {

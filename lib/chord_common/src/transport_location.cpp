@@ -169,6 +169,27 @@ chord_common::TransportLocation::toString() const
         m_priv->endpointTarget);
 }
 
+bool
+chord_common::TransportLocation::operator==(const TransportLocation &other) const
+{
+    if (m_priv == nullptr) {
+        return other.m_priv == nullptr;
+    }
+    if (other.m_priv == nullptr)
+        return false;
+    if (m_priv->type != other.m_priv->type)
+        return false;
+    if (m_priv->serverName != other.m_priv->serverName)
+        return false;
+    return m_priv->endpointTarget == other.m_priv->endpointTarget;
+}
+
+bool
+chord_common::TransportLocation::operator!=(const TransportLocation &other) const
+{
+    return !(*this == other);
+}
+
 chord_common::TransportLocation
 chord_common::TransportLocation::forUnix(
     const std::string &serverName,

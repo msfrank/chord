@@ -41,11 +41,13 @@ class Chord(ConanFile):
         # requirements from timbre
         'absl/20250127.1@timbre',
         'boost/1.88.0@timbre',
+        'capnproto/1.2.0@timbre',
         'curl/8.15.0@timbre',
         'fmt/12.0.0@timbre',
         'flatbuffers/25.2.10@timbre',
         'grpc/1.74.1@timbre',
         'gtest/1.17.0@timbre',
+        'nng/2.0.0-alpha.6@timbre',
         'openssl/3.5.2@timbre',
         'protobuf/32.0@timbre',
         'rocksdb/10.4.2@timbre',
@@ -76,6 +78,7 @@ class Chord(ConanFile):
         tc.cache_variables['CHORD_PACKAGE_VERSION'] = self.version
         tc.cache_variables['PROTOBUF_PROTOC'] = protobuf.get('PROTOBUF_PROTOC')
         tc.cache_variables['GRPC_CPP_PLUGIN'] = grpc.get('GRPC_CPP_PLUGIN')
+        tc.cache_variables['CAPNPROTO_CAPNP'] = protobuf.get('CAPNPROTO_CAPNP')
 
         if self.options.runtime_distribution_root:
             tc.cache_variables['RUNTIME_DISTRIBUTION_ROOT'] = self.options.runtime_distribution_root

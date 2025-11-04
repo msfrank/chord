@@ -162,6 +162,9 @@ find_package(zuri REQUIRED)
 # find required Abseil dependency
 find_package(absl REQUIRED)
 
+# find required CapnProto dependency
+find_package(CapnProto REQUIRED)
+
 # find required gRPC dependency
 find_package(grpc REQUIRED)
 
@@ -182,6 +185,9 @@ find_package(fmt REQUIRED)
 
 # find required ICU dependency
 find_package(icu REQUIRED)
+
+# find required NNG dependency
+find_package(nng REQUIRED)
 
 # find required RocksDB dependency
 find_package(rocksdb REQUIRED)
@@ -222,6 +228,9 @@ message(STATUS "protoc command is ${PROTOBUF_PROTOC}")
 
 # define path to grpc_cpp_plugin
 message(STATUS "grpc_cpp_plugin command is ${GRPC_CPP_PLUGIN}")
+
+# define path to capnp
+message(STATUS "capnp command is ${CAPNP_EXECUTABLE}")
 
 
 #######################################################################

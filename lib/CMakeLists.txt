@@ -1,6 +1,7 @@
 
 add_subdirectory(chord_invoke)
 add_subdirectory(chord_common)
+add_subdirectory(chord_mesh)
 add_subdirectory(chord_remoting)
 add_subdirectory(chord_sandbox)
 add_subdirectory(chord_test)

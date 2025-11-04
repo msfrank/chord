@@ -1,0 +1,35 @@
+
+enable_testing()
+
+include(GoogleTest)
+
+# define unit tests
+
+set(TEST_CASES
+    stream_acceptor_tests.cpp
+    )
+
+# define test suite driver
+
+add_executable(chord_mesh_testsuite
+    ${TEST_CASES}
+    base_mesh_fixture.cpp base_mesh_fixture.h
+    )
+target_link_libraries(chord_mesh_testsuite PUBLIC
+    chord::chord_mesh
+    tempo::tempo_test
+    gtest::gtest
+    )
+gtest_discover_tests(chord_mesh_testsuite)
+
+# define test suite static library
+
+add_library(ChordMeshTestSuite OBJECT
+    ${TEST_CASES}
+    base_mesh_fixture.cpp base_mesh_fixture.h
+    )
+target_link_libraries(ChordMeshTestSuite PUBLIC
+    chord::chord_mesh
+    tempo::tempo_test
+    gtest::gtest
+    )

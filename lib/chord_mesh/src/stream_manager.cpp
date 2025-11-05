@@ -1,9 +1,13 @@
 
 #include <chord_mesh/stream_manager.h>
 
-chord_mesh::StreamManager::StreamManager(uv_loop_t *loop)
-    : m_loop(loop),
-      m_handles(nullptr)
+#include "chord_mesh/mesh_result.h"
+
+chord_mesh::StreamManager::StreamManager(const StreamManagerOps &ops, uv_loop_t *loop)
+    : m_ops(ops),
+      m_loop(loop),
+      m_handles(nullptr),
+      m_running(true)
 {
     TU_ASSERT (m_loop != nullptr);
 }
@@ -18,6 +22,10 @@ chord_mesh::StreamHandle *
 chord_mesh::StreamManager::allocateHandle(uv_stream_t *stream, void *data)
 {
     TU_ASSERT (stream != nullptr);
+
+    if (!m_running)
+        return nullptr;
+
     auto *handle = new StreamHandle(stream, this, data);
     stream->data = handle;
     handle->stream = stream;
@@ -87,6 +95,22 @@ chord_mesh::StreamManager::freeHandle(StreamHandle *handle)
     next->prev = prev;
 }
 
+void
+chord_mesh::StreamManager::shutdown()
+{
+    if (!m_running)
+        return;
+    m_running = false;
+}
+
+void
+chord_mesh::StreamManager::emitError(const tempo_utils::Status &status)
+{
+    if (m_ops.error != nullptr) {
+        m_ops.error(status);
+    }
+}
+
 chord_mesh::StreamHandle::StreamHandle(uv_stream_t *stream, StreamManager *manager, void *data)
     : stream(stream),
       manager(manager),
@@ -108,8 +132,15 @@ chord_mesh::close_stream(uv_handle_t *stream)
 }
 
 void
-chord_mesh::shutdown_stream(uv_shutdown_t *req, int status)
+chord_mesh::shutdown_stream(uv_shutdown_t *req, int err)
 {
+    auto *handle = (StreamHandle *) req->handle->data;
+    auto *manager = handle->manager;
+    if (err < 0) {
+        manager->emitError(
+            MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+                "uv_shutdown error: {}", uv_strerror(err)));
+    }
     uv_close((uv_handle_t *) req->handle, close_stream);
 }
 
@@ -119,7 +150,14 @@ chord_mesh::StreamHandle::shutdown()
     if (m_closing)
         return;
     memset(&m_req, 0, sizeof(uv_shutdown_t));
-    uv_shutdown(&m_req, stream, shutdown_stream);
+    auto ret = uv_shutdown(&m_req, stream, shutdown_stream);
+    if (ret < 0) {
+        manager->emitError(
+            MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+                "uv_shutdown error: {}", uv_strerror(ret)));
+        return;
+    }
+
     m_closing = true;
 }
 

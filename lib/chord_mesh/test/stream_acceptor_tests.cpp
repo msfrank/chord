@@ -36,13 +36,14 @@ TEST_F(StreamAcceptor, CreateAcceptor)
 
     auto *loop = getUVLoop();
 
-    chord_mesh::StreamManager manager(loop);
+    chord_mesh::StreamManagerOps managerOps;
+    chord_mesh::StreamManager manager(managerOps, loop);
     auto createAcceptorResult = chord_mesh::StreamAcceptor::forUnix(socketPath.c_str(), 0, &manager);
     ASSERT_THAT (createAcceptorResult, tempo_test::IsResult());
     auto acceptor = createAcceptorResult.getResult();
 
-    chord_mesh::StreamAcceptorOps ops;
-    ASSERT_THAT (acceptor->listen(ops), tempo_test::IsOk());
+    chord_mesh::StreamAcceptorOps acceptorOps;
+    ASSERT_THAT (acceptor->listen(acceptorOps), tempo_test::IsOk());
     ASSERT_THAT (startUVThread(), tempo_test::IsOk());
 
     uv_sleep(500);
@@ -59,7 +60,8 @@ TEST_F(StreamAcceptor, ConnectToAcceptor)
 
     auto *loop = getUVLoop();
 
-    chord_mesh::StreamManager manager(loop);
+    chord_mesh::StreamManagerOps managerOps;
+    chord_mesh::StreamManager manager(managerOps, loop);
     auto createAcceptorResult = chord_mesh::StreamAcceptor::forUnix(socketPath.c_str(), 0, &manager);
     ASSERT_THAT (createAcceptorResult, tempo_test::IsResult()) << "failed to create acceptor";
     auto acceptor = createAcceptorResult.getResult();
@@ -105,7 +107,8 @@ TEST_F(StreamAcceptor, ReadAndWaitForServerClose)
 
     auto *loop = getUVLoop();
 
-    chord_mesh::StreamManager manager(loop);
+    chord_mesh::StreamManagerOps managerOps;
+    chord_mesh::StreamManager manager(managerOps, loop);
     auto createAcceptorResult = chord_mesh::StreamAcceptor::forUnix(socketPath.c_str(), 0, &manager);
     ASSERT_THAT (createAcceptorResult, tempo_test::IsResult()) << "failed to create acceptor";
     auto acceptor = createAcceptorResult.getResult();
@@ -116,8 +119,8 @@ TEST_F(StreamAcceptor, ReadAndWaitForServerClose)
 
     chord_mesh::StreamAcceptorOps acceptorOps;
     acceptorOps.accept = [](std::shared_ptr<chord_mesh::Stream> stream, void *ptr) {
-        chord_mesh::StreamOps ops;
-        stream->start(ops);
+        chord_mesh::StreamOps streamOps;
+        stream->start(streamOps, ptr);
         stream->send(tempo_utils::MemoryBytes::copy("hello, world!"));
         stream->shutdown();
         auto *data = (Data *) ptr;

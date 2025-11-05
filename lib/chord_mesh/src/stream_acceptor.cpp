@@ -57,10 +57,15 @@ chord_mesh::StreamAcceptor::getAcceptorState() const
 }
 
 void
-chord_mesh::new_listener_connection(uv_stream_t *server, int status)
+chord_mesh::new_listener_connection(uv_stream_t *server, int err)
 {
-    if (status < 0) {
-        TU_LOG_WARN_IF (status < 0) << "new_connection error: " << uv_strerror(status);
+    auto *handle = (StreamHandle *) server->data;
+    auto *acceptor = (StreamAcceptor *) handle->data;
+
+    if (err < 0) {
+        acceptor->emitError(
+            MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+                "failed to accept connection: {}", uv_strerror(err)));
         return;
     }
 
@@ -72,22 +77,24 @@ chord_mesh::new_listener_connection(uv_stream_t *server, int status)
     ret = uv_pipe_init(server->loop, pipe, false);
     if (ret != 0) {
         std::free(pipe);
-        TU_LOG_WARN << "uv_pipe_init error: " << uv_strerror(ret);
+        acceptor->emitError(
+            MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+                "uv_pipe_init error: {}", uv_strerror(err)));
         return;
     }
 
     auto *client = (uv_stream_t *) pipe;
 
     ret = uv_accept(server, client);
-    if (status != 0) {
+    if (err != 0) {
         std::free(pipe);
-        TU_LOG_WARN << "uv_accept error: " << uv_strerror(ret);
+        acceptor->emitError(
+            MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+                "uv_accept error: {}", uv_strerror(err)));
         return;
     }
 
-    auto *handle = (StreamHandle *) server->data;
     auto *manager = handle->manager;
-    auto *acceptor = (StreamAcceptor *) handle->data;
     auto &ops = acceptor->m_ops;
 
     auto stream = std::make_shared<Stream>(manager->allocateHandle(client));
@@ -134,14 +141,10 @@ chord_mesh::StreamAcceptor::shutdown()
     }
 }
 
-bool
-chord_mesh::StreamAcceptor::isOk() const
+void
+chord_mesh::StreamAcceptor::emitError(const tempo_utils::Status &status)
 {
-    return m_status.isOk();
-}
-
-tempo_utils::Status
-chord_mesh::StreamAcceptor::getStatus() const
-{
-    return m_status;
+    if (m_ops.error != nullptr) {
+        m_ops.error(status);
+    }
 }

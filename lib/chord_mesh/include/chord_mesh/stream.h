@@ -22,6 +22,7 @@ namespace chord_mesh {
 
     struct StreamOps {
         void (*receive)(std::shared_ptr<const tempo_utils::ImmutableBytes>, void *) = nullptr;
+        void (*error)(const tempo_utils::Status &) = nullptr;
         void (*cleanup)(void *) = nullptr;
     };
 
@@ -36,9 +37,6 @@ namespace chord_mesh {
         tempo_utils::Status send(std::shared_ptr<const tempo_utils::ImmutableBytes> message);
         void shutdown();
 
-        bool isOk() const;
-        tempo_utils::Status getStatus() const;
-
     private:
         StreamHandle *m_handle;
 
@@ -49,17 +47,16 @@ namespace chord_mesh {
         uv_write_t m_req;
         uv_buf_t m_buf;
         std::queue<std::shared_ptr<const tempo_utils::ImmutableBytes>> m_outgoing;
-        bool m_writable;
-        tempo_utils::Status m_status;
 
         friend class StreamAcceptor;
         friend class StreamConnector;
 
         tempo_utils::Status performWrite();
+        void emitError(const tempo_utils::Status &status);
 
         friend void allocate_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf);
         friend void perform_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf);
-        friend void perform_write(uv_write_t *req, int status);
+        friend void perform_write(uv_write_t *req, int err);
     };
 }
 

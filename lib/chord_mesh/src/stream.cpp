@@ -6,8 +6,7 @@
 chord_mesh::Stream::Stream(StreamHandle *handle)
     : m_handle(handle),
       m_state(StreamState::Initial),
-      m_data(nullptr),
-      m_writable(false)
+      m_data(nullptr)
 {
     TU_ASSERT (m_handle != nullptr);
     m_handle->data = this;
@@ -38,16 +37,27 @@ chord_mesh::perform_read(uv_stream_t *s, ssize_t nread, const uv_buf_t *buf)
     auto *handle = (StreamHandle *) s->data;
     auto *stream = (Stream *) handle->data;
 
+    // if the remote end has closed then shut down the stream
+    if (nread == UV_EOF) {
+        stream->shutdown();
+        return;
+    }
+
+    // if nread is 0 then there is no data to read
     if (nread == 0 || buf == nullptr || buf->len < nread)
         return;
-    auto &parser = stream->m_parser;
 
+    // push data into the message parser
+    auto &parser = stream->m_parser;
     auto messageReady = parser.appendBytes(std::span((const tu_uint8 *) buf->base, buf->len));
     std::free(buf->base);
 
+    // a complete message has not yet been assembled
     if (!messageReady)
         return;
 
+    // otherwise there is at least 1 ready message, so loop invoking the
+    // receive callback until there are no more ready messages
     auto &ops = stream->m_ops;
     auto data = stream->m_data;
     do {
@@ -72,21 +82,31 @@ chord_mesh::Stream::start(const StreamOps &ops, void *data)
     m_ops = ops;
     m_data = data;
 
-    if (!m_outgoing.empty()) {
-        performWrite();
-    }
+    if (!m_outgoing.empty())
+        return performWrite();
 
     return {};
 }
 
 void
-chord_mesh::perform_write(uv_write_t *req, int status)
+chord_mesh::perform_write(uv_write_t *req, int err)
 {
     auto *handle = (StreamHandle *) req->handle->data;
     auto *stream = (Stream *) handle->data;
+
+    if (err < 0) {
+        stream->emitError(
+            MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+                "perform_write error: {}", uv_strerror(err)));
+        return;
+    }
+
     stream->m_outgoing.pop();
     if (!stream->m_outgoing.empty()) {
-        stream->performWrite();
+        auto status = stream->performWrite();
+        if (status.notOk()) {
+            stream->emitError(status);
+        }
     }
 }
 
@@ -139,14 +159,10 @@ chord_mesh::Stream::shutdown()
     }
 }
 
-bool
-chord_mesh::Stream::isOk() const
+void
+chord_mesh::Stream::emitError(const tempo_utils::Status &status)
 {
-    return m_status.isOk();
-}
-
-tempo_utils::Status
-chord_mesh::Stream::getStatus() const
-{
-    return m_status;
+    if (m_ops.error != nullptr) {
+        m_ops.error(status);
+    }
 }

@@ -19,6 +19,7 @@ namespace chord_mesh {
 
     struct StreamAcceptorOps {
         void (*accept)(std::shared_ptr<Stream>, void *) = nullptr;
+        void (*error)(const tempo_utils::Status &) = nullptr;
         void (*cleanup)(void *) = nullptr;
     };
 
@@ -36,18 +37,15 @@ namespace chord_mesh {
         tempo_utils::Status listen(const StreamAcceptorOps &ops, void *data = nullptr);
         void shutdown();
 
-        bool isOk() const;
-        tempo_utils::Status getStatus() const;
-
     private:
         StreamHandle *m_handle;
 
         AcceptorState m_state;
         StreamAcceptorOps m_ops;
         void *m_data;
-        tempo_utils::Status m_status;
 
         explicit StreamAcceptor(StreamHandle *handle);
+        void emitError(const tempo_utils::Status &status);
 
         friend void new_listener_connection(uv_stream_t *server, int status);
     };

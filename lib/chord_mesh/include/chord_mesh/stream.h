@@ -10,6 +10,7 @@
 #include <tempo_utils/result.h>
 
 #include "message.h"
+#include "stream_manager.h"
 
 namespace chord_mesh {
 
@@ -26,7 +27,7 @@ namespace chord_mesh {
 
     class Stream {
     public:
-        Stream(uv_loop_t *loop, uv_stream_t *stream);
+        explicit Stream(StreamHandle *handle);
         virtual ~Stream();
 
         StreamState getStreamState() const;
@@ -39,8 +40,7 @@ namespace chord_mesh {
         tempo_utils::Status getStatus() const;
 
     private:
-        uv_loop_t *m_loop;
-        uv_stream_t *m_stream;
+        StreamHandle *m_handle;
 
         StreamState m_state;
         StreamOps m_ops;

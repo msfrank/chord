@@ -3,14 +3,13 @@
 #include <chord_mesh/mesh_result.h>
 #include <chord_mesh/stream.h>
 
-chord_mesh::StreamAcceptor::StreamAcceptor(uv_loop_t *loop, uv_stream_t *stream)
-    : m_loop(loop),
-      m_stream(stream),
-      m_configured(false),
+chord_mesh::StreamAcceptor::StreamAcceptor(StreamHandle *handle)
+    : m_handle(handle),
+      m_state(AcceptorState::Initial),
       m_data(nullptr)
 {
-    TU_ASSERT (m_loop != nullptr);
-    TU_ASSERT (m_stream != nullptr);
+    TU_ASSERT (m_handle != nullptr);
+    m_handle->data = this;
 }
 
 chord_mesh::StreamAcceptor::~StreamAcceptor()
@@ -22,8 +21,10 @@ tempo_utils::Result<std::shared_ptr<chord_mesh::StreamAcceptor>>
 chord_mesh::StreamAcceptor::forUnix(
      std::string_view pipePath,
      int pipeFlags,
-     uv_loop_t *loop)
+     StreamManager *manager)
 {
+    auto *loop = manager->getLoop();
+
     auto *pipe = (uv_pipe_t *) std::malloc(sizeof(uv_pipe_t));
     memset(pipe, 0, sizeof(uv_pipe_t));
 
@@ -42,22 +43,17 @@ chord_mesh::StreamAcceptor::forUnix(
     }
 
     auto *stream = (uv_stream_t *) pipe;
-    auto listener = std::shared_ptr<StreamAcceptor>(new StreamAcceptor(loop, stream));
-    stream->data = listener.get();
+    auto *handle = manager->allocateHandle(stream);
+    auto listener = std::shared_ptr<StreamAcceptor>(new StreamAcceptor(handle));
+    handle->data = listener.get();
 
     return listener;
 }
 
-bool
-chord_mesh::StreamAcceptor::isOk() const
+chord_mesh::AcceptorState
+chord_mesh::StreamAcceptor::getAcceptorState() const
 {
-    return m_status.isOk();
-}
-
-tempo_utils::Status
-chord_mesh::StreamAcceptor::getStatus() const
-{
-    return m_status;
+    return m_state;
 }
 
 void
@@ -89,50 +85,63 @@ chord_mesh::new_listener_connection(uv_stream_t *server, int status)
         return;
     }
 
-    auto *acceptor = (StreamAcceptor *) server->data;
+    auto *handle = (StreamHandle *) server->data;
+    auto *manager = handle->manager;
+    auto *acceptor = (StreamAcceptor *) handle->data;
     auto &ops = acceptor->m_ops;
-    auto stream = std::make_shared<Stream>(server->loop, client);
+
+    auto stream = std::make_shared<Stream>(manager->allocateHandle(client));
     ops.accept(stream, acceptor->m_data);
 }
 
 tempo_utils::Status
 chord_mesh::StreamAcceptor::listen(const StreamAcceptorOps &ops, void *data)
 {
-    if (m_configured)
+    if (m_state != AcceptorState::Initial)
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
-            "listener poller is already configured");
-    if (m_loop == nullptr)
-        return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
-            "listener poller has been shut down");
+            "invalid acceptor state");
 
-    auto ret = uv_listen(m_stream, 64, new_listener_connection);
+    auto ret = uv_listen(m_handle->stream, 64, new_listener_connection);
     if (ret != 0)
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
             "uv_listen error: {}", uv_strerror(ret));
 
-    m_configured = true;
+    m_state = AcceptorState::Active;
     m_ops = ops;
     m_data = data;
 
     return {};
 }
 
-static void
-free_stream(uv_handle_t *stream)
-{
-    std::free(stream);
-}
-
 void
 chord_mesh::StreamAcceptor::shutdown()
 {
-    if (m_loop == nullptr)
-        return;
-    m_loop = nullptr;
+    switch (m_state) {
+        case AcceptorState::Initial:
+            m_handle->close();
+            break;
+        case AcceptorState::Active:
+            m_handle->shutdown();
+            break;
+        default:
+            return;
+    }
 
-    uv_close((uv_handle_t *) m_stream, free_stream);
+    m_state = AcceptorState::Closed;
 
     if (m_ops.cleanup != nullptr) {
         m_ops.cleanup(m_data);
     }
+}
+
+bool
+chord_mesh::StreamAcceptor::isOk() const
+{
+    return m_status.isOk();
+}
+
+tempo_utils::Status
+chord_mesh::StreamAcceptor::getStatus() const
+{
+    return m_status;
 }

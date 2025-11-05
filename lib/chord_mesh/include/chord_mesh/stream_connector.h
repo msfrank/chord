@@ -3,12 +3,12 @@
 
 #include <queue>
 
-#include <nng/nng.h>
 #include <uv.h>
 
 #include <tempo_utils/result.h>
 
 #include "stream.h"
+#include "stream_manager.h"
 
 namespace chord_mesh {
 
@@ -19,13 +19,13 @@ namespace chord_mesh {
 
     class StreamConnector {
     public:
-        StreamConnector(uv_loop_t *loop, const StreamConnectorOps &ops, void *data = nullptr);
+        StreamConnector(StreamManager *manager, const StreamConnectorOps &ops, void *data = nullptr);
         virtual ~StreamConnector();
 
         tempo_utils::Status connectUnix(std::string_view pipePath, int pipeFlags);
 
     private:
-        uv_loop_t *m_loop;
+        StreamManager *m_manager;
         StreamConnectorOps m_ops;
         void *m_data;
 

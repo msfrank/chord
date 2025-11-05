@@ -31,6 +31,7 @@ set(CHORD_MESH_INCLUDES
     include/chord_mesh/stream.h
     include/chord_mesh/stream_acceptor.h
     include/chord_mesh/stream_connector.h
+    include/chord_mesh/stream_manager.h
     include/chord_mesh/supervisor_node.h
     )
 set_target_properties(chord_mesh PROPERTIES PUBLIC_HEADER "${CHORD_MESH_INCLUDES}")
@@ -41,6 +42,7 @@ target_sources(chord_mesh PRIVATE
     src/stream.cpp
     src/stream_acceptor.cpp
     src/stream_connector.cpp
+    src/stream_manager.cpp
     src/supervisor_node.cpp
 
     # generated sources

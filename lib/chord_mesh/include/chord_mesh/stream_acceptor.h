@@ -11,6 +11,12 @@
 
 namespace chord_mesh {
 
+    enum class AcceptorState {
+        Initial,
+        Active,
+        Closed,
+    };
+
     struct StreamAcceptorOps {
         void (*accept)(std::shared_ptr<Stream>, void *) = nullptr;
         void (*cleanup)(void *) = nullptr;
@@ -23,24 +29,25 @@ namespace chord_mesh {
         static tempo_utils::Result<std::shared_ptr<StreamAcceptor>> forUnix(
             std::string_view pipePath,
             int pipeFlags,
-            uv_loop_t *loop);
+            StreamManager *manager);
 
-        bool isOk() const;
-        tempo_utils::Status getStatus() const;
+        AcceptorState getAcceptorState() const;
 
         tempo_utils::Status listen(const StreamAcceptorOps &ops, void *data = nullptr);
         void shutdown();
 
-    private:
-        uv_loop_t *m_loop;
-        uv_stream_t *m_stream;
+        bool isOk() const;
+        tempo_utils::Status getStatus() const;
 
-        bool m_configured;
+    private:
+        StreamHandle *m_handle;
+
+        AcceptorState m_state;
         StreamAcceptorOps m_ops;
         void *m_data;
         tempo_utils::Status m_status;
 
-        StreamAcceptor(uv_loop_t *loop, uv_stream_t *stream);
+        explicit StreamAcceptor(StreamHandle *handle);
 
         friend void new_listener_connection(uv_stream_t *server, int status);
     };

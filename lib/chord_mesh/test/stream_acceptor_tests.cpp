@@ -36,7 +36,8 @@ TEST_F(StreamAcceptor, CreateAcceptor)
 
     auto *loop = getUVLoop();
 
-    auto createAcceptorResult = chord_mesh::StreamAcceptor::forUnix(socketPath.c_str(), 0, loop);
+    chord_mesh::StreamManager manager(loop);
+    auto createAcceptorResult = chord_mesh::StreamAcceptor::forUnix(socketPath.c_str(), 0, &manager);
     ASSERT_THAT (createAcceptorResult, tempo_test::IsResult());
     auto acceptor = createAcceptorResult.getResult();
 
@@ -44,7 +45,7 @@ TEST_F(StreamAcceptor, CreateAcceptor)
     ASSERT_THAT (acceptor->listen(ops), tempo_test::IsOk());
     ASSERT_THAT (startUVThread(), tempo_test::IsOk());
 
-    sleep(1);
+    uv_sleep(500);
     ASSERT_TRUE (std::filesystem::is_socket(socketPath));
 
     stopUVThread();
@@ -58,7 +59,8 @@ TEST_F(StreamAcceptor, ConnectToAcceptor)
 
     auto *loop = getUVLoop();
 
-    auto createAcceptorResult = chord_mesh::StreamAcceptor::forUnix(socketPath.c_str(), 0, loop);
+    chord_mesh::StreamManager manager(loop);
+    auto createAcceptorResult = chord_mesh::StreamAcceptor::forUnix(socketPath.c_str(), 0, &manager);
     ASSERT_THAT (createAcceptorResult, tempo_test::IsResult()) << "failed to create acceptor";
     auto acceptor = createAcceptorResult.getResult();
 
@@ -74,7 +76,7 @@ TEST_F(StreamAcceptor, ConnectToAcceptor)
     ASSERT_THAT (acceptor->listen(acceptorOps, &data), tempo_test::IsOk()) << "acceptor listen error";
 
     ASSERT_THAT (startUVThread(), tempo_test::IsOk()) << "failed to start UV thread";
-    sleep(1);
+    uv_sleep(500);
 
     sockaddr_un addr;
     memset(&addr, 0, sizeof(addr));
@@ -85,7 +87,7 @@ TEST_F(StreamAcceptor, ConnectToAcceptor)
     ASSERT_LE (0, fd) << "socket() error: " << strerror(errno);
     auto ret = connect(fd, (sockaddr *) &addr, sizeof(addr));
     ASSERT_EQ (0, ret) << "connect() error: " << strerror(errno);
-    sleep(1);
+    uv_sleep(250);
 
     ASSERT_THAT (stopUVThread(), tempo_test::IsOk()) << "failed to stop UV thread";
     acceptor->shutdown();
@@ -103,7 +105,8 @@ TEST_F(StreamAcceptor, ReadAndWaitForServerClose)
 
     auto *loop = getUVLoop();
 
-    auto createAcceptorResult = chord_mesh::StreamAcceptor::forUnix(socketPath.c_str(), 0, loop);
+    chord_mesh::StreamManager manager(loop);
+    auto createAcceptorResult = chord_mesh::StreamAcceptor::forUnix(socketPath.c_str(), 0, &manager);
     ASSERT_THAT (createAcceptorResult, tempo_test::IsResult()) << "failed to create acceptor";
     auto acceptor = createAcceptorResult.getResult();
 
@@ -124,7 +127,7 @@ TEST_F(StreamAcceptor, ReadAndWaitForServerClose)
     ASSERT_THAT (acceptor->listen(acceptorOps, &data), tempo_test::IsOk()) << "acceptor listen error";
 
     ASSERT_THAT (startUVThread(), tempo_test::IsOk()) << "failed to start UV thread";
-    sleep(1);
+    uv_sleep(500);
 
     sockaddr_un addr;
     memset(&addr, 0, sizeof(addr));

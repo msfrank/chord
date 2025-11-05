@@ -3,15 +3,14 @@
 #include <chord_mesh/stream.h>
 #include <tempo_utils/big_endian.h>
 
-chord_mesh::Stream::Stream(uv_loop_t *loop, uv_stream_t *stream)
-    : m_loop(loop),
-      m_stream(stream),
+chord_mesh::Stream::Stream(StreamHandle *handle)
+    : m_handle(handle),
       m_state(StreamState::Initial),
       m_data(nullptr),
       m_writable(false)
 {
-    TU_ASSERT (m_loop != nullptr);
-    TU_ASSERT (m_stream != nullptr);
+    TU_ASSERT (m_handle != nullptr);
+    m_handle->data = this;
 }
 
 chord_mesh::Stream::~Stream()
@@ -36,7 +35,8 @@ chord_mesh::allocate_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t
 void
 chord_mesh::perform_read(uv_stream_t *s, ssize_t nread, const uv_buf_t *buf)
 {
-    auto *stream = (Stream *) s->data;
+    auto *handle = (StreamHandle *) s->data;
+    auto *stream = (Stream *) handle->data;
 
     if (nread == 0 || buf == nullptr || buf->len < nread)
         return;
@@ -63,9 +63,7 @@ chord_mesh::Stream::start(const StreamOps &ops, void *data)
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
             "invalid stream state");
 
-    m_stream->data = this;
-
-    auto ret = uv_read_start(m_stream, allocate_buffer, perform_read);
+    auto ret = uv_read_start(m_handle->stream, allocate_buffer, perform_read);
     if (ret != 0)
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
             "uv_read_start error: {}", uv_strerror(ret));
@@ -84,7 +82,8 @@ chord_mesh::Stream::start(const StreamOps &ops, void *data)
 void
 chord_mesh::perform_write(uv_write_t *req, int status)
 {
-    auto *stream = (Stream *) req->data;
+    auto *handle = (StreamHandle *) req->handle->data;
+    auto *stream = (Stream *) handle->data;
     stream->m_outgoing.pop();
     if (!stream->m_outgoing.empty()) {
         stream->performWrite();
@@ -97,9 +96,8 @@ chord_mesh::Stream::performWrite()
     auto message = m_outgoing.front();
 
     m_buf = uv_buf_init((char *) message->getData(), message->getSize());
-    m_req.data = this;
 
-    auto ret = uv_write(&m_req, m_stream, &m_buf, 1, perform_write);
+    auto ret = uv_write(&m_req, m_handle->stream, &m_buf, 1, perform_write);
     if (ret != 0)
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
             "write error: {}", uv_strerror(ret));
@@ -120,35 +118,16 @@ chord_mesh::Stream::send(std::shared_ptr<const tempo_utils::ImmutableBytes> mess
     return {};
 }
 
-static void
-free_stream(uv_handle_t *stream)
-{
-    std::free(stream);
-}
-
-static void
-shutdown_stream(uv_shutdown_t *req, int status)
-{
-    uv_close((uv_handle_t *) req->handle, free_stream);
-    std::free(req);
-}
-
 void
 chord_mesh::Stream::shutdown()
 {
     switch (m_state) {
-        case StreamState::Initial: {
-            uv_close((uv_handle_t *) m_stream, free_stream);
+        case StreamState::Initial:
+            m_handle->close();
             break;
-        }
-        case StreamState::Active: {
-            auto *req = (uv_shutdown_t *) std::malloc(sizeof(uv_shutdown_t));
-            memset(req, 0, sizeof(uv_shutdown_t));
-            uv_shutdown(req, m_stream, shutdown_stream);
+        case StreamState::Active:
+            m_handle->shutdown();
             break;
-        }
-
-        //
         default:
             return;
     }

@@ -19,7 +19,7 @@ namespace chord_mesh {
 
     struct StreamAcceptorOps {
         void (*accept)(std::shared_ptr<Stream>, void *) = nullptr;
-        void (*error)(const tempo_utils::Status &) = nullptr;
+        void (*error)(const tempo_utils::Status &, void *) = nullptr;
         void (*cleanup)(void *) = nullptr;
     };
 

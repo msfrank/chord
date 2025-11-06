@@ -26,21 +26,22 @@ namespace chord_mesh {
     };
 
     struct StreamManagerOps {
-        void (*error)(const tempo_utils::Status &) = nullptr;
+        void (*error)(const tempo_utils::Status &, void *) = nullptr;
         void (*cleanup)(void *) = nullptr;
     };
 
     class StreamManager {
     public:
-        StreamManager(const StreamManagerOps &ops, uv_loop_t *loop);
+        StreamManager(uv_loop_t *loop, const StreamManagerOps &ops, void *data = nullptr);
 
         uv_loop_t *getLoop() const;
         StreamHandle *allocateHandle(uv_stream_t *stream, void *data = nullptr);
         void shutdown();
 
     private:
-        StreamManagerOps m_ops;
         uv_loop_t *m_loop;
+        StreamManagerOps m_ops;
+        void *m_data;
         StreamHandle *m_handles;
         bool m_running;
 

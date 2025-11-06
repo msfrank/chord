@@ -14,6 +14,7 @@ namespace chord_mesh {
 
     struct StreamConnectorOps {
         void (*connect)(std::shared_ptr<Stream>, void *) = nullptr;
+        void (*error)(const tempo_utils::Status &, void *) = nullptr;
         void (*cleanup)(void *) = nullptr;
     };
 
@@ -29,7 +30,9 @@ namespace chord_mesh {
         StreamConnectorOps m_ops;
         void *m_data;
 
-        friend void new_unix_connection(uv_connect_t *req, int status);
+        void emitError(const tempo_utils::Status &status);
+
+        friend void new_unix_connection(uv_connect_t *req, int err);
     };
 }
 

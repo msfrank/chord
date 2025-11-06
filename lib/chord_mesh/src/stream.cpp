@@ -36,6 +36,8 @@ chord_mesh::perform_read(uv_stream_t *s, ssize_t nread, const uv_buf_t *buf)
 {
     auto *handle = (StreamHandle *) s->data;
     auto *stream = (Stream *) handle->data;
+    auto &ops = stream->m_ops;
+    auto data = stream->m_data;
 
     // if the remote end has closed then shut down the stream
     if (nread == UV_EOF) {
@@ -49,19 +51,23 @@ chord_mesh::perform_read(uv_stream_t *s, ssize_t nread, const uv_buf_t *buf)
 
     // push data into the message parser
     auto &parser = stream->m_parser;
-    auto messageReady = parser.appendBytes(std::span((const tu_uint8 *) buf->base, buf->len));
+    std::span bytes((const tu_uint8 *) buf->base, buf->len);
+    auto status = parser.pushBytes(bytes);
     std::free(buf->base);
 
+    //
+    if (status.notOk()) {
+        ops.error(status, data);
+    }
+
     // a complete message has not yet been assembled
-    if (!messageReady)
+    if (!parser.hasMessage())
         return;
 
     // otherwise there is at least 1 ready message, so loop invoking the
     // receive callback until there are no more ready messages
-    auto &ops = stream->m_ops;
-    auto data = stream->m_data;
     do {
-        ops.receive(parser.takeMessage(), data);
+        ops.receive(parser.popMessage(), data);
     }
     while (parser.hasMessage());
 }
@@ -163,6 +169,6 @@ void
 chord_mesh::Stream::emitError(const tempo_utils::Status &status)
 {
     if (m_ops.error != nullptr) {
-        m_ops.error(status);
+        m_ops.error(status, m_data);
     }
 }

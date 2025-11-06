@@ -21,8 +21,8 @@ namespace chord_mesh {
     };
 
     struct StreamOps {
-        void (*receive)(std::shared_ptr<const tempo_utils::ImmutableBytes>, void *) = nullptr;
-        void (*error)(const tempo_utils::Status &) = nullptr;
+        void (*receive)(const Message &, void *) = nullptr;
+        void (*error)(const tempo_utils::Status &, void *) = nullptr;
         void (*cleanup)(void *) = nullptr;
     };
 

@@ -3,9 +3,10 @@
 
 #include "chord_mesh/mesh_result.h"
 
-chord_mesh::StreamManager::StreamManager(const StreamManagerOps &ops, uv_loop_t *loop)
-    : m_ops(ops),
-      m_loop(loop),
+chord_mesh::StreamManager::StreamManager(uv_loop_t *loop, const StreamManagerOps &ops, void *data)
+    : m_loop(loop),
+      m_ops(ops),
+      m_data(data),
       m_handles(nullptr),
       m_running(true)
 {
@@ -107,7 +108,7 @@ void
 chord_mesh::StreamManager::emitError(const tempo_utils::Status &status)
 {
     if (m_ops.error != nullptr) {
-        m_ops.error(status);
+        m_ops.error(status, m_data);
     }
 }
 

@@ -37,7 +37,7 @@ TEST_F(StreamAcceptor, CreateAcceptor)
     auto *loop = getUVLoop();
 
     chord_mesh::StreamManagerOps managerOps;
-    chord_mesh::StreamManager manager(managerOps, loop);
+    chord_mesh::StreamManager manager(loop, managerOps);
     auto createAcceptorResult = chord_mesh::StreamAcceptor::forUnix(socketPath.c_str(), 0, &manager);
     ASSERT_THAT (createAcceptorResult, tempo_test::IsResult());
     auto acceptor = createAcceptorResult.getResult();
@@ -61,7 +61,7 @@ TEST_F(StreamAcceptor, ConnectToAcceptor)
     auto *loop = getUVLoop();
 
     chord_mesh::StreamManagerOps managerOps;
-    chord_mesh::StreamManager manager(managerOps, loop);
+    chord_mesh::StreamManager manager(loop, managerOps);
     auto createAcceptorResult = chord_mesh::StreamAcceptor::forUnix(socketPath.c_str(), 0, &manager);
     ASSERT_THAT (createAcceptorResult, tempo_test::IsResult()) << "failed to create acceptor";
     auto acceptor = createAcceptorResult.getResult();
@@ -108,7 +108,7 @@ TEST_F(StreamAcceptor, ReadAndWaitForServerClose)
     auto *loop = getUVLoop();
 
     chord_mesh::StreamManagerOps managerOps;
-    chord_mesh::StreamManager manager(managerOps, loop);
+    chord_mesh::StreamManager manager(loop, managerOps);
     auto createAcceptorResult = chord_mesh::StreamAcceptor::forUnix(socketPath.c_str(), 0, &manager);
     ASSERT_THAT (createAcceptorResult, tempo_test::IsResult()) << "failed to create acceptor";
     auto acceptor = createAcceptorResult.getResult();

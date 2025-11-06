@@ -21,10 +21,19 @@ struct ConnectUnixData {
 };
 
 void
-chord_mesh::new_unix_connection(uv_connect_t *req, int status)
+chord_mesh::new_unix_connection(uv_connect_t *req, int err)
 {
     auto data = std::unique_ptr<ConnectUnixData>((ConnectUnixData *) req->data);
-    auto &ops = data->connector->m_ops;
+    auto *connector = data->connector;
+    auto &ops = connector->m_ops;
+
+    if (err < 0) {
+        connector->emitError(
+            MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+                "failed to connect: {}", uv_strerror(err)));
+        return;
+    }
+
     auto *manager = data->connector->m_manager;
     auto *handle = manager->allocateHandle(req->handle);
     auto stream = std::make_shared<Stream>(handle);
@@ -55,4 +64,12 @@ chord_mesh::StreamConnector::connectUnix(std::string_view pipePath, int pipeFlag
     data.release();
 
     return {};
+}
+
+void
+chord_mesh::StreamConnector::emitError(const tempo_utils::Status &status)
+{
+    if (m_ops.error != nullptr) {
+        m_ops.error(status, m_data);
+    }
 }

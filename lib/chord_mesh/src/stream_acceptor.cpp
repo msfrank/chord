@@ -145,6 +145,6 @@ void
 chord_mesh::StreamAcceptor::emitError(const tempo_utils::Status &status)
 {
     if (m_ops.error != nullptr) {
-        m_ops.error(status);
+        m_ops.error(status, m_data);
     }
 }

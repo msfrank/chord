@@ -17,8 +17,9 @@ protected:
         BaseMeshFixture::SetUp();
 
         tempo_security::Ed25519PrivateKeyGenerator keygen;
-        m_keyPair = tempo_security::generate_self_signed_key_pair(
+        m_keyPair = tempo_security::GenerateUtils::generate_self_signed_key_pair(
             keygen,
+            tempo_security::DigestId::None,
             "test_O",
             "test_OU",
             "edKeyPair",
@@ -43,23 +44,20 @@ private:
     tempo_security::CertificateKeyPair m_keyPair;
 };
 
-TEST_F(MessageParser, ParseMessage)
+TEST_F(MessageParser, ParseUnsignedMessage)
 {
     auto now = absl::Now();
     auto payload = tempo_utils::MemoryBytes::copy("hello, world!");
-    auto keyPair = getKeyPair();
 
     chord_mesh::MessageBuilder builder;
     builder.setTimestamp(now);
     builder.setPayload(payload);
-    builder.setPemPrivateKeyFile(keyPair.getPemPrivateKeyFile());
 
     auto toBytesResult = builder.toBytes();
     ASSERT_THAT (toBytesResult, tempo_test::IsResult());
     auto bytes = toBytesResult.getResult();
 
     chord_mesh::MessageParser parser;
-    parser.setPemCertificateFile(keyPair.getPemCertificateFile());
 
     ASSERT_THAT (parser.pushBytes(bytes->getSpan()), tempo_test::IsOk());
     ASSERT_TRUE (parser.hasMessage());
@@ -69,4 +67,43 @@ TEST_F(MessageParser, ParseMessage)
 
     auto payloadString = message.getPayload()->getStringView();
     ASSERT_EQ ("hello, world!", payloadString);
+
+    auto digest = message.getDigest();
+    ASSERT_FALSE (digest.isValid());
+}
+
+TEST_F(MessageParser, ParseSignedMessage)
+{
+    auto now = absl::Now();
+    auto payload = tempo_utils::MemoryBytes::copy("hello, world!");
+    auto keyPair = getKeyPair();
+
+    std::shared_ptr<tempo_security::PrivateKey> privateKey;
+    TU_ASSIGN_OR_RAISE (privateKey, tempo_security::PrivateKey::readFile(keyPair.getPemPrivateKeyFile()));
+    std::shared_ptr<tempo_security::X509Certificate> certificate;
+    TU_ASSIGN_OR_RAISE (certificate, tempo_security::X509Certificate::readFile(keyPair.getPemCertificateFile()));
+
+    chord_mesh::MessageBuilder builder;
+    builder.setTimestamp(now);
+    builder.setPayload(payload);
+    builder.setPrivateKey(privateKey);
+
+    auto toBytesResult = builder.toBytes();
+    ASSERT_THAT (toBytesResult, tempo_test::IsResult());
+    auto bytes = toBytesResult.getResult();
+
+    chord_mesh::MessageParser parser;
+    parser.setCertificate(certificate);
+
+    ASSERT_THAT (parser.pushBytes(bytes->getSpan()), tempo_test::IsOk());
+    ASSERT_TRUE (parser.hasMessage());
+    auto message = parser.popMessage();
+
+    ASSERT_EQ (absl::ToUnixSeconds(now), absl::ToUnixSeconds(message.getTimestamp()));
+
+    auto payloadString = message.getPayload()->getStringView();
+    ASSERT_EQ ("hello, world!", payloadString);
+
+    auto digest = message.getDigest();
+    ASSERT_TRUE (digest.isValid());
 }

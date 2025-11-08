@@ -8,6 +8,7 @@
 #include <tempo_utils/result.h>
 
 #include "stream.h"
+#include "chord_common/transport_location.h"
 
 namespace chord_mesh {
 
@@ -30,6 +31,9 @@ namespace chord_mesh {
         static tempo_utils::Result<std::shared_ptr<StreamAcceptor>> forUnix(
             std::string_view pipePath,
             int pipeFlags,
+            StreamManager *manager);
+        static tempo_utils::Result<std::shared_ptr<StreamAcceptor>> forLocation(
+            const chord_common::TransportLocation &endpoint,
             StreamManager *manager);
 
         AcceptorState getAcceptorState() const;

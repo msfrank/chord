@@ -5,6 +5,7 @@
 
 chord_mesh::Stream::Stream(StreamHandle *handle)
     : m_handle(handle),
+      m_id(tempo_utils::UUID::randomUUID()),
       m_state(StreamState::Initial),
       m_data(nullptr)
 {
@@ -15,6 +16,12 @@ chord_mesh::Stream::Stream(StreamHandle *handle)
 chord_mesh::Stream::~Stream()
 {
     shutdown();
+}
+
+tempo_utils::UUID
+chord_mesh::Stream::getId() const
+{
+    return m_id;
 }
 
 chord_mesh::StreamState

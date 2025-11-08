@@ -3,11 +3,11 @@
 
 #include <queue>
 
-#include <nng/nng.h>
 #include <uv.h>
 
 #include <tempo_utils/bytes_appender.h>
 #include <tempo_utils/result.h>
+#include <tempo_utils/uuid.h>
 
 #include "message.h"
 #include "stream_manager.h"
@@ -31,6 +31,7 @@ namespace chord_mesh {
         explicit Stream(StreamHandle *handle);
         virtual ~Stream();
 
+        tempo_utils::UUID getId() const;
         StreamState getStreamState() const;
 
         tempo_utils::Status start(const StreamOps &ops, void *data = nullptr);
@@ -40,6 +41,7 @@ namespace chord_mesh {
     private:
         StreamHandle *m_handle;
 
+        tempo_utils::UUID m_id;
         StreamState m_state;
         StreamOps m_ops;
         void *m_data;

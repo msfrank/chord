@@ -12,6 +12,10 @@ struct EnsembleEvent {
         machine @3;
     }
 
+    struct PeerHello {
+        certificate @0 :Text;
+    }
+
     struct NodeJoined {
         type @0 :NodeType;
         endpoint @1 :Text;
@@ -31,15 +35,32 @@ struct EnsembleEvent {
     }
 
     struct CertificateSigned {
-        certificate @0 :Data;
+        certificate @0 :Text;
         endpoint @1 :Text;
     }
 
+    struct GossipGraft {
+    }
+
+    struct GossipPrune {
+    }
+
+    struct GossipIHave {
+    }
+
+    struct GossipIWant {
+    }
+
     event :union {
-        nodeJoined @0 :NodeJoined;
-        nodeLeft @1 :NodeLeft;
-        portOpened @2 :PortOpened;
-        portClosed @3 :PortClosed;
-        certificateSigned @4 :CertificateSigned;
+        peerHello @0 :PeerHello;
+        nodeJoined @1 :NodeJoined;
+        nodeLeft @2 :NodeLeft;
+        portOpened @3 :PortOpened;
+        portClosed @4 :PortClosed;
+        certSigned @5 :CertificateSigned;
+        gossipGraft @6 :GossipGraft;
+        gossipPrune @7 :GossipPrune;
+        gossipIHave @8 :GossipIHave;
+        gossipIWant @9 :GossipIWant;
     }
 }

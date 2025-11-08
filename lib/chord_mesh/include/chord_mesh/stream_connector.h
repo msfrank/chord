@@ -9,6 +9,7 @@
 
 #include "stream.h"
 #include "stream_manager.h"
+#include "chord_common/transport_location.h"
 
 namespace chord_mesh {
 
@@ -23,7 +24,8 @@ namespace chord_mesh {
         StreamConnector(StreamManager *manager, const StreamConnectorOps &ops, void *data = nullptr);
         virtual ~StreamConnector();
 
-        tempo_utils::Status connectUnix(std::string_view pipePath, int pipeFlags);
+        tempo_utils::Status connectUnix(std::string_view pipePath, int pipeFlags, void *data = nullptr);
+        tempo_utils::Status connectLocation(const chord_common::TransportLocation &endpoint, void *data = nullptr);
 
     private:
         StreamManager *m_manager;

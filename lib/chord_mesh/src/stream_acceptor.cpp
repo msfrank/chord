@@ -50,6 +50,20 @@ chord_mesh::StreamAcceptor::forUnix(
     return listener;
 }
 
+tempo_utils::Result<std::shared_ptr<chord_mesh::StreamAcceptor>>
+chord_mesh::StreamAcceptor::forLocation(
+    const chord_common::TransportLocation &endpoint,
+    StreamManager *manager)
+{
+    switch (endpoint.getType()) {
+        case chord_common::TransportType::Unix:
+            return forUnix(endpoint.getUnixPath().c_str(), 0, manager);
+        default:
+            return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+                "invalid acceptor endpoint");
+    }
+}
+
 chord_mesh::AcceptorState
 chord_mesh::StreamAcceptor::getAcceptorState() const
 {
@@ -86,7 +100,7 @@ chord_mesh::new_listener_connection(uv_stream_t *server, int err)
     auto *client = (uv_stream_t *) pipe;
 
     ret = uv_accept(server, client);
-    if (err != 0) {
+    if (ret != 0) {
         std::free(pipe);
         acceptor->emitError(
             MeshStatus::forCondition(MeshCondition::kMeshInvariant,

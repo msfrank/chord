@@ -111,20 +111,17 @@ chord_mesh::MessageBuilder::setPayload(std::shared_ptr<const tempo_utils::Immuta
     return {};
 }
 
-std::filesystem::path
-chord_mesh::MessageBuilder::getPemPrivateKeyFile() const
+std::shared_ptr<tempo_security::PrivateKey>
+chord_mesh::MessageBuilder::getPrivateKey() const
 {
-    return m_pemPrivateKeyFile;
+    return m_privateKey;
 }
 
 void
-chord_mesh::MessageBuilder::setPemPrivateKeyFile(const std::filesystem::path &pemPrivateKeyFile)
+chord_mesh::MessageBuilder::setPrivateKey(std::shared_ptr<tempo_security::PrivateKey> privateKey)
 {
-    m_pemPrivateKeyFile = pemPrivateKeyFile;
+    m_privateKey = privateKey;
 }
-
-constexpr tu_uint32 kMessageVersion1 = 1;
-constexpr tu_uint32 kMaxPayloadSize = 16777216;     // 2^24
 
 tempo_utils::Result<std::shared_ptr<const tempo_utils::ImmutableBytes>>
 chord_mesh::MessageBuilder::toBytes() const
@@ -138,32 +135,50 @@ chord_mesh::MessageBuilder::toBytes() const
             "message payload is too large");
 
     tempo_utils::BytesAppender appender;
+
+    // append the version field
     appender.appendU8(kMessageVersion1);
 
-    //
+    // append the flags field
+    tu_uint8 flags = 0;
+    if (m_privateKey != nullptr) {
+        flags |= kMessageSignedFlag;
+    }
+    appender.appendU8(flags);
+
+    // append the timestamp field
     tu_uint32 timestamp = absl::ToUnixSeconds(m_timestamp);
     if (timestamp == 0) {
         timestamp = absl::ToUnixSeconds(absl::Now());
     }
     appender.appendU32(timestamp);
 
-    //
+    // append the payload size field
     appender.appendU32(payloadSize);
+
+    // append the payload
     appender.appendBytes(m_payload->getSpan());
 
-    std::span data(appender.getData(), appender.getSize());
-    tempo_security::Digest digest;
-    TU_ASSIGN_OR_RETURN (digest, tempo_security::generate_signed_message_digest(
-        data, m_pemPrivateKeyFile, tempo_security::DigestId::None));
-    if (std::numeric_limits<tu_uint8>::max() < digest.getSize())
-        return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
-            "message digest is too large");
+    // if message is signed then generate the signature
+    if (flags & kMessageSignedFlag) {
+        std::span data(appender.getData(), appender.getSize());
 
-    appender.appendU8(static_cast<tu_uint8>(digest.getSize()));
-    appender.appendBytes(digest.getSpan());
+        tempo_security::Digest digest;
+        TU_ASSIGN_OR_RETURN (digest, tempo_security::DigestUtils::generate_signed_message_digest(
+            data, m_privateKey, tempo_security::DigestId::None));
 
+        // append the digest size field
+        if (std::numeric_limits<tu_uint8>::max() < digest.getSize())
+            return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+                "message digest is too large");
+        appender.appendU8(static_cast<tu_uint8>(digest.getSize()));
+
+        // append the digest
+        appender.appendBytes(digest.getSpan());
+    }
+
+    // return the serialized bytes
     auto bytes = appender.finish();
-
     return std::static_pointer_cast<const tempo_utils::ImmutableBytes>(bytes);
 }
 
@@ -174,32 +189,25 @@ chord_mesh::MessageBuilder::reset()
 }
 
 chord_mesh::MessageParser::MessageParser()
-    : m_messageVersion(0),
-      m_timestamp(0),
-      m_payloadSize(0),
-      m_digestSize(0)
 {
+    reset();
 }
 
-std::filesystem::path
-chord_mesh::MessageParser::getPemCertificateFile() const
+std::shared_ptr<tempo_security::X509Certificate>
+chord_mesh::MessageParser::getCertificate() const
 {
-    return m_pemCertificateFile;
+    return m_certificate;
 }
 
 void
-chord_mesh::MessageParser::setPemCertificateFile(const std::filesystem::path &pemCertificateFile)
+chord_mesh::MessageParser::setCertificate(std::shared_ptr<tempo_security::X509Certificate> certificate)
 {
-    m_pemCertificateFile = pemCertificateFile;
+    m_certificate = certificate;
 }
 
 tempo_utils::Status
 chord_mesh::MessageParser::pushBytes(std::span<const tu_uint8> bytes)
 {
-    if (m_pending == nullptr) {
-        m_pending = std::make_unique<tempo_utils::BytesAppender>();
-    }
-
     m_pending->appendBytes(bytes);
 
     // get the message version if we have read enough input
@@ -217,9 +225,10 @@ chord_mesh::MessageParser::pushBytes(std::span<const tu_uint8> bytes)
 
     // get the message version and payload size if we have read enough input
     if (m_payloadSize == 0) {
-        if (m_pending->getSize() >= 9) {
+        if (m_pending->getSize() >= 10) {
             auto *ptr = m_pending->getData();
             m_messageVersion = tempo_utils::read_u8_and_advance(ptr);
+            m_messageFlags = tempo_utils::read_u8_and_advance(ptr);
             m_timestamp = tempo_utils::read_u32_and_advance(ptr);
             m_payloadSize = tempo_utils::read_u32_and_advance(ptr);
         }
@@ -229,29 +238,45 @@ chord_mesh::MessageParser::pushBytes(std::span<const tu_uint8> bytes)
     if (m_payloadSize == 0)
         return {};
 
+    bool verificationRequired = m_messageFlags & kMessageSignedFlag;
+
+    // fail if message is signed and no certificate is present
+    if (verificationRequired && m_certificate == nullptr)
+        return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+            "cannot verify signed message");
+
     // we haven't read enough input to parse the payload
-    if (m_pending->getSize() < 9 + m_payloadSize)
+    if (m_pending->getSize() < 10 + m_payloadSize)
         return {};
 
-    // get the digest size if we have read enough input
-    if (m_digestSize == 0) {
-        if (m_pending->getSize() >= 9 + m_payloadSize + 1) {
-            auto *ptr = m_pending->getData() + 9 + m_payloadSize;
-            m_digestSize = tempo_utils::read_u8_and_advance(ptr);
+    tu_uint32 trailerSize;
+
+    if (verificationRequired) {
+
+        // get the digest size if we have read enough input
+        if (m_digestSize == 0) {
+            if (m_pending->getSize() >= 10 + m_payloadSize + 1) {
+                auto *ptr = m_pending->getData() + 10 + m_payloadSize;
+                m_digestSize = tempo_utils::read_u8_and_advance(ptr);
+            }
         }
+
+        // we haven't read enough input to get the digest size
+        if (m_digestSize == 0)
+            return {};
+
+        trailerSize = 1 + m_digestSize;
+
+        // we haven't read enough input to parse the digest
+        if (m_pending->getSize() < 10 + m_payloadSize + 1 + m_digestSize)
+            return {};
+    } else {
+        trailerSize = 0;
     }
-
-    // we haven't read enough input to get the digest size
-    if (m_digestSize == 0)
-        return {};
-
-    // we haven't read enough input to parse the digest
-    if (m_pending->getSize() < 9 + m_payloadSize + 1 + m_digestSize)
-        return {};
 
     // finish the appender
     auto pending = m_pending->finish()->toSlice();
-    auto messageSize = 9 + m_payloadSize + 1 + m_digestSize;
+    auto messageSize = 10 + m_payloadSize + trailerSize;
     auto timestamp = absl::FromUnixSeconds(m_timestamp);
     auto payloadSize = m_payloadSize;
     auto digestSize = m_digestSize;
@@ -265,25 +290,27 @@ chord_mesh::MessageParser::pushBytes(std::span<const tu_uint8> bytes)
         m_pending->appendBytes(remainder.sliceView());
     }
 
-    auto verifyBytes = pending.slice(0, 9 + payloadSize).sliceView();
-    auto digestBytes = pending.slice(9 + payloadSize + 1, digestSize).sliceView();
-    auto payloadBytes = pending.slice(9, payloadSize).sliceView();
+    // construct the message
+    Message message(timestamp);
+    auto payloadBytes = pending.slice(10, payloadSize).sliceView();
 
     // verify the signature against the public key
-    tempo_security::Digest digest(digestBytes);
-    bool verified;
-    TU_ASSIGN_OR_RETURN (verified, tempo_security::verify_signed_message_digest(
-        verifyBytes, digest, m_pemCertificateFile, tempo_security::DigestId::None));
-    if (!verified)
-        return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
-            "signature verification failed");
+    if (verificationRequired) {
+        auto verifyBytes = pending.slice(0, 10 + payloadSize).sliceView();
+        auto digestBytes = pending.slice(10 + payloadSize + 1, digestSize).sliceView();
+        tempo_security::Digest digest(digestBytes);
+        bool verified;
+        TU_ASSIGN_OR_RETURN (verified, tempo_security::DigestUtils::verify_signed_message_digest(
+            verifyBytes, digest, m_certificate));
+        if (!verified)
+            return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+                "signature verification failed");
+        message.setDigest(digest);
+    }
 
-    // construct the message and push it
-    Message message(timestamp);
-    message.setDigest(digest);
     message.setPayload(tempo_utils::MemoryBytes::copy(payloadBytes));
-    m_messages.push(message);
 
+    m_messages.push(message);
     return {};
 }
 
@@ -312,7 +339,7 @@ chord_mesh::MessageParser::popMessage()
 void
 chord_mesh::MessageParser::reset()
 {
-    m_pending.reset();
+    m_pending = std::make_unique<tempo_utils::BytesAppender>();
     m_messageVersion = 0;
     m_timestamp = 0;
     m_payloadSize = 0;

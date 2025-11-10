@@ -9,20 +9,32 @@
 
 namespace chord_mesh {
 
+    constexpr tu_uint32 kMessageVersionStream = 0xFF;
     constexpr tu_uint32 kMessageVersion1 = 1;
-    constexpr tu_uint32 kMaxPayloadSize = 16777216;     // 2^24
     constexpr tu_uint32 kMessageSignedFlag = 1;
+    constexpr tu_uint32 kMaxPayloadSize = 16777216;     // 2^24
+
+    enum class MessageVersion {
+        Invalid,
+        Stream,
+        Version1,
+    };
 
     class Message {
     public:
         Message();
         explicit Message(
+            tu_uint8 version,
+            tu_uint8 flags,
             absl::Time timestamp,
             std::shared_ptr<const tempo_utils::ImmutableBytes> payload = {},
             const tempo_security::Digest &digest = {});
         Message(const Message &other);
 
         bool isValid() const;
+
+        MessageVersion getVersion() const;
+        bool isSigned() const;
 
         absl::Time getTimestamp() const;
         void setTimestamp(absl::Time timestamp);
@@ -37,6 +49,8 @@ namespace chord_mesh {
 
     private:
         struct Priv {
+            tu_uint8 version;
+            tu_uint8 flags;
             absl::Time timestamp;
             std::shared_ptr<const tempo_utils::ImmutableBytes> payload;
             tempo_security::Digest digest;
@@ -50,6 +64,9 @@ namespace chord_mesh {
     class MessageBuilder {
     public:
         explicit MessageBuilder(std::shared_ptr<const tempo_utils::ImmutableBytes> payload = {});
+
+        MessageVersion getVersion() const;
+        void setVersion(MessageVersion version);
 
         absl::Time getTimestamp() const;
         void setTimestamp(absl::Time timestamp);
@@ -65,6 +82,7 @@ namespace chord_mesh {
         void reset();
 
     private:
+        MessageVersion m_version;
         absl::Time m_timestamp;
         std::shared_ptr<const tempo_utils::ImmutableBytes> m_payload;
         std::shared_ptr<tempo_security::PrivateKey> m_privateKey;
@@ -77,17 +95,15 @@ namespace chord_mesh {
         std::shared_ptr<tempo_security::X509Certificate> getCertificate() const;
         void setCertificate(std::shared_ptr<tempo_security::X509Certificate> certificate);
 
-        tempo_utils::Status pushBytes(std::span<const tu_uint8> bytes);
+        tempo_utils::Result<Message> pushBytes(std::span<const tu_uint8> bytes);
 
-        bool hasMessage() const;
-        size_t numMessages() const;
-        Message popMessage();
+        bool hasPending() const;
+        std::shared_ptr<const tempo_utils::MemoryBytes> popPending();
 
         void reset();
 
     private:
         std::shared_ptr<tempo_security::X509Certificate> m_certificate;
-        std::queue<Message> m_messages;
         std::unique_ptr<tempo_utils::BytesAppender> m_pending;
         tu_uint8 m_messageVersion;
         tu_uint8 m_messageFlags;

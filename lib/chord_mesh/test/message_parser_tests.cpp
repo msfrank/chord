@@ -50,6 +50,7 @@ TEST_F(MessageParser, ParseUnsignedMessage)
     auto payload = tempo_utils::MemoryBytes::copy("hello, world!");
 
     chord_mesh::MessageBuilder builder;
+    builder.setVersion(chord_mesh::MessageVersion::Version1);
     builder.setTimestamp(now);
     builder.setPayload(payload);
 
@@ -59,9 +60,9 @@ TEST_F(MessageParser, ParseUnsignedMessage)
 
     chord_mesh::MessageParser parser;
 
-    ASSERT_THAT (parser.pushBytes(bytes->getSpan()), tempo_test::IsOk());
-    ASSERT_TRUE (parser.hasMessage());
-    auto message = parser.popMessage();
+    auto pushBytesResult = parser.pushBytes(bytes->getSpan());
+    ASSERT_THAT (pushBytesResult, tempo_test::IsResult());
+    auto message = pushBytesResult.getResult();
 
     ASSERT_EQ (absl::ToUnixSeconds(now), absl::ToUnixSeconds(message.getTimestamp()));
 
@@ -84,6 +85,7 @@ TEST_F(MessageParser, ParseSignedMessage)
     TU_ASSIGN_OR_RAISE (certificate, tempo_security::X509Certificate::readFile(keyPair.getPemCertificateFile()));
 
     chord_mesh::MessageBuilder builder;
+    builder.setVersion(chord_mesh::MessageVersion::Version1);
     builder.setTimestamp(now);
     builder.setPayload(payload);
     builder.setPrivateKey(privateKey);
@@ -95,9 +97,9 @@ TEST_F(MessageParser, ParseSignedMessage)
     chord_mesh::MessageParser parser;
     parser.setCertificate(certificate);
 
-    ASSERT_THAT (parser.pushBytes(bytes->getSpan()), tempo_test::IsOk());
-    ASSERT_TRUE (parser.hasMessage());
-    auto message = parser.popMessage();
+    auto pushBytesResult = parser.pushBytes(bytes->getSpan());
+    ASSERT_THAT (pushBytesResult, tempo_test::IsResult());
+    auto message = pushBytesResult.getResult();
 
     ASSERT_EQ (absl::ToUnixSeconds(now), absl::ToUnixSeconds(message.getTimestamp()));
 

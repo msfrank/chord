@@ -9,11 +9,15 @@ chord_mesh::Message::Message()
 }
 
 chord_mesh::Message::Message(
+    tu_uint8 version,
+    tu_uint8 flags,
     absl::Time timestamp,
     std::shared_ptr<const tempo_utils::ImmutableBytes> payload,
     const tempo_security::Digest &digest)
     : m_priv(std::make_shared<Priv>())
 {
+    m_priv->version = version;
+    m_priv->flags = flags;
     m_priv->timestamp = timestamp;
     m_priv->payload = std::move(payload);
     m_priv->digest = digest;
@@ -28,6 +32,29 @@ bool
 chord_mesh::Message::isValid() const
 {
     return m_priv != nullptr;
+}
+
+chord_mesh::MessageVersion
+chord_mesh::Message::getVersion() const
+{
+    if (m_priv == nullptr)
+        return MessageVersion::Invalid;
+    switch (m_priv->version) {
+        case kMessageVersionStream:
+            return MessageVersion::Stream;
+        case kMessageVersion1:
+            return MessageVersion::Version1;
+        default:
+            return MessageVersion::Invalid;
+    }
+}
+
+bool
+chord_mesh::Message::isSigned() const
+{
+    if (m_priv == nullptr)
+        return false;
+    return m_priv->flags & kMessageSignedFlag;
 }
 
 absl::Time
@@ -82,8 +109,21 @@ chord_mesh::Message::setDigest(const tempo_security::Digest &digest)
 }
 
 chord_mesh::MessageBuilder::MessageBuilder(std::shared_ptr<const tempo_utils::ImmutableBytes> payload)
-    : m_payload(std::move(payload))
+    : m_version(MessageVersion::Invalid),
+      m_payload(std::move(payload))
 {
+}
+
+chord_mesh::MessageVersion
+chord_mesh::MessageBuilder::getVersion() const
+{
+    return m_version;
+}
+
+void
+chord_mesh::MessageBuilder::setVersion(MessageVersion version)
+{
+    m_version = version;
 }
 
 absl::Time
@@ -137,7 +177,19 @@ chord_mesh::MessageBuilder::toBytes() const
     tempo_utils::BytesAppender appender;
 
     // append the version field
-    appender.appendU8(kMessageVersion1);
+    tu_uint8 version;
+    switch (m_version) {
+        case MessageVersion::Stream:
+            version = kMessageVersionStream;
+            break;
+        case MessageVersion::Version1:
+            version = kMessageVersion1;
+            break;
+        default:
+            return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+                "invalid message version");
+    }
+    appender.appendU8(version);
 
     // append the flags field
     tu_uint8 flags = 0;
@@ -205,7 +257,7 @@ chord_mesh::MessageParser::setCertificate(std::shared_ptr<tempo_security::X509Ce
     m_certificate = certificate;
 }
 
-tempo_utils::Status
+tempo_utils::Result<chord_mesh::Message>
 chord_mesh::MessageParser::pushBytes(std::span<const tu_uint8> bytes)
 {
     m_pending->appendBytes(bytes);
@@ -218,10 +270,15 @@ chord_mesh::MessageParser::pushBytes(std::span<const tu_uint8> bytes)
         }
     }
 
-    //
-    if (m_messageVersion != 1)
-        return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
-            "invalid message version");
+    // validate message version
+    switch (m_messageVersion) {
+        case kMessageVersionStream:
+        case kMessageVersion1:
+            break;
+        default:
+            return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+                "invalid message version");
+    }
 
     // get the message version and payload size if we have read enough input
     if (m_payloadSize == 0) {
@@ -291,7 +348,7 @@ chord_mesh::MessageParser::pushBytes(std::span<const tu_uint8> bytes)
     }
 
     // construct the message
-    Message message(timestamp);
+    Message message(m_messageVersion, m_messageFlags, timestamp);
     auto payloadBytes = pending.slice(10, payloadSize).sliceView();
 
     // verify the signature against the public key
@@ -310,30 +367,21 @@ chord_mesh::MessageParser::pushBytes(std::span<const tu_uint8> bytes)
 
     message.setPayload(tempo_utils::MemoryBytes::copy(payloadBytes));
 
-    m_messages.push(message);
-    return {};
+    return message;
 }
 
 bool
-chord_mesh::MessageParser::hasMessage() const
+chord_mesh::MessageParser::hasPending() const
 {
-    return !m_messages.empty();
+    return m_pending->getSize() > 0;
 }
 
-size_t
-chord_mesh::MessageParser::numMessages() const
+std::shared_ptr<const tempo_utils::MemoryBytes>
+chord_mesh::MessageParser::popPending()
 {
-    return m_messages.size();
-}
-
-chord_mesh::Message
-chord_mesh::MessageParser::popMessage()
-{
-    if (m_messages.empty())
-        return {};
-    auto message = m_messages.front();
-    m_messages.pop();
-    return message;
+    auto pending = m_pending->finish();
+    reset();
+    return pending;
 }
 
 void

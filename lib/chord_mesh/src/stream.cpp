@@ -3,14 +3,16 @@
 #include <chord_mesh/stream.h>
 #include <tempo_utils/big_endian.h>
 
-chord_mesh::Stream::Stream(StreamHandle *handle)
+chord_mesh::Stream::Stream(StreamHandle *handle, bool initiator)
     : m_handle(handle),
+      m_initiator(initiator),
       m_id(tempo_utils::UUID::randomUUID()),
       m_state(StreamState::Initial),
       m_data(nullptr)
 {
     TU_ASSERT (m_handle != nullptr);
     m_handle->data = this;
+    m_io = std::make_unique<StreamIO>(this);
 }
 
 chord_mesh::Stream::~Stream()
@@ -43,6 +45,7 @@ chord_mesh::perform_read(uv_stream_t *s, ssize_t nread, const uv_buf_t *buf)
 {
     auto *handle = (StreamHandle *) s->data;
     auto *stream = (Stream *) handle->data;
+    auto &io = stream->m_io;
     auto &ops = stream->m_ops;
     auto data = stream->m_data;
 
@@ -57,26 +60,23 @@ chord_mesh::perform_read(uv_stream_t *s, ssize_t nread, const uv_buf_t *buf)
         return;
 
     // push data into the message parser
-    auto &parser = stream->m_parser;
-    std::span bytes((const tu_uint8 *) buf->base, buf->len);
-    auto status = parser.pushBytes(bytes);
-    std::free(buf->base);
+    Message message;
+    bool hasMore = true;
 
-    //
-    if (status.notOk()) {
-        ops.error(status, data);
+    while (hasMore) {
+        auto status = io->read((const tu_uint8 *) buf->base, nread, message, hasMore);
+        std::free(buf->base);
+
+        // invoke the receive callback for each ready message
+        if (message.isValid()) {
+            ops.receive(message, data);
+        }
+
+        // if read returned error then propagate it
+        if (status.notOk()) {
+            ops.error(status, data);
+        }
     }
-
-    // a complete message has not yet been assembled
-    if (!parser.hasMessage())
-        return;
-
-    // otherwise there is at least 1 ready message, so loop invoking the
-    // receive callback until there are no more ready messages
-    do {
-        ops.receive(parser.popMessage(), data);
-    }
-    while (parser.hasMessage());
 }
 
 tempo_utils::Status
@@ -95,17 +95,31 @@ chord_mesh::Stream::start(const StreamOps &ops, void *data)
     m_ops = ops;
     m_data = data;
 
-    if (!m_outgoing.empty())
-        return performWrite();
+    TU_RETURN_IF_NOT_OK (m_io->start());
 
     return {};
 }
 
-void
-chord_mesh::perform_write(uv_write_t *req, int err)
+tempo_utils::Status
+chord_mesh::Stream::handshake(
+    const NoiseProtocolId *protocolId,
+    std::span<const tu_uint8> prologue,
+    std::shared_ptr<tempo_security::X509Certificate> remoteCertificate,
+    std::shared_ptr<tempo_security::PrivateKey> localPrivateKey)
 {
+    return {};
+}
+
+void
+chord_mesh::write_completed(uv_write_t *req, int err)
+{
+    auto *streamBuf = (StreamBuf *) req->data;
     auto *handle = (StreamHandle *) req->handle->data;
     auto *stream = (Stream *) handle->data;
+
+    // we are done with req and streamBuf
+    std::free(req);
+    free_stream_buf(streamBuf);
 
     if (err < 0) {
         stream->emitError(
@@ -114,26 +128,23 @@ chord_mesh::perform_write(uv_write_t *req, int err)
         return;
     }
 
-    stream->m_outgoing.pop();
-    if (!stream->m_outgoing.empty()) {
-        auto status = stream->performWrite();
-        if (status.notOk()) {
-            stream->emitError(status);
-        }
-    }
+    // TODO: signal write completion to StreamIO
 }
 
 tempo_utils::Status
-chord_mesh::Stream::performWrite()
+chord_mesh::Stream::write(StreamBuf *streamBuf)
 {
-    auto message = m_outgoing.front();
+    // construct write req which will be freed in write_completed callback
+    auto *req = (uv_write_t *) std::malloc(sizeof(uv_write_t));
+    memset(req, 0, sizeof(uv_write_t));
+    req->data = streamBuf;
 
-    m_buf = uv_buf_init((char *) message->getData(), message->getSize());
-
-    auto ret = uv_write(&m_req, m_handle->stream, &m_buf, 1, perform_write);
-    if (ret != 0)
+    auto ret = uv_write(req, m_handle->stream, &streamBuf->buf, 1, write_completed);
+    if (ret != 0) {
+        std::free(req); // we free req but leave streamBuf untouched
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
             "write error: {}", uv_strerror(ret));
+    }
     return {};
 }
 
@@ -144,10 +155,7 @@ chord_mesh::Stream::send(std::shared_ptr<const tempo_utils::ImmutableBytes> mess
     if (m_state == StreamState::Closed)
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
             "stream is closed");
-    bool ready = m_outgoing.empty();
-    m_outgoing.push(message);
-    if (ready)
-        return performWrite();
+    TU_RETURN_IF_NOT_OK (m_io->write(message));
     return {};
 }
 

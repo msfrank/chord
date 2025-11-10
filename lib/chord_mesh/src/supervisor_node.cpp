@@ -2,7 +2,8 @@
 #include <capnp/message.h>
 #include <capnp/serialize.h>
 
-#include <chord_mesh/generated/ensemble_events.capnp.h>
+#include <chord_mesh/generated/ensemble_messages.capnp.h>
+#include <chord_mesh/generated/stream_messages.capnp.h>
 #include <chord_mesh/mesh_result.h>
 #include <chord_mesh/stream_connector.h>
 #include <chord_mesh/supervisor_node.h>
@@ -56,12 +57,13 @@ chord_mesh::on_supervisor_stream_receive(const Message &message, void *data)
     capnp::MallocMessageBuilder builder;
     capnp::readMessageCopy(inputStream, builder);
 
-    auto event = builder.getRoot<generated::EnsembleEvent>();
-    switch (event.getEvent().which()) {
-        case generated::EnsembleEvent::Event::NODE_JOINED:
-        case generated::EnsembleEvent::Event::NODE_LEFT:
-        case generated::EnsembleEvent::Event::PORT_OPENED:
-        case generated::EnsembleEvent::Event::PORT_CLOSED:
+    auto root = builder.getRoot<generated::EnsembleMessage>();
+    switch (root.getMessage().which()) {
+
+        case generated::EnsembleMessage::Message::NODE_JOINED:
+        case generated::EnsembleMessage::Message::NODE_LEFT:
+        case generated::EnsembleMessage::Message::PORT_OPENED:
+        case generated::EnsembleMessage::Message::PORT_CLOSED:
         default:
             break;
     }
@@ -100,9 +102,8 @@ chord_mesh::on_supervisor_connector_connect(std::shared_ptr<Stream> stream, void
 
     // construct the PeerHello message
     ::capnp::MallocMessageBuilder message;
-    generated::EnsembleEvent::Builder root = message.initRoot<generated::EnsembleEvent>();
-    auto event = root.initEvent();
-    auto peerHello = event.initPeerHello();
+    generated::EnsembleMessage::Builder root = message.initRoot<generated::EnsembleMessage>();
+    auto peerHello = root.initMessage().initPeerHello();
     peerHello.setCertificate(certificate->toString());
 
     // send the message
@@ -152,9 +153,8 @@ chord_mesh::on_supervisor_acceptor_accept(std::shared_ptr<Stream> stream, void *
 
     // construct the PeerHello message
     ::capnp::MallocMessageBuilder message;
-    generated::EnsembleEvent::Builder root = message.initRoot<generated::EnsembleEvent>();
-    auto event = root.initEvent();
-    auto peerHello = event.initPeerHello();
+    generated::EnsembleMessage::Builder root = message.initRoot<generated::EnsembleMessage>();
+    auto peerHello = root.initMessage().initPeerHello();
     peerHello.setCertificate(certificate->toString());
 
     // send the message

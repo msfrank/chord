@@ -186,8 +186,8 @@ find_package(fmt REQUIRED)
 # find required ICU dependency
 find_package(icu REQUIRED)
 
-# find required NNG dependency
-find_package(nng REQUIRED)
+# find required Noise-C dependency
+find_package(noise-c REQUIRED)
 
 # find required RocksDB dependency
 find_package(rocksdb REQUIRED)

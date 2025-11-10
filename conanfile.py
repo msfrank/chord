@@ -47,7 +47,7 @@ class Chord(ConanFile):
         'flatbuffers/25.2.10@timbre',
         'grpc/1.74.1@timbre',
         'gtest/1.17.0@timbre',
-        'nng/2.0.0-alpha.6@timbre',
+        'noise-c/20231206.1@timbre',
         'openssl/3.5.2@timbre',
         'protobuf/32.0@timbre',
         'rocksdb/10.4.2@timbre',

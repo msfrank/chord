@@ -52,6 +52,7 @@ TEST_F(MessageBuilder, BuildUnsignedMessage)
     auto payload = tempo_utils::MemoryBytes::copy("hello, world!");
 
     chord_mesh::MessageBuilder builder;
+    builder.setVersion(chord_mesh::MessageVersion::Version1);
     builder.setPayload(payload);
     builder.setTimestamp(now);
 
@@ -92,6 +93,7 @@ TEST_F(MessageBuilder, BuildSignedMessage)
     TU_ASSIGN_OR_RAISE (certificate, tempo_security::X509Certificate::readFile(keyPair.getPemCertificateFile()));
 
     chord_mesh::MessageBuilder builder;
+    builder.setVersion(chord_mesh::MessageVersion::Version1);
     builder.setPayload(payload);
     builder.setTimestamp(now);
     builder.setPrivateKey(privateKey);

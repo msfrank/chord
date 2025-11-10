@@ -3,20 +3,32 @@
 
 #include "chord_mesh/mesh_result.h"
 
-chord_mesh::StreamManager::StreamManager(uv_loop_t *loop, const StreamManagerOps &ops, void *data)
+chord_mesh::StreamManager::StreamManager(
+    uv_loop_t *loop,
+    std::shared_ptr<tempo_security::X509Store> trustStore,
+    const StreamManagerOps &ops,
+    void *data)
     : m_loop(loop),
+      m_trustStore(std::move(trustStore)),
       m_ops(ops),
       m_data(data),
       m_handles(nullptr),
       m_running(true)
 {
     TU_ASSERT (m_loop != nullptr);
+    TU_ASSERT (m_trustStore != nullptr);
 }
 
 uv_loop_t *
 chord_mesh::StreamManager::getLoop() const
 {
     return m_loop;
+}
+
+std::shared_ptr<tempo_security::X509Store>
+chord_mesh::StreamManager::getTrustStore() const
+{
+    return m_trustStore;
 }
 
 chord_mesh::StreamHandle *

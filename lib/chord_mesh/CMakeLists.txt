@@ -8,46 +8,69 @@ set(CMAKE_AUTOMOC OFF)
 add_library(chord_mesh SHARED)
 add_library(chord::chord_mesh ALIAS chord_mesh)
 
-#
+# generate stream messages
 add_custom_command (
     OUTPUT
-      ${CMAKE_CURRENT_BINARY_DIR}/include/chord_mesh/generated/ensemble_events.capnp.c++
-      ${CMAKE_CURRENT_BINARY_DIR}/include/chord_mesh/generated/ensemble_events.capnp.h
+      ${CMAKE_CURRENT_BINARY_DIR}/include/chord_mesh/generated/stream_messages.capnp.c++
+      ${CMAKE_CURRENT_BINARY_DIR}/include/chord_mesh/generated/stream_messages.capnp.h
     COMMAND
       cmake -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/include/chord_mesh/generated
     COMMAND
       ${CAPNP_EXECUTABLE} compile
-      -I/Users/msfrank/.conan2/p/b/capnp89eded32c4d6a/p/include
+      -I${CAPNP_INCLUDE_DIRECTORY}
       --src-prefix=${CMAKE_CURRENT_SOURCE_DIR}/share
       --output=${CAPNPC_CXX_EXECUTABLE}:${CMAKE_CURRENT_BINARY_DIR}/include/chord_mesh/generated
-      ${CMAKE_CURRENT_SOURCE_DIR}/share/ensemble_events.capnp
+      ${CMAKE_CURRENT_SOURCE_DIR}/share/stream_messages.capnp
     DEPENDS
-      ${CMAKE_CURRENT_SOURCE_DIR}/share/ensemble_events.capnp
+      ${CMAKE_CURRENT_SOURCE_DIR}/share/stream_messages.capnp
+)
+
+# generate ensemble messages
+add_custom_command (
+    OUTPUT
+      ${CMAKE_CURRENT_BINARY_DIR}/include/chord_mesh/generated/ensemble_messages.capnp.c++
+      ${CMAKE_CURRENT_BINARY_DIR}/include/chord_mesh/generated/ensemble_messages.capnp.h
+    COMMAND
+      cmake -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/include/chord_mesh/generated
+    COMMAND
+      ${CAPNP_EXECUTABLE} compile
+      -I${CAPNP_INCLUDE_DIRECTORY}
+      --src-prefix=${CMAKE_CURRENT_SOURCE_DIR}/share
+      --output=${CAPNPC_CXX_EXECUTABLE}:${CMAKE_CURRENT_BINARY_DIR}/include/chord_mesh/generated
+    ${CMAKE_CURRENT_SOURCE_DIR}/share/ensemble_messages.capnp
+    DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/share/ensemble_messages.capnp
 )
 
 set(CHORD_MESH_INCLUDES
+    include/chord_mesh/handshake.h
     include/chord_mesh/mesh_result.h
     include/chord_mesh/message.h
     include/chord_mesh/stream.h
     include/chord_mesh/stream_acceptor.h
     include/chord_mesh/stream_connector.h
+    include/chord_mesh/stream_io.h
     include/chord_mesh/stream_manager.h
     include/chord_mesh/supervisor_node.h
     )
 set_target_properties(chord_mesh PROPERTIES PUBLIC_HEADER "${CHORD_MESH_INCLUDES}")
 
 target_sources(chord_mesh PRIVATE
+    src/handshake.cpp
     src/mesh_result.cpp
     src/message.cpp
     src/stream.cpp
     src/stream_acceptor.cpp
     src/stream_connector.cpp
+    src/stream_io.cpp
     src/stream_manager.cpp
     src/supervisor_node.cpp
 
     # generated sources
-    ${CMAKE_CURRENT_BINARY_DIR}/include/chord_mesh/generated/ensemble_events.capnp.c++
-    ${CMAKE_CURRENT_BINARY_DIR}/include/chord_mesh/generated/ensemble_events.capnp.h
+    ${CMAKE_CURRENT_BINARY_DIR}/include/chord_mesh/generated/ensemble_messages.capnp.c++
+    ${CMAKE_CURRENT_BINARY_DIR}/include/chord_mesh/generated/ensemble_messages.capnp.h
+    ${CMAKE_CURRENT_BINARY_DIR}/include/chord_mesh/generated/stream_messages.capnp.c++
+    ${CMAKE_CURRENT_BINARY_DIR}/include/chord_mesh/generated/stream_messages.capnp.h
     )
 
 # set the library version
@@ -82,7 +105,7 @@ target_link_libraries(chord_mesh
     tempo::tempo_utils
     absl::flat_hash_map
     CapnProto::capnp
-    nng::nng
+    noise-c::noise-c
     uv::uv
     )
 

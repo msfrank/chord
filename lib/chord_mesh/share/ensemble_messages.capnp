@@ -3,7 +3,7 @@
 using Cxx = import "/capnp/c++.capnp";
 $Cxx.namespace("chord_mesh::generated");
 
-struct EnsembleEvent {
+struct EnsembleMessage {
 
     enum NodeType {
         user @0;
@@ -51,7 +51,7 @@ struct EnsembleEvent {
     struct GossipIWant {
     }
 
-    event :union {
+    message :union {
         peerHello @0 :PeerHello;
         nodeJoined @1 :NodeJoined;
         nodeLeft @2 :NodeLeft;

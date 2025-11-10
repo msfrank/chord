@@ -37,7 +37,7 @@ chord_mesh::new_unix_connection(uv_connect_t *req, int err)
 
     auto *manager = connect->connector->m_manager;
     auto *handle = manager->allocateHandle(req->handle);
-    auto stream = std::make_shared<Stream>(handle);
+    auto stream = std::make_shared<Stream>(handle, /* initiator= */ true);
     auto *data = connect->data? connect->data : connect->connector->m_data;
 
     ops.connect(stream, data);

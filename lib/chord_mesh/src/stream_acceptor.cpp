@@ -111,7 +111,7 @@ chord_mesh::new_listener_connection(uv_stream_t *server, int err)
     auto *manager = handle->manager;
     auto &ops = acceptor->m_ops;
 
-    auto stream = std::make_shared<Stream>(manager->allocateHandle(client));
+    auto stream = std::make_shared<Stream>(manager->allocateHandle(client), /* initiator= */ false);
     ops.accept(stream, acceptor->m_data);
 }
 

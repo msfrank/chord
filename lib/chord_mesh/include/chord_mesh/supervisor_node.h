@@ -2,7 +2,6 @@
 #define CHORD_MESH_SUPERVISOR_NODE_H
 
 #include <uv.h>
-#include <nng/nng.h>
 
 #include <chord_common/transport_location.h>
 #include <tempo_utils/result.h>
@@ -16,6 +15,11 @@ namespace chord_mesh {
     class SupervisorNode;
 
     struct SupervisorPeer {
+        enum class State {
+            Initial,
+            Handshake,
+
+        };
         std::shared_ptr<Stream> stream;
         SupervisorNode *supervisor;
         absl::Time connectedAt;

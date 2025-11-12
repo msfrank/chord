@@ -11,6 +11,7 @@
 #include <tempo_utils/uuid.h>
 
 #include "message.h"
+#include "stream_buf.h"
 #include "stream_io.h"
 #include "stream_manager.h"
 
@@ -37,11 +38,7 @@ namespace chord_mesh {
         StreamState getStreamState() const;
 
         tempo_utils::Status start(const StreamOps &ops, void *data = nullptr);
-        tempo_utils::Status handshake(
-            const NoiseProtocolId *protocolId,
-            std::span<const tu_uint8> prologue,
-            std::shared_ptr<tempo_security::X509Certificate> remoteCertificate,
-            std::shared_ptr<tempo_security::PrivateKey> localPrivateKey = {});
+        tempo_utils::Status handshake();
         tempo_utils::Status send(std::shared_ptr<const tempo_utils::ImmutableBytes> message);
         void shutdown();
 
@@ -56,15 +53,12 @@ namespace chord_mesh {
         StreamOps m_ops;
         void *m_data;
         std::unique_ptr<StreamIO> m_io;
-        // MessageParser m_parser;
-        // uv_write_t m_req;
-        // uv_buf_t m_buf;
-        // std::queue<std::shared_ptr<const tempo_utils::ImmutableBytes>> m_outgoing;
 
         friend class StreamAcceptor;
         friend class StreamConnector;
 
-        tempo_utils::Status performWrite();
+        void processReadyMessages();
+        void processStreamMessage(const Message &message);
         void emitError(const tempo_utils::Status &status);
 
         friend void allocate_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf);

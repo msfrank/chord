@@ -1,7 +1,16 @@
 
+#include <capnp/message.h>
+#include <capnp/serialize.h>
+#include <kj/common.h>
+#include <kj/io.h>
+
+#include <chord_mesh/generated/stream_messages.capnp.h>
 #include <chord_mesh/mesh_result.h>
 #include <chord_mesh/stream.h>
+#include <chord_mesh/stream_io.h>
 #include <tempo_utils/big_endian.h>
+
+#include "chord_mesh/handshake.h"
 
 chord_mesh::Stream::Stream(StreamHandle *handle, bool initiator)
     : m_handle(handle),
@@ -12,7 +21,7 @@ chord_mesh::Stream::Stream(StreamHandle *handle, bool initiator)
 {
     TU_ASSERT (m_handle != nullptr);
     m_handle->data = this;
-    m_io = std::make_unique<StreamIO>(this);
+    m_io = std::make_unique<StreamIO>(m_initiator, m_handle->manager, this);
 }
 
 chord_mesh::Stream::~Stream()
@@ -46,8 +55,6 @@ chord_mesh::perform_read(uv_stream_t *s, ssize_t nread, const uv_buf_t *buf)
     auto *handle = (StreamHandle *) s->data;
     auto *stream = (Stream *) handle->data;
     auto &io = stream->m_io;
-    auto &ops = stream->m_ops;
-    auto data = stream->m_data;
 
     // if the remote end has closed then shut down the stream
     if (nread == UV_EOF) {
@@ -59,24 +66,16 @@ chord_mesh::perform_read(uv_stream_t *s, ssize_t nread, const uv_buf_t *buf)
     if (nread == 0 || buf == nullptr || buf->len < nread)
         return;
 
-    // push data into the message parser
-    Message message;
-    bool hasMore = true;
-
-    while (hasMore) {
-        auto status = io->read((const tu_uint8 *) buf->base, nread, message, hasMore);
-        std::free(buf->base);
-
-        // invoke the receive callback for each ready message
-        if (message.isValid()) {
-            ops.receive(message, data);
-        }
-
-        // if read returned error then propagate it
-        if (status.notOk()) {
-            ops.error(status, data);
-        }
+    // push data into the StreamIO
+    auto status = io->read((const tu_uint8 *) buf->base, nread);
+    std::free(buf->base);
+    if (status.notOk()) {
+        stream->emitError(status);
+        return;
     }
+
+    // handle any ready messages
+    stream->processReadyMessages();
 }
 
 tempo_utils::Status
@@ -101,12 +100,27 @@ chord_mesh::Stream::start(const StreamOps &ops, void *data)
 }
 
 tempo_utils::Status
-chord_mesh::Stream::handshake(
-    const NoiseProtocolId *protocolId,
-    std::span<const tu_uint8> prologue,
-    std::shared_ptr<tempo_security::X509Certificate> remoteCertificate,
-    std::shared_ptr<tempo_security::PrivateKey> localPrivateKey)
+chord_mesh::Stream::handshake()
 {
+    if (m_state != StreamState::Active)
+        return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+            "invalid stream state");
+
+    auto *manager = m_handle->manager;
+    auto keypair = manager->getKeypair();
+
+    std::shared_ptr<tempo_security::X509Certificate> certificate;
+    TU_ASSIGN_OR_RETURN (certificate, tempo_security::X509Certificate::readFile(keypair.getPemCertificateFile()));
+    std::shared_ptr<tempo_security::PrivateKey> privateKey;
+    TU_ASSIGN_OR_RETURN (privateKey, tempo_security::PrivateKey::readFile(keypair.getPemPrivateKeyFile()));
+
+    // generate the noise keypair and sign it using the private key
+    StaticKeypair localKeypair;
+    TU_RETURN_IF_NOT_OK (generate_static_key(privateKey, localKeypair));
+
+    // perform the local handshake
+    TU_RETURN_IF_NOT_OK (m_io->negotiateLocal(certificate->toString(), localKeypair));
+
     return {};
 }
 
@@ -157,6 +171,100 @@ chord_mesh::Stream::send(std::shared_ptr<const tempo_utils::ImmutableBytes> mess
             "stream is closed");
     TU_RETURN_IF_NOT_OK (m_io->write(message));
     return {};
+}
+
+void
+chord_mesh::Stream::processReadyMessages()
+{
+    bool ready;
+    tempo_utils::Status status;
+
+    for (;;) {
+        status = m_io->checkReady(ready);
+        if (status.notOk()) {
+            emitError(status);
+            return;
+        }
+
+        if (!ready)
+            break;
+
+        Message message;
+        status = m_io->takeReady(message);
+        if (status.notOk()) {
+            emitError(status);
+            return;
+        }
+
+        switch (message.getVersion()) {
+            case MessageVersion::Stream:
+                // handle stream messages internally
+                processStreamMessage(message);
+                break;
+            default:
+                // invoke the receive callback any other message
+                m_ops.receive(message, m_data);
+                break;
+        }
+    }
+}
+
+void
+chord_mesh::Stream::processStreamMessage(const Message &message)
+{
+    TU_ASSERT (message.getVersion() == MessageVersion::Stream);
+
+    auto payload = message.getPayload();
+    auto arrayPtr = kj::arrayPtr(payload->getData(), payload->getSize());
+    kj::ArrayInputStream inputStream(arrayPtr);
+    capnp::MallocMessageBuilder builder;
+    capnp::readMessageCopy(inputStream, builder);
+
+    auto root = builder.getRoot<generated::StreamMessage>();
+    switch (root.getMessage().which()) {
+
+        case generated::StreamMessage::Message::STREAM_NEGOTIATE: {
+            auto streamNegotiate = root.getMessage().getStreamNegotiate();
+            auto publicKeyBytes = streamNegotiate.getPublicKey().asBytes();
+            auto certificateString = streamNegotiate.getCertificate().asString();;
+            auto digestBytes = streamNegotiate.getDigest().asBytes();
+
+            std::span publicKey(publicKeyBytes.begin(), publicKeyBytes.end());
+            std::string_view certificate(certificateString.cStr());
+            tempo_security::Digest digest(std::span(digestBytes.begin(), digestBytes.end()));
+
+            auto status = m_io->negotiateRemote(publicKey, certificate, digest);
+            if (status.notOk()) {
+                emitError(status);
+            }
+            break;
+        }
+
+        case generated::StreamMessage::Message::STREAM_HANDSHAKE: {
+            auto streamHandshake = root.getMessage().getStreamHandshake();
+            auto dataBytes = streamHandshake.getData().asBytes();
+            std::span data(dataBytes.begin(), dataBytes.end());
+
+            bool finished;
+            auto status = m_io->processHandshake(data, finished);
+            if (status.notOk()) {
+                emitError(status);
+            }
+            break;
+        }
+
+        case generated::StreamMessage::Message::STREAM_ERROR: {
+            auto streamError = root.getMessage().getStreamError();
+            auto errorMessage = streamError.getMessage().asString();
+            auto status = MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+                errorMessage.cStr());
+            emitError(status);
+            break;
+        }
+
+        default:
+            break;
+    }
 }
 
 void

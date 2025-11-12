@@ -95,7 +95,10 @@ namespace chord_mesh {
         std::shared_ptr<tempo_security::X509Certificate> getCertificate() const;
         void setCertificate(std::shared_ptr<tempo_security::X509Certificate> certificate);
 
-        tempo_utils::Result<Message> pushBytes(std::span<const tu_uint8> bytes);
+        tempo_utils::Status pushBytes(std::span<const tu_uint8> bytes);
+
+        tempo_utils::Status checkReady(bool &ready);
+        tempo_utils::Status takeReady(Message &message);
 
         bool hasPending() const;
         std::shared_ptr<const tempo_utils::MemoryBytes> popPending();
@@ -105,6 +108,7 @@ namespace chord_mesh {
     private:
         std::shared_ptr<tempo_security::X509Certificate> m_certificate;
         std::unique_ptr<tempo_utils::BytesAppender> m_pending;
+        bool m_ready;
         tu_uint8 m_messageVersion;
         tu_uint8 m_messageFlags;
         tu_uint32 m_timestamp;

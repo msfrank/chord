@@ -2,9 +2,9 @@
 #define CHORD_MESH_STREAM_MANAGER_H
 
 #include <uv.h>
-#include <tempo_security/abstract_private_key_generator.h>
-#include <tempo_security/x509_store.h>
 
+#include <tempo_security/certificate_key_pair.h>
+#include <tempo_security/x509_store.h>
 #include <tempo_utils/result.h>
 
 namespace chord_mesh {
@@ -36,17 +36,21 @@ namespace chord_mesh {
     public:
         StreamManager(
             uv_loop_t *loop,
+            const tempo_security::CertificateKeyPair &keypair,
             std::shared_ptr<tempo_security::X509Store> trustStore,
             const StreamManagerOps &ops,
             void *data = nullptr);
 
         uv_loop_t *getLoop() const;
         std::shared_ptr<tempo_security::X509Store> getTrustStore() const;
+        tempo_security::CertificateKeyPair getKeypair() const;
+
         StreamHandle *allocateHandle(uv_stream_t *stream, void *data = nullptr);
         void shutdown();
 
     private:
         uv_loop_t *m_loop;
+        tempo_security::CertificateKeyPair m_keypair;
         std::shared_ptr<tempo_security::X509Store> m_trustStore;
         StreamManagerOps m_ops;
         void *m_data;

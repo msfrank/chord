@@ -257,10 +257,22 @@ chord_mesh::MessageParser::setCertificate(std::shared_ptr<tempo_security::X509Ce
     m_certificate = certificate;
 }
 
-tempo_utils::Result<chord_mesh::Message>
+tempo_utils::Status
 chord_mesh::MessageParser::pushBytes(std::span<const tu_uint8> bytes)
 {
     m_pending->appendBytes(bytes);
+    return {};
+}
+
+tempo_utils::Status
+chord_mesh::MessageParser::checkReady(bool &ready)
+{
+    if (m_ready) {
+        ready = true;
+        return {};
+    }
+
+    ready = false;
 
     // get the message version if we have read enough input
     if (m_messageVersion == 0) {
@@ -306,8 +318,6 @@ chord_mesh::MessageParser::pushBytes(std::span<const tu_uint8> bytes)
     if (m_pending->getSize() < 10 + m_payloadSize)
         return {};
 
-    tu_uint32 trailerSize;
-
     if (verificationRequired) {
 
         // get the digest size if we have read enough input
@@ -322,21 +332,33 @@ chord_mesh::MessageParser::pushBytes(std::span<const tu_uint8> bytes)
         if (m_digestSize == 0)
             return {};
 
-        trailerSize = 1 + m_digestSize;
-
         // we haven't read enough input to parse the digest
         if (m_pending->getSize() < 10 + m_payloadSize + 1 + m_digestSize)
             return {};
-    } else {
-        trailerSize = 0;
     }
+
+    m_ready = true;
+    ready = true;
+    return {};
+}
+
+tempo_utils::Status
+chord_mesh::MessageParser::takeReady(Message &message)
+{
+    if (!m_ready)
+        return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+            "no ready message available");
 
     // finish the appender
     auto pending = m_pending->finish()->toSlice();
+
+    // copy parser state before reset
+    auto trailerSize = m_digestSize > 0? m_digestSize + 1 : 0;
     auto messageSize = 10 + m_payloadSize + trailerSize;
-    auto timestamp = absl::FromUnixSeconds(m_timestamp);
     auto payloadSize = m_payloadSize;
     auto digestSize = m_digestSize;
+    auto timestamp = absl::FromUnixSeconds(m_timestamp);
+    bool verificationRequired = m_messageFlags & kMessageSignedFlag;
 
     // reset parser state
     reset();
@@ -348,7 +370,7 @@ chord_mesh::MessageParser::pushBytes(std::span<const tu_uint8> bytes)
     }
 
     // construct the message
-    Message message(m_messageVersion, m_messageFlags, timestamp);
+    Message message_(m_messageVersion, m_messageFlags, timestamp);
     auto payloadBytes = pending.slice(10, payloadSize).sliceView();
 
     // verify the signature against the public key
@@ -362,12 +384,13 @@ chord_mesh::MessageParser::pushBytes(std::span<const tu_uint8> bytes)
         if (!verified)
             return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
                 "signature verification failed");
-        message.setDigest(digest);
+        message_.setDigest(digest);
     }
 
-    message.setPayload(tempo_utils::MemoryBytes::copy(payloadBytes));
+    message_.setPayload(tempo_utils::MemoryBytes::copy(payloadBytes));
+    message = message_;
 
-    return message;
+    return {};
 }
 
 bool
@@ -388,7 +411,9 @@ void
 chord_mesh::MessageParser::reset()
 {
     m_pending = std::make_unique<tempo_utils::BytesAppender>();
+    m_ready = false;
     m_messageVersion = 0;
+    m_messageFlags = 0;
     m_timestamp = 0;
     m_payloadSize = 0;
     m_digestSize = 0;

@@ -5,10 +5,15 @@ $Cxx.namespace("chord_mesh::generated");
 
 struct StreamMessage {
 
-    struct StreamHello {
+    struct StreamNegotiate {
         publicKey @0 :Data;
         certificate @1 :Text;
         digest @2 :Data;
+        protocol @3 :Text;
+    }
+
+    struct StreamHandshake {
+        data @0 :Data;
     }
 
     struct StreamError {
@@ -17,7 +22,8 @@ struct StreamMessage {
     }
 
     message :union {
-        streamHello @0 :StreamHello;
-        streamError @1 :StreamError;
+        streamNegotiate @0 :StreamNegotiate;
+        streamHandshake @1 :StreamHandshake;
+        streamError @2 :StreamError;
     }
 }

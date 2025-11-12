@@ -5,10 +5,12 @@
 
 chord_mesh::StreamManager::StreamManager(
     uv_loop_t *loop,
+    const tempo_security::CertificateKeyPair &keypair,
     std::shared_ptr<tempo_security::X509Store> trustStore,
     const StreamManagerOps &ops,
     void *data)
     : m_loop(loop),
+      m_keypair(keypair),
       m_trustStore(std::move(trustStore)),
       m_ops(ops),
       m_data(data),
@@ -16,6 +18,7 @@ chord_mesh::StreamManager::StreamManager(
       m_running(true)
 {
     TU_ASSERT (m_loop != nullptr);
+    TU_ASSERT (m_keypair.isValid());
     TU_ASSERT (m_trustStore != nullptr);
 }
 
@@ -29,6 +32,12 @@ std::shared_ptr<tempo_security::X509Store>
 chord_mesh::StreamManager::getTrustStore() const
 {
     return m_trustStore;
+}
+
+tempo_security::CertificateKeyPair
+chord_mesh::StreamManager::getKeypair() const
+{
+    return m_keypair;
 }
 
 chord_mesh::StreamHandle *

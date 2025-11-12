@@ -6,6 +6,8 @@ include(GoogleTest)
 # define unit tests
 
 set(TEST_CASES
+    cipher_tests.cpp
+    handshake_tests.cpp
     message_builder_tests.cpp
     message_parser_tests.cpp
     stream_acceptor_tests.cpp

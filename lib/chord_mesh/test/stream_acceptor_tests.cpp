@@ -18,7 +18,8 @@
 class StreamAcceptor : public BaseMeshFixture {
 protected:
     std::unique_ptr<tempo_utils::TempdirMaker> tempdir;
-    tempo_security::CertificateKeyPair m_keyPair;
+    tempo_security::CertificateKeyPair caKeypair;
+    tempo_security::CertificateKeyPair streamKeypair;
     std::shared_ptr<tempo_security::X509Store> trustStore;
 
     void SetUp() override {
@@ -28,7 +29,22 @@ protected:
         TU_RAISE_IF_NOT_OK (tempdir->getStatus());
 
         tempo_security::Ed25519PrivateKeyGenerator keygen;
-        m_keyPair = tempo_security::GenerateUtils::generate_self_signed_key_pair(
+
+        caKeypair = tempo_security::GenerateUtils::generate_self_signed_ca_key_pair(
+            keygen,
+            tempo_security::DigestId::None,
+            "test_O",
+            "test_OU",
+            "edKeyPair",
+            1,
+            std::chrono::seconds{3600},
+            1,
+            tempdir->getTempdir(),
+            tempo_utils::generate_name("test_ca_key_XXXXXXXX")).orElseThrow();
+        TU_ASSERT (caKeypair.isValid());
+
+        streamKeypair = tempo_security::GenerateUtils::generate_key_pair(
+            caKeypair,
             keygen,
             tempo_security::DigestId::None,
             "test_O",
@@ -38,11 +54,11 @@ protected:
             std::chrono::seconds{3600},
             tempdir->getTempdir(),
             tempo_utils::generate_name("test_ed_key_XXXXXXXX")).orElseThrow();
-        ASSERT_TRUE (m_keyPair.isValid());
+        TU_ASSERT (streamKeypair.isValid());
 
         tempo_security::X509StoreOptions options;
         TU_ASSIGN_OR_RAISE (trustStore, tempo_security::X509Store::loadTrustedCerts(
-            options, {m_keyPair.getPemCertificateFile()}));
+            options, {caKeypair.getPemCertificateFile()}));
     }
     void TearDown() override {
         BaseMeshFixture::TearDown();
@@ -58,7 +74,7 @@ TEST_F(StreamAcceptor, CreateAcceptor)
     auto *loop = getUVLoop();
 
     chord_mesh::StreamManagerOps managerOps;
-    chord_mesh::StreamManager manager(loop, trustStore, managerOps);
+    chord_mesh::StreamManager manager(loop, streamKeypair, trustStore, managerOps);
     auto createAcceptorResult = chord_mesh::StreamAcceptor::forUnix(socketPath.c_str(), 0, &manager);
     ASSERT_THAT (createAcceptorResult, tempo_test::IsResult());
     auto acceptor = createAcceptorResult.getResult();
@@ -82,7 +98,7 @@ TEST_F(StreamAcceptor, ConnectToAcceptor)
     auto *loop = getUVLoop();
 
     chord_mesh::StreamManagerOps managerOps;
-    chord_mesh::StreamManager manager(loop, trustStore, managerOps);
+    chord_mesh::StreamManager manager(loop, streamKeypair, trustStore, managerOps);
     auto createAcceptorResult = chord_mesh::StreamAcceptor::forUnix(socketPath.c_str(), 0, &manager);
     ASSERT_THAT (createAcceptorResult, tempo_test::IsResult()) << "failed to create acceptor";
     auto acceptor = createAcceptorResult.getResult();
@@ -129,7 +145,7 @@ TEST_F(StreamAcceptor, ReadAndWaitForServerClose)
     auto *loop = getUVLoop();
 
     chord_mesh::StreamManagerOps managerOps;
-    chord_mesh::StreamManager manager(loop, trustStore, managerOps);
+    chord_mesh::StreamManager manager(loop, streamKeypair, trustStore, managerOps);
     auto createAcceptorResult = chord_mesh::StreamAcceptor::forUnix(socketPath.c_str(), 0, &manager);
     ASSERT_THAT (createAcceptorResult, tempo_test::IsResult()) << "failed to create acceptor";
     auto acceptor = createAcceptorResult.getResult();

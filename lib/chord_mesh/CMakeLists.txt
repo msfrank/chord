@@ -47,6 +47,7 @@ set(CHORD_MESH_INCLUDES
     include/chord_mesh/mesh_result.h
     include/chord_mesh/message.h
     include/chord_mesh/stream.h
+    include/chord_mesh/stream_buf.h
     include/chord_mesh/stream_acceptor.h
     include/chord_mesh/stream_connector.h
     include/chord_mesh/stream_io.h
@@ -60,6 +61,7 @@ target_sources(chord_mesh PRIVATE
     src/mesh_result.cpp
     src/message.cpp
     src/stream.cpp
+    src/stream_buf.cpp
     src/stream_acceptor.cpp
     src/stream_connector.cpp
     src/stream_io.cpp

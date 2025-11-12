@@ -59,10 +59,12 @@ TEST_F(MessageParser, ParseUnsignedMessage)
     auto bytes = toBytesResult.getResult();
 
     chord_mesh::MessageParser parser;
-
-    auto pushBytesResult = parser.pushBytes(bytes->getSpan());
-    ASSERT_THAT (pushBytesResult, tempo_test::IsResult());
-    auto message = pushBytesResult.getResult();
+    ASSERT_THAT (parser.pushBytes(bytes->getSpan()), tempo_test::IsOk());
+    bool ready;
+    ASSERT_THAT (parser.checkReady(ready), tempo_test::IsOk());
+    ASSERT_TRUE (ready);
+    chord_mesh::Message message;
+    ASSERT_THAT (parser.takeReady(message), tempo_test::IsOk());
 
     ASSERT_EQ (absl::ToUnixSeconds(now), absl::ToUnixSeconds(message.getTimestamp()));
 
@@ -96,10 +98,12 @@ TEST_F(MessageParser, ParseSignedMessage)
 
     chord_mesh::MessageParser parser;
     parser.setCertificate(certificate);
-
-    auto pushBytesResult = parser.pushBytes(bytes->getSpan());
-    ASSERT_THAT (pushBytesResult, tempo_test::IsResult());
-    auto message = pushBytesResult.getResult();
+    ASSERT_THAT (parser.pushBytes(bytes->getSpan()), tempo_test::IsOk());
+    bool ready;
+    ASSERT_THAT (parser.checkReady(ready), tempo_test::IsOk());
+    ASSERT_TRUE (ready);
+    chord_mesh::Message message;
+    ASSERT_THAT (parser.takeReady(message), tempo_test::IsOk());
 
     ASSERT_EQ (absl::ToUnixSeconds(now), absl::ToUnixSeconds(message.getTimestamp()));
 

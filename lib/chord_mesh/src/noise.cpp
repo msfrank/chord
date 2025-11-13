@@ -1,5 +1,5 @@
 
-#include <chord_mesh/handshake.h>
+#include <chord_mesh/noise.h>
 #include <chord_mesh/mesh_result.h>
 #include <chord_mesh/supervisor_node.h>
 #include <tempo_utils/big_endian.h>
@@ -28,14 +28,24 @@ noise_error_to_status(int err)
 
 tempo_utils::Status
 chord_mesh::Handshake::initialize(
-    const NoiseProtocolId *protocolId,
+    std::string_view protocolName,
     int role,
     std::span<const tu_uint8> prologue,
     std::span<const tu_uint8> localPrivateKey,
     std::span<const tu_uint8> remotePublicKey)
 {
     TU_ASSERT (m_handshake == nullptr);
-    auto ret = noise_handshakestate_new_by_id(&m_handshake, protocolId, role);
+
+    NoiseProtocolId protocolId;
+    int ret;
+
+    // lookup the protocol
+    ret = noise_protocol_name_to_id(&protocolId, protocolName.data(), protocolName.size());
+    if (ret != NOISE_ERROR_NONE)
+        return noise_error_to_status(ret);
+
+    // create the handshake
+    ret = noise_handshakestate_new_by_id(&m_handshake, &protocolId, role);
     if (ret != NOISE_ERROR_NONE)
         return noise_error_to_status(ret);
 
@@ -72,27 +82,27 @@ chord_mesh::Handshake::initialize(
 
 tempo_utils::Result<std::shared_ptr<chord_mesh::Handshake>>
 chord_mesh::Handshake::forInitiator(
-    const NoiseProtocolId *protocolId,
+    std::string_view protocolName,
     std::span<const tu_uint8> localPrivateKey,
     std::span<const tu_uint8> remotePublicKey,
     std::span<const tu_uint8> prologue)
 {
     auto initiator = std::shared_ptr<Handshake>(new Handshake());
     TU_RETURN_IF_NOT_OK (initiator->initialize(
-        protocolId, NOISE_ROLE_INITIATOR, prologue, localPrivateKey, remotePublicKey));
+        protocolName, NOISE_ROLE_INITIATOR, prologue, localPrivateKey, remotePublicKey));
     return initiator;
 }
 
 tempo_utils::Result<std::shared_ptr<chord_mesh::Handshake>>
 chord_mesh::Handshake::forResponder(
-    const NoiseProtocolId *protocolId,
+    std::string_view protocolName,
     std::span<const tu_uint8> localPrivateKey,
     std::span<const tu_uint8> remotePublicKey,
     std::span<const tu_uint8> prologue)
 {
     auto initiator = std::shared_ptr<Handshake>(new Handshake());
     TU_RETURN_IF_NOT_OK (initiator->initialize(
-        protocolId, NOISE_ROLE_RESPONDER, prologue, localPrivateKey, remotePublicKey));
+        protocolName, NOISE_ROLE_RESPONDER, prologue, localPrivateKey, remotePublicKey));
     return initiator;
 }
 
@@ -104,14 +114,10 @@ chord_mesh::Handshake::create(
     std::span<const tu_uint8> remotePublicKey,
     std::span<const tu_uint8> prologue)
 {
-    NoiseProtocolId protocolId;
-    auto ret = noise_protocol_name_to_id(&protocolId, protocolName.data(), protocolName.size());
-    if (ret != NOISE_ERROR_NONE)
-        return noise_error_to_status(ret);
     if (initiator) {
-        return forInitiator(&protocolId, localPrivateKey, remotePublicKey, prologue);
+        return forInitiator(protocolName, localPrivateKey, remotePublicKey, prologue);
     }
-    return forResponder(&protocolId, localPrivateKey, remotePublicKey, prologue);
+    return forResponder(protocolName, localPrivateKey, remotePublicKey, prologue);
 }
 
 static tempo_utils::Result<std::shared_ptr<const tempo_utils::ImmutableBytes>>
@@ -448,9 +454,7 @@ chord_mesh::validate_static_key(
     std::shared_ptr<tempo_security::X509Store> store,
     const tempo_security::Digest &digest)
 {
-    if (!store->verifyCertificate(certificate))
-        return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
-            "certificate {} is not valid", certificate->getCommonName());
+    TU_RETURN_IF_NOT_OK (store->verifyCertificate(certificate));
 
     bool verified;
     TU_ASSIGN_OR_RETURN (verified, tempo_security::DigestUtils::verify_signed_message_digest(

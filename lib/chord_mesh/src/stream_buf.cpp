@@ -7,6 +7,12 @@ chord_mesh::StreamBuf::getSpan() const
     return std::span((const tu_uint8 *) buf.base, buf.len);
 }
 
+std::string_view
+chord_mesh::StreamBuf::getStringView() const
+{
+    return std::string_view(buf.base, buf.len);
+}
+
 void
 chord_mesh::free_stream_buf(void *ptr)
 {

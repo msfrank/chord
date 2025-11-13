@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include <chord_mesh/handshake.h>
+#include <chord_mesh/noise.h>
 #include <tempo_security/ed25519_private_key_generator.h>
 #include <tempo_security/generate_utils.h>
 #include <tempo_test/tempo_test.h>

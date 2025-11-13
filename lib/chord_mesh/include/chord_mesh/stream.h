@@ -25,6 +25,7 @@ namespace chord_mesh {
 
     struct StreamOps {
         void (*receive)(const Message &, void *) = nullptr;
+        bool (*negotiate)(std::string_view, std::string_view, void *) = nullptr;
         void (*error)(const tempo_utils::Status &, void *) = nullptr;
         void (*cleanup)(void *) = nullptr;
     };
@@ -38,7 +39,7 @@ namespace chord_mesh {
         StreamState getStreamState() const;
 
         tempo_utils::Status start(const StreamOps &ops, void *data = nullptr);
-        tempo_utils::Status handshake();
+        tempo_utils::Status negotiate(std::string_view protocolName);
         tempo_utils::Status send(std::shared_ptr<const tempo_utils::ImmutableBytes> message);
         void shutdown();
 

@@ -276,10 +276,10 @@ chord_mesh::MessageParser::checkReady(bool &ready)
 
     // get the message version if we have read enough input
     if (m_messageVersion == 0) {
-        if (m_pending->getSize() >= 1) {
-            auto *ptr = m_pending->getData();
-            m_messageVersion = tempo_utils::read_u8_and_advance(ptr);
-        }
+        if (m_pending->getSize() < 2)
+            return {};
+        auto *ptr = m_pending->getData();
+        m_messageVersion = tempo_utils::read_u8_and_advance(ptr);
     }
 
     // validate message version
@@ -294,18 +294,16 @@ chord_mesh::MessageParser::checkReady(bool &ready)
 
     // get the message version and payload size if we have read enough input
     if (m_payloadSize == 0) {
-        if (m_pending->getSize() >= 10) {
-            auto *ptr = m_pending->getData();
-            m_messageVersion = tempo_utils::read_u8_and_advance(ptr);
-            m_messageFlags = tempo_utils::read_u8_and_advance(ptr);
-            m_timestamp = tempo_utils::read_u32_and_advance(ptr);
-            m_payloadSize = tempo_utils::read_u32_and_advance(ptr);
-        }
+        if (m_pending->getSize() < 10)
+            return {};
+        auto *ptr = m_pending->getData() + 1;
+        m_messageFlags = tempo_utils::read_u8_and_advance(ptr);
+        m_timestamp = tempo_utils::read_u32_and_advance(ptr);
+        m_payloadSize = tempo_utils::read_u32_and_advance(ptr);
+        if (m_payloadSize == 0)
+            return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+                "payload size must be greater than 0");
     }
-
-    // we haven't read enough input to get the payload size
-    if (m_payloadSize == 0)
-        return {};
 
     bool verificationRequired = m_messageFlags & kMessageSignedFlag;
 
@@ -322,15 +320,14 @@ chord_mesh::MessageParser::checkReady(bool &ready)
 
         // get the digest size if we have read enough input
         if (m_digestSize == 0) {
-            if (m_pending->getSize() >= 10 + m_payloadSize + 1) {
-                auto *ptr = m_pending->getData() + 10 + m_payloadSize;
-                m_digestSize = tempo_utils::read_u8_and_advance(ptr);
-            }
+            if (m_pending->getSize() < 10 + m_payloadSize + 1)
+                return {};
+            auto *ptr = m_pending->getData() + 10 + m_payloadSize;
+            m_digestSize = tempo_utils::read_u8_and_advance(ptr);
+            if (m_digestSize == 0)
+                return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+                    "digest size must be greater than 0");
         }
-
-        // we haven't read enough input to get the digest size
-        if (m_digestSize == 0)
-            return {};
 
         // we haven't read enough input to parse the digest
         if (m_pending->getSize() < 10 + m_payloadSize + 1 + m_digestSize)
@@ -357,8 +354,10 @@ chord_mesh::MessageParser::takeReady(Message &message)
     auto messageSize = 10 + m_payloadSize + trailerSize;
     auto payloadSize = m_payloadSize;
     auto digestSize = m_digestSize;
+    auto messageVersion = m_messageVersion;
+    auto messageFlags = m_messageFlags;
     auto timestamp = absl::FromUnixSeconds(m_timestamp);
-    bool verificationRequired = m_messageFlags & kMessageSignedFlag;
+    bool verificationRequired = messageFlags & kMessageSignedFlag;
 
     // reset parser state
     reset();
@@ -370,7 +369,7 @@ chord_mesh::MessageParser::takeReady(Message &message)
     }
 
     // construct the message
-    Message message_(m_messageVersion, m_messageFlags, timestamp);
+    Message message_(messageVersion, messageFlags, timestamp);
     auto payloadBytes = pending.slice(10, payloadSize).sliceView();
 
     // verify the signature against the public key

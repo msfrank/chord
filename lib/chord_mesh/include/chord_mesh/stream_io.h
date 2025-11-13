@@ -4,7 +4,7 @@
 #include <tempo_utils/immutable_bytes.h>
 #include <tempo_utils/status.h>
 
-#include "handshake.h"
+#include "noise.h"
 #include "message.h"
 #include "stream_buf.h"
 #include "stream_manager.h"
@@ -52,6 +52,9 @@ namespace chord_mesh {
         tempo_utils::Status check(bool &ready) override;
         tempo_utils::Status take(Message &message) override;
 
+        tempo_utils::Status negotiate(
+            std::shared_ptr<const tempo_utils::ImmutableBytes> bytes,
+            AbstractStreamBufWriter *writer);
         std::shared_ptr<const tempo_utils::ImmutableBytes> takePending();
 
     private:
@@ -61,55 +64,61 @@ namespace chord_mesh {
     class PendingLocalStreamBehavior : public AbstractStreamBehavior {
     public:
         PendingLocalStreamBehavior(
-            std::span<const tu_uint8> pending,
-            std::span<const tu_uint8> remotePublicKey);
+            std::string_view protocolName,
+            std::span<const tu_uint8> remotePublicKey,
+            std::span<const tu_uint8> pending);
         tempo_utils::Status read(const tu_uint8 *data, ssize_t size) override;
         tempo_utils::Status write(AbstractStreamBufWriter *writer, StreamBuf *streamBuf) override;
         tempo_utils::Status check(bool &ready) override;
         tempo_utils::Status take(Message &message) override;
 
+        std::string getRemoteProtocolName() const;
         std::span<const tu_uint8> getRemotePublicKey() const;
+        tempo_utils::Status negotiate(
+            std::shared_ptr<const tempo_utils::ImmutableBytes> bytes,
+            AbstractStreamBufWriter *writer);
 
     private:
-        tempo_utils::BytesAppender m_pending;
+        std::string m_protocolName;
         std::vector<tu_uint8> m_remotePublicKey;
+        tempo_utils::BytesAppender m_pending;
     };
 
     class PendingRemoteStreamBehavior : public AbstractStreamBehavior {
     public:
         PendingRemoteStreamBehavior(
-            std::span<const tu_uint8> pending,
-            std::span<const tu_uint8> localPrivateKey);
+            std::string_view protocolName,
+            std::span<const tu_uint8> localPrivateKey,
+            std::span<const tu_uint8> pending);
         tempo_utils::Status read(const tu_uint8 *data, ssize_t size) override;
         tempo_utils::Status write(AbstractStreamBufWriter *writer, StreamBuf *streamBuf) override;
         tempo_utils::Status check(bool &ready) override;
         tempo_utils::Status take(Message &message) override;
 
+        std::string getLocalProtocolName() const;
         std::span<const tu_uint8> getLocalPrivateKey() const;
 
     private:
-        tempo_utils::BytesAppender m_pending;
+        std::string m_protocolName;
         std::vector<tu_uint8> m_localPrivateKey;
+        tempo_utils::BytesAppender m_pending;
     };
 
     class HandshakingStreamBehavior : public AbstractStreamBehavior {
     public:
-        explicit HandshakingStreamBehavior(
-            std::shared_ptr<Handshake> handshake,
-            AbstractStreamBufWriter *writer);
+        explicit HandshakingStreamBehavior(std::shared_ptr<Handshake> handshake);
         tempo_utils::Status read(const tu_uint8 *data, ssize_t size) override;
         tempo_utils::Status write(AbstractStreamBufWriter *writer, StreamBuf *streamBuf) override;
         tempo_utils::Status check(bool &ready) override;
         tempo_utils::Status take(Message &message) override;
 
-        tempo_utils::Status start();
+        tempo_utils::Status start(AbstractStreamBufWriter *writer);
         tempo_utils::Status process(std::span<const tu_uint8> data, AbstractStreamBufWriter *writer, bool &finished);
         tempo_utils::Result<std::shared_ptr<Cipher>> finish();
         std::shared_ptr<const tempo_utils::ImmutableBytes> takePending();
 
     private:
         std::shared_ptr<Handshake> m_handshake;
-        AbstractStreamBufWriter *m_writer;
         MessageParser m_parser;
     };
 
@@ -137,10 +146,12 @@ namespace chord_mesh {
 
         tempo_utils::Status start();
         tempo_utils::Status negotiateRemote(
-            std::span<const tu_uint8> remotePublicKey,
+            std::string_view protocolName,
             std::string_view pemCertificateString,
+            std::span<const tu_uint8> remotePublicKey,
             const tempo_security::Digest &digest);
         tempo_utils::Status negotiateLocal(
+            std::string_view protocolName,
             std::string_view pemCertificateString,
             const StaticKeypair &localKeypair);
         tempo_utils::Status processHandshake(std::span<const tu_uint8> data, bool &finished);

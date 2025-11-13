@@ -1,5 +1,5 @@
-#ifndef CHORD_MESH_HANDSHAKE_H
-#define CHORD_MESH_HANDSHAKE_H
+#ifndef CHORD_MESH_NOISE_H
+#define CHORD_MESH_NOISE_H
 
 #include <noise/protocol/handshakestate.h>
 #include <noise/protocol/names.h>
@@ -14,6 +14,8 @@
 #include "stream_buf.h"
 
 namespace chord_mesh {
+
+    constexpr const char *kDefaultNoiseProtocol = "Noise_KK_25519_ChaChaPoly_BLAKE2s";
 
     struct StaticKeypair {
         std::vector<tu_uint8> publicKey;
@@ -54,13 +56,13 @@ namespace chord_mesh {
         std::shared_ptr<const tempo_utils::ImmutableBytes> popOutgoing();
 
         static tempo_utils::Result<std::shared_ptr<Handshake>> forInitiator(
-            const NoiseProtocolId *protocolId,
+            std::string_view protocolName,
             std::span<const tu_uint8> localPrivateKey,
             std::span<const tu_uint8> remotePublicKey,
             std::span<const tu_uint8> prologue = {});
 
         static tempo_utils::Result<std::shared_ptr<Handshake>> forResponder(
-            const NoiseProtocolId *protocolId,
+            std::string_view protocolName,
             std::span<const tu_uint8> localPrivateKey,
             std::span<const tu_uint8> remotePublicKey,
             std::span<const tu_uint8> prologue = {});
@@ -79,7 +81,7 @@ namespace chord_mesh {
 
         Handshake();
         tempo_utils::Status initialize(
-            const NoiseProtocolId *protocolId,
+            std::string_view protocolName,
             int role,
             std::span<const tu_uint8> prologue,
             std::span<const tu_uint8> localPrivateKey,
@@ -111,4 +113,4 @@ namespace chord_mesh {
     };
 }
 
-#endif // CHORD_MESH_HANDSHAKE_H
+#endif // CHORD_MESH_NOISE_H

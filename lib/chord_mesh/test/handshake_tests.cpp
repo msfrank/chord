@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include <chord_mesh/handshake.h>
+#include <chord_mesh/noise.h>
 #include <tempo_security/ed25519_private_key_generator.h>
 #include <tempo_security/generate_utils.h>
 #include <tempo_test/tempo_test.h>
@@ -50,7 +50,7 @@ protected:
             1,
             std::chrono::seconds{3600},
             tempdir->getTempdir(),
-            tempo_utils::generate_name("test_ed_key_XXXXXXXX")).orElseThrow();
+            tempo_utils::generate_name("test_stream_key_XXXXXXXX")).orElseThrow();
         TU_ASSERT (streamKeypair.isValid());
 
         std::shared_ptr<tempo_security::PrivateKey> privateKey;

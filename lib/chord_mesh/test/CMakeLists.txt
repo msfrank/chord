@@ -11,6 +11,7 @@ set(TEST_CASES
     message_builder_tests.cpp
     message_parser_tests.cpp
     stream_acceptor_tests.cpp
+    stream_io_tests.cpp
     )
 
 # define test suite driver
@@ -18,6 +19,7 @@ set(TEST_CASES
 add_executable(chord_mesh_testsuite
     ${TEST_CASES}
     base_mesh_fixture.cpp base_mesh_fixture.h
+    test_mocks.h
     )
 target_link_libraries(chord_mesh_testsuite PUBLIC
     chord::chord_mesh
@@ -31,6 +33,7 @@ gtest_discover_tests(chord_mesh_testsuite)
 add_library(ChordMeshTestSuite OBJECT
     ${TEST_CASES}
     base_mesh_fixture.cpp base_mesh_fixture.h
+    test_mocks.h
     )
 target_link_libraries(ChordMeshTestSuite PUBLIC
     chord::chord_mesh

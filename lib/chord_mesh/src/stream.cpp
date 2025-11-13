@@ -10,7 +10,7 @@
 #include <chord_mesh/stream_io.h>
 #include <tempo_utils/big_endian.h>
 
-#include "chord_mesh/handshake.h"
+#include "chord_mesh/noise.h"
 
 chord_mesh::Stream::Stream(StreamHandle *handle, bool initiator)
     : m_handle(handle),
@@ -100,7 +100,7 @@ chord_mesh::Stream::start(const StreamOps &ops, void *data)
 }
 
 tempo_utils::Status
-chord_mesh::Stream::handshake()
+chord_mesh::Stream::negotiate(std::string_view protocolName)
 {
     if (m_state != StreamState::Active)
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
@@ -119,7 +119,7 @@ chord_mesh::Stream::handshake()
     TU_RETURN_IF_NOT_OK (generate_static_key(privateKey, localKeypair));
 
     // perform the local handshake
-    TU_RETURN_IF_NOT_OK (m_io->negotiateLocal(certificate->toString(), localKeypair));
+    TU_RETURN_IF_NOT_OK (m_io->negotiateLocal(protocolName, certificate->toString(), localKeypair));
 
     return {};
 }
@@ -203,7 +203,9 @@ chord_mesh::Stream::processReadyMessages()
                 break;
             default:
                 // invoke the receive callback any other message
-                m_ops.receive(message, m_data);
+                if (m_ops.receive != nullptr) {
+                    m_ops.receive(message, m_data);
+                }
                 break;
         }
     }
@@ -225,18 +227,28 @@ chord_mesh::Stream::processStreamMessage(const Message &message)
 
         case generated::StreamMessage::Message::STREAM_NEGOTIATE: {
             auto streamNegotiate = root.getMessage().getStreamNegotiate();
+            auto protocolString = streamNegotiate.getProtocol().asString();;
             auto publicKeyBytes = streamNegotiate.getPublicKey().asBytes();
             auto certificateString = streamNegotiate.getCertificate().asString();;
             auto digestBytes = streamNegotiate.getDigest().asBytes();
 
+            std::string_view protocolName(protocolString.cStr());
             std::span publicKey(publicKeyBytes.begin(), publicKeyBytes.end());
             std::string_view certificate(certificateString.cStr());
             tempo_security::Digest digest(std::span(digestBytes.begin(), digestBytes.end()));
 
-            auto status = m_io->negotiateRemote(publicKey, certificate, digest);
+            if (m_ops.negotiate != nullptr) {
+                if (!m_ops.negotiate(protocolName, certificate, m_data)) {
+                    emitError(MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+                        "negotiation failure"));
+                }
+            }
+
+            auto status = m_io->negotiateRemote(protocolString.cStr(), certificate, publicKey, digest);
             if (status.notOk()) {
                 emitError(status);
             }
+
             break;
         }
 
@@ -256,9 +268,8 @@ chord_mesh::Stream::processStreamMessage(const Message &message)
         case generated::StreamMessage::Message::STREAM_ERROR: {
             auto streamError = root.getMessage().getStreamError();
             auto errorMessage = streamError.getMessage().asString();
-            auto status = MeshStatus::forCondition(MeshCondition::kMeshInvariant,
-                errorMessage.cStr());
-            emitError(status);
+            emitError(MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+                errorMessage.cStr()));
             break;
         }
 

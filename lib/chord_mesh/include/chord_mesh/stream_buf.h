@@ -13,6 +13,7 @@ namespace chord_mesh {
         void (*free)(StreamBuf *);
 
         std::span<const tu_uint8> getSpan() const;
+        std::string_view getStringView() const;
     };
 
     class AbstractStreamBufWriter {

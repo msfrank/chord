@@ -90,8 +90,8 @@ TEST_F(InsecureStream, ReadAndWriteStream)
         chord_mesh::StreamConnector *connector;
         std::shared_ptr<chord_mesh::Stream> acceptorStream;
         std::shared_ptr<chord_mesh::Stream> connectorStream;
-        std::queue<chord_mesh::Message> acceptorReceived;
-        std::queue<chord_mesh::Message> connectorReceived;
+        std::vector<chord_mesh::Message> acceptorReceived;
+        std::vector<chord_mesh::Message> connectorReceived;
         absl::Notification notifyComplete;
     } data;
 
@@ -100,9 +100,10 @@ TEST_F(InsecureStream, ReadAndWriteStream)
         chord_mesh::StreamOps streamOps;
         streamOps.receive = [](const chord_mesh::Message &message, void *ptr) {
             auto *data = (Data *) ptr;
-            data->acceptorReceived.push(message);
+            data->acceptorReceived.push_back(message);
             auto &stream = data->acceptorStream;
-            TU_RAISE_IF_NOT_OK (stream->send(tempo_utils::MemoryBytes::copy("pong!")));
+            TU_RAISE_IF_NOT_OK (stream->send(
+                chord_mesh::MessageVersion::Version1, tempo_utils::MemoryBytes::copy("pong!")));
         };
         TU_RAISE_IF_NOT_OK (stream->start(streamOps, ptr));
         auto *data = (Data *) ptr;
@@ -116,17 +117,19 @@ TEST_F(InsecureStream, ReadAndWriteStream)
         chord_mesh::StreamOps streamOps;
         streamOps.receive = [](const chord_mesh::Message &message, void *ptr) {
             auto *data = (Data *) ptr;
-            data->connectorReceived.push(message);
+            data->connectorReceived.push_back(message);
             auto &stream = data->connectorStream;
             if (data->connectorReceived.size() < data->numRounds) {
-                TU_RAISE_IF_NOT_OK (stream->send(tempo_utils::MemoryBytes::copy("ping!")));
+                TU_RAISE_IF_NOT_OK (stream->send(
+                    chord_mesh::MessageVersion::Version1, tempo_utils::MemoryBytes::copy("ping!")));
             } else {
                 stream->shutdown();
                 data->notifyComplete.Notify();
             }
         };
         TU_RAISE_IF_NOT_OK (stream->start(streamOps, ptr));
-        TU_RAISE_IF_NOT_OK (stream->send(tempo_utils::MemoryBytes::copy("ping!")));
+        TU_RAISE_IF_NOT_OK (stream->send(
+            chord_mesh::MessageVersion::Version1, tempo_utils::MemoryBytes::copy("ping!")));
         auto *data = (Data *) ptr;
         data->connectorStream = std::move(stream);
     };
@@ -153,4 +156,14 @@ TEST_F(InsecureStream, ReadAndWriteStream)
 
     ASSERT_THAT (stopUVThread(), tempo_test::IsOk()) << "failed to stop UV thread";
     acceptor->shutdown();
+
+    ASSERT_EQ (data.numRounds, data.acceptorReceived.size());
+    for (const auto &message : data.acceptorReceived) {
+        ASSERT_EQ ("ping!", message.getPayload()->getStringView());
+    }
+
+    ASSERT_EQ (data.numRounds, data.connectorReceived.size());
+    for (const auto &message : data.connectorReceived) {
+        ASSERT_EQ ("pong!", message.getPayload()->getStringView());
+    }
 }

@@ -40,7 +40,10 @@ namespace chord_mesh {
 
         tempo_utils::Status start(const StreamOps &ops, void *data = nullptr);
         tempo_utils::Status negotiate(std::string_view protocolName);
-        tempo_utils::Status send(std::shared_ptr<const tempo_utils::ImmutableBytes> message);
+        tempo_utils::Status send(
+            MessageVersion version,
+            std::shared_ptr<const tempo_utils::ImmutableBytes> payload,
+            absl::Time timestamp = {});
         void shutdown();
 
         tempo_utils::Status write(StreamBuf *buf) override;

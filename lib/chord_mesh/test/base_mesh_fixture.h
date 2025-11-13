@@ -4,6 +4,7 @@
 #include <uv.h>
 #include <gtest/gtest.h>
 
+#include <chord_mesh/message.h>
 #include <tempo_utils/status.h>
 
 class BaseMeshFixture : public ::testing::Test {
@@ -19,5 +20,7 @@ private:
     uv_async_t m_async;
     std::unique_ptr<uv_thread_t> m_tid;
 };
+
+chord_mesh::Message parse_raw_message(std::span<const tu_uint8> raw);
 
 #endif // CHORD_MESH_BASE_MESH_FIXTURE_H

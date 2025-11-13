@@ -163,14 +163,21 @@ chord_mesh::Stream::write(StreamBuf *streamBuf)
 }
 
 tempo_utils::Status
-chord_mesh::Stream::send(std::shared_ptr<const tempo_utils::ImmutableBytes> message)
+chord_mesh::Stream::send(
+    MessageVersion version,
+    std::shared_ptr<const tempo_utils::ImmutableBytes> payload,
+    absl::Time timestamp)
 {
-    TU_ASSERT (message != nullptr);
     if (m_state == StreamState::Closed)
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
             "stream is closed");
-    TU_RETURN_IF_NOT_OK (m_io->write(message));
-    return {};
+    MessageBuilder builder;
+    builder.setVersion(version);
+    builder.setPayload(payload);
+    builder.setTimestamp(timestamp);
+    std::shared_ptr<const tempo_utils::ImmutableBytes> message;
+    TU_ASSIGN_OR_RETURN (message, builder.toBytes());
+    return m_io->write(message);
 }
 
 void

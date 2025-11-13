@@ -40,3 +40,15 @@ BaseMeshFixture::stopUVThread()
     m_tid.reset();
     return {};
 }
+
+chord_mesh::Message
+parse_raw_message(std::span<const tu_uint8> raw)
+{
+    chord_mesh::MessageParser parser;
+    parser.pushBytes(raw);
+    bool ready;
+    TU_RAISE_IF_NOT_OK (parser.checkReady(ready));
+    chord_mesh::Message message;
+    TU_RAISE_IF_NOT_OK (parser.takeReady(message));
+    return message;
+}

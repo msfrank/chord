@@ -112,7 +112,7 @@ chord_mesh::on_supervisor_connector_connect(std::shared_ptr<Stream> stream, void
     auto payload = tempo_utils::MemoryBytes::copy(
         std::span(arrayPtr.begin(), arrayPtr.end()));
 
-    stream->send(payload);
+    TU_RAISE_IF_NOT_OK (stream->send(MessageVersion::Version1, payload));
 }
 
 void
@@ -163,7 +163,7 @@ chord_mesh::on_supervisor_acceptor_accept(std::shared_ptr<Stream> stream, void *
     auto payload = tempo_utils::MemoryBytes::copy(
         std::span(arrayPtr.begin(), arrayPtr.end()));
 
-    stream->send(payload);
+    TU_RAISE_IF_NOT_OK (stream->send(MessageVersion::Version1, payload));
 }
 
 void

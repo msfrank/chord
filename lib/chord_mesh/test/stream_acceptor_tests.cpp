@@ -158,7 +158,7 @@ TEST_F(StreamAcceptor, ReadAndWaitForUnixAcceptorClose)
     acceptorOps.accept = [](std::shared_ptr<chord_mesh::Stream> stream, void *ptr) {
         chord_mesh::StreamOps streamOps;
         stream->start(streamOps, ptr);
-        stream->send(tempo_utils::MemoryBytes::copy("hello, world!"));
+        stream->send(chord_mesh::MessageVersion::Version1, tempo_utils::MemoryBytes::copy("hello, world!"));
         stream->shutdown();
         auto *data = (Data *) ptr;
         data->stream = std::move(stream);
@@ -179,11 +179,12 @@ TEST_F(StreamAcceptor, ReadAndWaitForUnixAcceptorClose)
     auto ret = connect(fd, (sockaddr *) &addr, sizeof(addr));
     ASSERT_EQ (0, ret) << "connect() error: " << strerror(errno);
 
-    char buffer[128];
+    tu_uint8 buffer[128];
     memset(buffer, 0, sizeof(buffer));
     ret = read(fd, buffer, 127);
     ASSERT_LE (0, ret) << "read() error: " << strerror(errno);
-    ASSERT_EQ ("hello, world!", std::string_view(buffer));
+    auto message = parse_raw_message(std::span(buffer, ret));
+    ASSERT_EQ ("hello, world!", message.getPayload()->getStringView());
     ret = read(fd, buffer, 127);
     ASSERT_EQ (0, ret) << "expected EOF but read returned " << ret;
 
@@ -289,7 +290,7 @@ TEST_F(StreamAcceptor, ReadAndWaitForTcp4AcceptorClose)
     acceptorOps.accept = [](std::shared_ptr<chord_mesh::Stream> stream, void *ptr) {
         chord_mesh::StreamOps streamOps;
         stream->start(streamOps, ptr);
-        stream->send(tempo_utils::MemoryBytes::copy("hello, world!"));
+        stream->send(chord_mesh::MessageVersion::Version1, tempo_utils::MemoryBytes::copy("hello, world!"));
         stream->shutdown();
         auto *data = (Data *) ptr;
         data->stream = std::move(stream);
@@ -309,11 +310,12 @@ TEST_F(StreamAcceptor, ReadAndWaitForTcp4AcceptorClose)
     auto ret = connect(fd, (sockaddr *) &addr, sizeof(addr));
     ASSERT_EQ (0, ret) << "connect() error: " << strerror(errno);
 
-    char buffer[128];
+    tu_uint8 buffer[128];
     memset(buffer, 0, sizeof(buffer));
     ret = read(fd, buffer, 127);
     ASSERT_LE (0, ret) << "read() error: " << strerror(errno);
-    ASSERT_EQ ("hello, world!", std::string_view(buffer));
+    auto message = parse_raw_message(std::span(buffer, ret));
+    ASSERT_EQ ("hello, world!", message.getPayload()->getStringView());
     ret = read(fd, buffer, 127);
     ASSERT_EQ (0, ret) << "expected EOF but read returned " << ret;
 

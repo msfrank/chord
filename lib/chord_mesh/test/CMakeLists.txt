@@ -8,9 +8,11 @@ include(GoogleTest)
 set(TEST_CASES
     cipher_tests.cpp
     handshake_tests.cpp
+    insecure_stream_tests.cpp
     message_builder_tests.cpp
     message_parser_tests.cpp
     stream_acceptor_tests.cpp
+    stream_connector_tests.cpp
     stream_io_tests.cpp
     )
 

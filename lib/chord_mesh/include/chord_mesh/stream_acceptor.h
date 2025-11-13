@@ -1,14 +1,12 @@
 #ifndef CHORD_MESH_STREAM_ACCEPTOR_H
 #define CHORD_MESH_STREAM_ACCEPTOR_H
 
-#include <queue>
-
 #include <uv.h>
 
+#include <chord_common/transport_location.h>
 #include <tempo_utils/result.h>
 
 #include "stream.h"
-#include "chord_common/transport_location.h"
 
 namespace chord_mesh {
 
@@ -32,6 +30,10 @@ namespace chord_mesh {
             std::string_view pipePath,
             int pipeFlags,
             StreamManager *manager);
+        static tempo_utils::Result<std::shared_ptr<StreamAcceptor>> forTcp4(
+            std::string_view ipAddress,
+            tu_uint16 tcpPort,
+            StreamManager *manager);
         static tempo_utils::Result<std::shared_ptr<StreamAcceptor>> forLocation(
             const chord_common::TransportLocation &endpoint,
             StreamManager *manager);
@@ -51,7 +53,8 @@ namespace chord_mesh {
         explicit StreamAcceptor(StreamHandle *handle);
         void emitError(const tempo_utils::Status &status);
 
-        friend void new_listener_connection(uv_stream_t *server, int status);
+        friend void new_unix_listener(uv_stream_t *server, int status);
+        friend void new_tcp4_listener(uv_stream_t *server, int status);
     };
 }
 

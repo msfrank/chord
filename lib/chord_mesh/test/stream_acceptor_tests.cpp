@@ -35,7 +35,7 @@ protected:
             tempo_security::DigestId::None,
             "test_O",
             "test_OU",
-            "edKeyPair",
+            "caKeyPair",
             1,
             std::chrono::seconds{3600},
             1,
@@ -49,11 +49,11 @@ protected:
             tempo_security::DigestId::None,
             "test_O",
             "test_OU",
-            "edKeyPair",
+            "streamKeyPair",
             1,
             std::chrono::seconds{3600},
             tempdir->getTempdir(),
-            tempo_utils::generate_name("test_ed_key_XXXXXXXX")).orElseThrow();
+            tempo_utils::generate_name("test_stream_key_XXXXXXXX")).orElseThrow();
         TU_ASSERT (streamKeypair.isValid());
 
         tempo_security::X509StoreOptions options;
@@ -66,7 +66,7 @@ protected:
     }
 };
 
-TEST_F(StreamAcceptor, CreateAcceptor)
+TEST_F(StreamAcceptor, CreateUnixAcceptor)
 {
     auto testerDirectory = tempdir->getTempdir();
     auto socketPath = testerDirectory / "test.sock";
@@ -84,13 +84,13 @@ TEST_F(StreamAcceptor, CreateAcceptor)
     ASSERT_THAT (startUVThread(), tempo_test::IsOk());
 
     uv_sleep(500);
-    ASSERT_TRUE (std::filesystem::is_socket(socketPath));
+    ASSERT_EQ (chord_mesh::AcceptorState::Active, acceptor->getAcceptorState());
 
     stopUVThread();
     acceptor->shutdown();
 }
 
-TEST_F(StreamAcceptor, ConnectToAcceptor)
+TEST_F(StreamAcceptor, ConnectToUnixAcceptor)
 {
     auto testerDirectory = tempdir->getTempdir();
     auto socketPath = testerDirectory / "test.sock";
@@ -137,7 +137,7 @@ TEST_F(StreamAcceptor, ConnectToAcceptor)
     ASSERT_EQ (0, close(fd)) << "close() error: " << strerror(errno);
 }
 
-TEST_F(StreamAcceptor, ReadAndWaitForServerClose)
+TEST_F(StreamAcceptor, ReadAndWaitForUnixAcceptorClose)
 {
     auto testerDirectory = tempdir->getTempdir();
     auto socketPath = testerDirectory / "test.sock";
@@ -185,7 +185,137 @@ TEST_F(StreamAcceptor, ReadAndWaitForServerClose)
     ASSERT_LE (0, ret) << "read() error: " << strerror(errno);
     ASSERT_EQ ("hello, world!", std::string_view(buffer));
     ret = read(fd, buffer, 127);
-    ASSERT_EQ (0, ret) << "expected EOF";
+    ASSERT_EQ (0, ret) << "expected EOF but read returned " << ret;
+
+    ASSERT_THAT (stopUVThread(), tempo_test::IsOk()) << "failed to stop UV thread";
+    acceptor->shutdown();
+
+    ASSERT_TRUE (data.stream != nullptr) << "expected server stream";
+
+    ASSERT_EQ (0, close(fd)) << "close() error: " << strerror(errno);
+}
+
+TEST_F(StreamAcceptor, CreateTcp4Acceptor)
+{
+    auto testerDirectory = tempdir->getTempdir();
+    std::string ipAddress = "127.0.0.1";
+    tu_uint16 tcpPort = (random() % 5000) + 25000;
+
+    auto *loop = getUVLoop();
+
+    chord_mesh::StreamManagerOps managerOps;
+    chord_mesh::StreamManager manager(loop, streamKeypair, trustStore, managerOps);
+    auto createAcceptorResult = chord_mesh::StreamAcceptor::forTcp4(ipAddress, tcpPort, &manager);
+    ASSERT_THAT (createAcceptorResult, tempo_test::IsResult());
+    auto acceptor = createAcceptorResult.getResult();
+
+    chord_mesh::StreamAcceptorOps acceptorOps;
+    ASSERT_THAT (acceptor->listen(acceptorOps), tempo_test::IsOk());
+    ASSERT_THAT (startUVThread(), tempo_test::IsOk());
+
+    uv_sleep(500);
+    ASSERT_EQ (chord_mesh::AcceptorState::Active, acceptor->getAcceptorState());
+
+    stopUVThread();
+    acceptor->shutdown();
+}
+
+TEST_F(StreamAcceptor, ConnectToTcp4Acceptor)
+{
+    auto testerDirectory = tempdir->getTempdir();
+    std::string ipAddress = "127.0.0.1";
+    tu_uint16 tcpPort = (random() % 5000) + 25000;
+
+    auto *loop = getUVLoop();
+
+    chord_mesh::StreamManagerOps managerOps;
+    chord_mesh::StreamManager manager(loop, streamKeypair, trustStore, managerOps);
+    auto createAcceptorResult = chord_mesh::StreamAcceptor::forTcp4(ipAddress, tcpPort, &manager);
+    ASSERT_THAT (createAcceptorResult, tempo_test::IsResult()) << "failed to create acceptor";
+    auto acceptor = createAcceptorResult.getResult();
+
+    struct Data {
+        std::shared_ptr<chord_mesh::Stream> stream;
+    } data;
+
+    chord_mesh::StreamAcceptorOps acceptorOps;
+    acceptorOps.accept = [](std::shared_ptr<chord_mesh::Stream> stream, void *ptr) {
+        auto *data = (Data *) ptr;
+        data->stream = std::move(stream);
+    };
+    ASSERT_THAT (acceptor->listen(acceptorOps, &data), tempo_test::IsOk()) << "acceptor listen error";
+
+    ASSERT_THAT (startUVThread(), tempo_test::IsOk()) << "failed to start UV thread";
+    uv_sleep(500);
+
+    sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    uv_ip4_addr(ipAddress.c_str(), tcpPort, &addr);
+
+    auto fd = socket(AF_INET, SOCK_STREAM, 0);
+    ASSERT_LE (0, fd) << "socket() error: " << strerror(errno);
+    auto ret = connect(fd, (sockaddr *) &addr, sizeof(addr));
+    ASSERT_EQ (0, ret) << "connect() error: " << strerror(errno);
+    uv_sleep(250);
+
+    ASSERT_THAT (stopUVThread(), tempo_test::IsOk()) << "failed to stop UV thread";
+    acceptor->shutdown();
+
+    ASSERT_TRUE (data.stream != nullptr) << "expected server stream";
+    data.stream->shutdown();
+
+    ASSERT_EQ (0, close(fd)) << "close() error: " << strerror(errno);
+}
+
+TEST_F(StreamAcceptor, ReadAndWaitForTcp4AcceptorClose)
+{
+    auto testerDirectory = tempdir->getTempdir();
+    std::string ipAddress = "127.0.0.1";
+    tu_uint16 tcpPort = (random() % 5000) + 25000;
+
+    auto *loop = getUVLoop();
+
+    chord_mesh::StreamManagerOps managerOps;
+    chord_mesh::StreamManager manager(loop, streamKeypair, trustStore, managerOps);
+    auto createAcceptorResult = chord_mesh::StreamAcceptor::forTcp4(ipAddress.c_str(), tcpPort, &manager);
+    ASSERT_THAT (createAcceptorResult, tempo_test::IsResult()) << "failed to create acceptor";
+    auto acceptor = createAcceptorResult.getResult();
+
+    struct Data {
+        std::shared_ptr<chord_mesh::Stream> stream;
+    } data;
+
+    chord_mesh::StreamAcceptorOps acceptorOps;
+    acceptorOps.accept = [](std::shared_ptr<chord_mesh::Stream> stream, void *ptr) {
+        chord_mesh::StreamOps streamOps;
+        stream->start(streamOps, ptr);
+        stream->send(tempo_utils::MemoryBytes::copy("hello, world!"));
+        stream->shutdown();
+        auto *data = (Data *) ptr;
+        data->stream = std::move(stream);
+    };
+
+    ASSERT_THAT (acceptor->listen(acceptorOps, &data), tempo_test::IsOk()) << "acceptor listen error";
+
+    ASSERT_THAT (startUVThread(), tempo_test::IsOk()) << "failed to start UV thread";
+    uv_sleep(500);
+
+    sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    uv_ip4_addr(ipAddress.c_str(), tcpPort, &addr);
+
+    auto fd = socket(AF_INET, SOCK_STREAM, 0);
+    ASSERT_LE (0, fd) << "socket() error: " << strerror(errno);
+    auto ret = connect(fd, (sockaddr *) &addr, sizeof(addr));
+    ASSERT_EQ (0, ret) << "connect() error: " << strerror(errno);
+
+    char buffer[128];
+    memset(buffer, 0, sizeof(buffer));
+    ret = read(fd, buffer, 127);
+    ASSERT_LE (0, ret) << "read() error: " << strerror(errno);
+    ASSERT_EQ ("hello, world!", std::string_view(buffer));
+    ret = read(fd, buffer, 127);
+    ASSERT_EQ (0, ret) << "expected EOF but read returned " << ret;
 
     ASSERT_THAT (stopUVThread(), tempo_test::IsOk()) << "failed to stop UV thread";
     acceptor->shutdown();

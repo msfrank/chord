@@ -24,11 +24,12 @@ chord_mesh::StreamAcceptor::forUnix(
      StreamManager *manager)
 {
     auto *loop = manager->getLoop();
+    int ret;
 
     auto *pipe = (uv_pipe_t *) std::malloc(sizeof(uv_pipe_t));
     memset(pipe, 0, sizeof(uv_pipe_t));
 
-    auto ret = uv_pipe_init(loop, pipe, false);
+    ret = uv_pipe_init(loop, pipe, false);
     if (ret != 0) {
         std::free(pipe);
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
@@ -43,6 +44,48 @@ chord_mesh::StreamAcceptor::forUnix(
     }
 
     auto *stream = (uv_stream_t *) pipe;
+    auto *handle = manager->allocateHandle(stream);
+    auto listener = std::shared_ptr<StreamAcceptor>(new StreamAcceptor(handle));
+    handle->data = listener.get();
+
+    return listener;
+}
+
+tempo_utils::Result<std::shared_ptr<chord_mesh::StreamAcceptor>>
+chord_mesh::StreamAcceptor::forTcp4(
+     std::string_view ipAddress,
+     tu_uint16 tcpPort,
+     StreamManager *manager)
+{
+    auto *loop = manager->getLoop();
+    int ret;
+
+    std::string addressString(ipAddress);
+    sockaddr_in addr;
+    memset(&addr, 0, sizeof(sockaddr_in));
+    ret = uv_ip4_addr(addressString.c_str(), tcpPort, &addr);
+    if (ret != 0)
+        return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+            "invalid ipv4 address: {}", uv_strerror(ret));
+
+    auto *tcp = (uv_tcp_t *) std::malloc(sizeof(uv_tcp_t));
+    memset(tcp, 0, sizeof(uv_tcp_t));
+
+    ret = uv_tcp_init(loop, tcp);
+    if (ret != 0) {
+        std::free(tcp);
+        return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+            "uv_tcp_init failed: {}", uv_strerror(ret));
+    }
+
+    ret = uv_tcp_bind(tcp, (const sockaddr *) &addr, 0);
+    if (ret != 0) {
+        std::free(tcp);
+        return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+            "uv_tcp_bind failed: {}", uv_strerror(ret));
+    }
+
+    auto *stream = (uv_stream_t *) tcp;
     auto *handle = manager->allocateHandle(stream);
     auto listener = std::shared_ptr<StreamAcceptor>(new StreamAcceptor(handle));
     handle->data = listener.get();
@@ -71,7 +114,7 @@ chord_mesh::StreamAcceptor::getAcceptorState() const
 }
 
 void
-chord_mesh::new_listener_connection(uv_stream_t *server, int err)
+chord_mesh::new_unix_listener(uv_stream_t *server, int err)
 {
     auto *handle = (StreamHandle *) server->data;
     auto *acceptor = (StreamAcceptor *) handle->data;
@@ -115,6 +158,51 @@ chord_mesh::new_listener_connection(uv_stream_t *server, int err)
     ops.accept(stream, acceptor->m_data);
 }
 
+void
+chord_mesh::new_tcp4_listener(uv_stream_t *server, int err)
+{
+    auto *handle = (StreamHandle *) server->data;
+    auto *acceptor = (StreamAcceptor *) handle->data;
+
+    if (err < 0) {
+        acceptor->emitError(
+            MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+                "failed to accept connection: {}", uv_strerror(err)));
+        return;
+    }
+
+    int ret;
+
+    auto *tcp = (uv_tcp_t *) std::malloc(sizeof(uv_tcp_t));
+    memset(tcp, 0, sizeof(uv_tcp_t));
+
+    ret = uv_tcp_init(server->loop, tcp);
+    if (ret != 0) {
+        std::free(tcp);
+        acceptor->emitError(
+            MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+                "uv_tcp_init error: {}", uv_strerror(err)));
+        return;
+    }
+
+    auto *client = (uv_stream_t *) tcp;
+
+    ret = uv_accept(server, client);
+    if (ret != 0) {
+        std::free(tcp);
+        acceptor->emitError(
+            MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+                "uv_accept error: {}", uv_strerror(err)));
+        return;
+    }
+
+    auto *manager = handle->manager;
+    auto &ops = acceptor->m_ops;
+
+    auto stream = std::make_shared<Stream>(manager->allocateHandle(client), /* initiator= */ false);
+    ops.accept(stream, acceptor->m_data);
+}
+
 tempo_utils::Status
 chord_mesh::StreamAcceptor::listen(const StreamAcceptorOps &ops, void *data)
 {
@@ -122,7 +210,20 @@ chord_mesh::StreamAcceptor::listen(const StreamAcceptorOps &ops, void *data)
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
             "invalid acceptor state");
 
-    auto ret = uv_listen(m_handle->stream, 64, new_listener_connection);
+    int ret;
+
+    switch (m_handle->stream->type) {
+        case UV_NAMED_PIPE:
+            ret = uv_listen(m_handle->stream, 64, new_unix_listener);
+            break;
+        case UV_TCP:
+            ret = uv_listen(m_handle->stream, 64, new_tcp4_listener);
+            break;
+        default:
+            return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+                "invalid handle type for stream acceptor");
+    }
+
     if (ret != 0)
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
             "uv_listen error: {}", uv_strerror(ret));

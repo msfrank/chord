@@ -25,6 +25,7 @@ namespace chord_mesh {
         virtual ~StreamConnector();
 
         tempo_utils::Status connectUnix(std::string_view pipePath, int pipeFlags, void *data = nullptr);
+        tempo_utils::Status connectTcp4(std::string_view ipAddress, tu_uint16 tcpPort, void *data = nullptr);
         tempo_utils::Status connectLocation(const chord_common::TransportLocation &endpoint, void *data = nullptr);
 
     private:
@@ -35,6 +36,7 @@ namespace chord_mesh {
         void emitError(const tempo_utils::Status &status);
 
         friend void new_unix_connection(uv_connect_t *req, int err);
+        friend void new_tcp4_connection(uv_connect_t *req, int err);
     };
 }
 

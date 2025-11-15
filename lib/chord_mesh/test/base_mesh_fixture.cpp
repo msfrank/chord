@@ -8,6 +8,10 @@ void stop_loop(uv_async_t *async)
 
 void BaseMeshFixture::SetUp()
 {
+    tempo_utils::LoggingConfiguration loggingConfig;
+    loggingConfig.severityFilter = tempo_utils::SeverityFilter::kVerbose;
+    tempo_utils::init_logging(loggingConfig);
+
     uv_loop_init(&m_loop);
     uv_async_init(&m_loop, &m_async, stop_loop);
 }

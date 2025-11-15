@@ -3,10 +3,13 @@
 
 #include "chord_mesh/mesh_result.h"
 
-chord_mesh::StreamConnector::StreamConnector(StreamManager *manager, const StreamConnectorOps &ops, void *data)
+chord_mesh::StreamConnector::StreamConnector(
+    StreamManager *manager,
+    const StreamConnectorOps &ops,
+    const StreamConnectorOptions &options)
     : m_manager(manager),
       m_ops(ops),
-      m_data(data)
+      m_options(options)
 {
     TU_ASSERT (m_manager != nullptr);
 }
@@ -28,6 +31,7 @@ chord_mesh::new_unix_connection(uv_connect_t *req, int err)
     auto *pipe = req->handle;
     auto *connector = connect->connector;
     auto &ops = connector->m_ops;
+    auto &options = connector->m_options;
 
     if (err < 0) {
         connector->emitError(
@@ -40,8 +44,8 @@ chord_mesh::new_unix_connection(uv_connect_t *req, int err)
 
     auto *manager = connect->connector->m_manager;
     auto *handle = manager->allocateHandle(pipe);
-    auto stream = std::make_shared<Stream>(handle, /* initiator= */ true);
-    auto *data = connect->data? connect->data : connect->connector->m_data;
+    auto stream = std::make_shared<Stream>(handle, /* initiator= */ true, !options.startInsecure);
+    auto *data = connect->data? connect->data : options.data;
 
     ops.connect(stream, data);
 }
@@ -93,6 +97,7 @@ chord_mesh::new_tcp4_connection(uv_connect_t *req, int err)
     auto *tcp = req->handle;
     auto *connector = connect->connector;
     auto &ops = connector->m_ops;
+    auto &options = connector->m_options;
 
     if (err < 0) {
         connector->emitError(
@@ -105,8 +110,8 @@ chord_mesh::new_tcp4_connection(uv_connect_t *req, int err)
 
     auto *manager = connect->connector->m_manager;
     auto *handle = manager->allocateHandle(tcp);
-    auto stream = std::make_shared<Stream>(handle, /* initiator= */ true);
-    auto *data = connect->data? connect->data : connect->connector->m_data;
+    auto stream = std::make_shared<Stream>(handle, /* initiator= */ true, !options.startInsecure);
+    auto *data = connect->data? connect->data : options.data;
 
     ops.connect(stream, data);
 }
@@ -168,6 +173,6 @@ void
 chord_mesh::StreamConnector::emitError(const tempo_utils::Status &status)
 {
     if (m_ops.error != nullptr) {
-        m_ops.error(status, m_data);
+        m_ops.error(status, m_options.data);
     }
 }

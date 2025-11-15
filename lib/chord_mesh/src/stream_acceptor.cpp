@@ -5,8 +5,7 @@
 
 chord_mesh::StreamAcceptor::StreamAcceptor(StreamHandle *handle)
     : m_handle(handle),
-      m_state(AcceptorState::Initial),
-      m_data(nullptr)
+      m_state(AcceptorState::Initial)
 {
     TU_ASSERT (m_handle != nullptr);
     m_handle->data = this;
@@ -153,9 +152,10 @@ chord_mesh::new_unix_listener(uv_stream_t *server, int err)
 
     auto *manager = handle->manager;
     auto &ops = acceptor->m_ops;
+    auto &options = acceptor->m_options;
 
-    auto stream = std::make_shared<Stream>(manager->allocateHandle(client), /* initiator= */ false);
-    ops.accept(stream, acceptor->m_data);
+    auto stream = std::make_shared<Stream>(manager->allocateHandle(client), /* initiator= */ false, !options.allowInsecure);
+    ops.accept(stream, acceptor->m_options.data);
 }
 
 void
@@ -198,13 +198,14 @@ chord_mesh::new_tcp4_listener(uv_stream_t *server, int err)
 
     auto *manager = handle->manager;
     auto &ops = acceptor->m_ops;
+    auto &options = acceptor->m_options;
 
-    auto stream = std::make_shared<Stream>(manager->allocateHandle(client), /* initiator= */ false);
-    ops.accept(stream, acceptor->m_data);
+    auto stream = std::make_shared<Stream>(manager->allocateHandle(client), /* initiator= */ false, !options.allowInsecure);
+    ops.accept(stream, acceptor->m_options.data);
 }
 
 tempo_utils::Status
-chord_mesh::StreamAcceptor::listen(const StreamAcceptorOps &ops, void *data)
+chord_mesh::StreamAcceptor::listen(const StreamAcceptorOps &ops, const StreamAcceptorOptions &options)
 {
     if (m_state != AcceptorState::Initial)
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
@@ -230,7 +231,7 @@ chord_mesh::StreamAcceptor::listen(const StreamAcceptorOps &ops, void *data)
 
     m_state = AcceptorState::Active;
     m_ops = ops;
-    m_data = data;
+    m_options = options;
 
     return {};
 }
@@ -252,7 +253,7 @@ chord_mesh::StreamAcceptor::shutdown()
     m_state = AcceptorState::Closed;
 
     if (m_ops.cleanup != nullptr) {
-        m_ops.cleanup(m_data);
+        m_ops.cleanup(m_options.data);
     }
 }
 
@@ -260,6 +261,6 @@ void
 chord_mesh::StreamAcceptor::emitError(const tempo_utils::Status &status)
 {
     if (m_ops.error != nullptr) {
-        m_ops.error(status, m_data);
+        m_ops.error(status, m_options.data);
     }
 }

@@ -156,7 +156,9 @@ TEST_F(StreamConnector, ReadAndWaitForUnixConnectorClose)
         stream->send(chord_mesh::MessageVersion::Version1, tempo_utils::MemoryBytes::copy("hello, world!"));
         stream->shutdown();
     };
-    chord_mesh::StreamConnector connector(&manager, connectorOps);
+    chord_mesh::StreamConnectorOptions connectorOptions;
+    connectorOptions.startInsecure = true;
+    chord_mesh::StreamConnector connector(&manager, connectorOps, connectorOptions);
 
     struct Data {
         uv_async_t async;
@@ -286,7 +288,9 @@ TEST_F(StreamConnector, ReadAndWaitForTcp4ConnectorClose)
         stream->send(chord_mesh::MessageVersion::Version1, tempo_utils::MemoryBytes::copy("hello, world!"));
         stream->shutdown();
     };
-    chord_mesh::StreamConnector connector(&manager, connectorOps);
+    chord_mesh::StreamConnectorOptions connectorOptions;
+    connectorOptions.startInsecure = true;
+    chord_mesh::StreamConnector connector(&manager, connectorOps, connectorOptions);
 
     struct Data {
         uv_async_t async;

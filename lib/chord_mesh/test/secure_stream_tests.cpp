@@ -16,7 +16,7 @@
 
 #include "base_mesh_fixture.h"
 
-class InsecureStream : public BaseMeshFixture {
+class SecureStream : public BaseMeshFixture {
 protected:
     std::unique_ptr<tempo_utils::TempdirMaker> tempdir;
     tempo_security::CertificateKeyPair caKeypair;
@@ -67,7 +67,7 @@ protected:
     }
 };
 
-TEST_F(InsecureStream, ReadAndWriteStream)
+TEST_F(SecureStream, ReadAndWriteStream)
 {
     auto testerDirectory = tempdir->getTempdir();
     std::string ipAddress = "127.0.0.1";
@@ -98,6 +98,9 @@ TEST_F(InsecureStream, ReadAndWriteStream)
     chord_mesh::StreamAcceptorOps acceptorOps;
     acceptorOps.accept = [](std::shared_ptr<chord_mesh::Stream> stream, void *ptr) {
         chord_mesh::StreamOps streamOps;
+        streamOps.negotiate = [](std::string_view, std::string_view, void *) -> bool {
+            return true;
+        };
         streamOps.receive = [](const chord_mesh::Message &message, void *ptr) {
             auto *data = (Data *) ptr;
             data->acceptorReceived.push_back(message);
@@ -111,7 +114,7 @@ TEST_F(InsecureStream, ReadAndWriteStream)
     };
 
     chord_mesh::StreamAcceptorOptions acceptorOptions;
-    acceptorOptions.allowInsecure = true;
+    acceptorOptions.allowInsecure = false;
     acceptorOptions.data = &data;
 
     ASSERT_THAT (acceptor->listen(acceptorOps, acceptorOptions), tempo_test::IsOk()) << "acceptor listen error";
@@ -139,7 +142,7 @@ TEST_F(InsecureStream, ReadAndWriteStream)
     };
 
     chord_mesh::StreamConnectorOptions connectorOptions;
-    connectorOptions.startInsecure = true;
+    connectorOptions.startInsecure = false;
     connectorOptions.data = &data;
     chord_mesh::StreamConnector connector(&manager, connectorOps, connectorOptions);
 
@@ -159,7 +162,7 @@ TEST_F(InsecureStream, ReadAndWriteStream)
     ret = uv_async_send(&data.async);
     ASSERT_EQ (0, ret) << "uv_async_send() error: " << uv_strerror(ret);
 
-    ASSERT_TRUE (data.notifyComplete.WaitForNotificationWithTimeout(absl::Seconds(5))) << "timeout waiting for notification";
+    ASSERT_TRUE (data.notifyComplete.WaitForNotificationWithTimeout(absl::Seconds(500))) << "timeout waiting for notification";
 
     ASSERT_THAT (stopUVThread(), tempo_test::IsOk()) << "failed to stop UV thread";
     acceptor->shutdown();

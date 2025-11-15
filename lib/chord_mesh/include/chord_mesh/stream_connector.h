@@ -19,9 +19,17 @@ namespace chord_mesh {
         void (*cleanup)(void *) = nullptr;
     };
 
+    struct StreamConnectorOptions {
+        bool startInsecure = false;
+        void *data = nullptr;
+    };
+
     class StreamConnector {
     public:
-        StreamConnector(StreamManager *manager, const StreamConnectorOps &ops, void *data = nullptr);
+        StreamConnector(
+            StreamManager *manager,
+            const StreamConnectorOps &ops,
+            const StreamConnectorOptions &options = {});
         virtual ~StreamConnector();
 
         tempo_utils::Status connectUnix(std::string_view pipePath, int pipeFlags, void *data = nullptr);
@@ -31,7 +39,7 @@ namespace chord_mesh {
     private:
         StreamManager *m_manager;
         StreamConnectorOps m_ops;
-        void *m_data;
+        StreamConnectorOptions m_options;
 
         void emitError(const tempo_utils::Status &status);
 

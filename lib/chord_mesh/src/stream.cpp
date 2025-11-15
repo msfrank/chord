@@ -12,9 +12,10 @@
 
 #include "chord_mesh/noise.h"
 
-chord_mesh::Stream::Stream(StreamHandle *handle, bool initiator)
+chord_mesh::Stream::Stream(StreamHandle *handle, bool initiator, bool secure)
     : m_handle(handle),
       m_initiator(initiator),
+      m_secure(secure),
       m_id(tempo_utils::UUID::randomUUID()),
       m_state(StreamState::Initial),
       m_data(nullptr)
@@ -90,11 +91,16 @@ chord_mesh::Stream::start(const StreamOps &ops, void *data)
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
             "uv_read_start error: {}", uv_strerror(ret));
 
+    TU_RETURN_IF_NOT_OK (m_io->start(m_secure));
+
     m_state = StreamState::Active;
     m_ops = ops;
     m_data = data;
 
-    TU_RETURN_IF_NOT_OK (m_io->start());
+    if (m_initiator && m_secure) {
+        auto protocolName = m_handle->manager->getProtocolName();
+        TU_RETURN_IF_NOT_OK (negotiate(protocolName));
+    }
 
     return {};
 }
@@ -119,7 +125,7 @@ chord_mesh::Stream::negotiate(std::string_view protocolName)
     TU_RETURN_IF_NOT_OK (generate_static_key(privateKey, localKeypair));
 
     // perform the local handshake
-    TU_RETURN_IF_NOT_OK (m_io->negotiateLocal(protocolName, certificate->toString(), localKeypair));
+    TU_RETURN_IF_NOT_OK (m_io->negotiateLocal(protocolName, certificate->toPem(), localKeypair));
 
     return {};
 }
@@ -251,9 +257,18 @@ chord_mesh::Stream::processStreamMessage(const Message &message)
                 }
             }
 
-            auto status = m_io->negotiateRemote(protocolString.cStr(), certificate, publicKey, digest);
+            tempo_utils::Status status;
+
+            status = m_io->negotiateRemote(protocolString.cStr(), certificate, publicKey, digest);
             if (status.notOk()) {
                 emitError(status);
+            }
+
+            if (m_io->getIOState() == IOState::PendingLocal) {
+                status = negotiate(protocolString.cStr());
+                if (status.notOk()) {
+                    emitError(status);
+                }
             }
 
             break;

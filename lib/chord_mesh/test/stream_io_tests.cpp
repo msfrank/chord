@@ -91,7 +91,7 @@ TEST_F(StreamIO, CreateAndStartInitiator)
     chord_mesh::StreamIO streamIO(true, &manager, &streamBufWriter);
     ASSERT_EQ (chord_mesh::IOState::Initial, streamIO.getIOState());
 
-    ASSERT_THAT (streamIO.start(), tempo_test::IsOk());
+    ASSERT_THAT (streamIO.start(false), tempo_test::IsOk());
     ASSERT_EQ (chord_mesh::IOState::Insecure, streamIO.getIOState());
 
     bool ready;
@@ -110,7 +110,7 @@ TEST_F(StreamIO, CreateAndStartResponder)
     chord_mesh::StreamIO streamIO(false, &manager, &streamBufWriter);
     ASSERT_EQ (chord_mesh::IOState::Initial, streamIO.getIOState());
 
-    ASSERT_THAT (streamIO.start(), tempo_test::IsOk());
+    ASSERT_THAT (streamIO.start(false), tempo_test::IsOk());
     ASSERT_EQ (chord_mesh::IOState::Insecure, streamIO.getIOState());
 
     bool ready;
@@ -129,7 +129,7 @@ TEST_F(StreamIO, SendAndReceiveInsecure)
     chord_mesh::StreamIO streamIO(false, &manager, &streamBufWriter);
     ASSERT_EQ (chord_mesh::IOState::Initial, streamIO.getIOState());
 
-    ASSERT_THAT (streamIO.start(), tempo_test::IsOk());
+    ASSERT_THAT (streamIO.start(false), tempo_test::IsOk());
     ASSERT_EQ (chord_mesh::IOState::Insecure, streamIO.getIOState());
 
     chord_mesh::StreamBuf *writeBuf = nullptr;
@@ -195,7 +195,16 @@ parse_stream_message(const chord_mesh::Message &message)
 std::shared_ptr<const tempo_utils::ImmutableBytes>
 parse_handshake_message(std::span<const tu_uint8> data)
 {
-    auto arrayPtr = kj::arrayPtr(data.data(), data.size());
+    chord_mesh::MessageParser parser;
+    TU_RAISE_IF_NOT_OK (parser.pushBytes(data));
+    bool ready;
+    TU_RAISE_IF_NOT_OK (parser.checkReady(ready));
+    if (!ready)
+        return {};
+    chord_mesh::Message message;
+    TU_RAISE_IF_NOT_OK (parser.takeReady(message));
+    auto payload = message.getPayload();
+    auto arrayPtr = kj::arrayPtr(payload->getData(), payload->getSize());
     kj::ArrayInputStream inputStream(arrayPtr);
     capnp::MallocMessageBuilder builder;
     capnp::readMessageCopy(inputStream, builder);
@@ -215,7 +224,7 @@ TEST_F(StreamIO, PerformInitiatorHandshake)
     chord_mesh::StreamIO streamIO(true, &manager, &streamBufWriter);
     ASSERT_EQ (chord_mesh::IOState::Initial, streamIO.getIOState());
 
-    ASSERT_THAT (streamIO.start(), tempo_test::IsOk());
+    ASSERT_THAT (streamIO.start(false), tempo_test::IsOk());
     ASSERT_EQ (chord_mesh::IOState::Insecure, streamIO.getIOState());
 
     ASSERT_THAT (streamIO.negotiateLocal(chord_mesh::kDefaultNoiseProtocol, pemCertificateString, initiatorKeypair),
@@ -283,7 +292,7 @@ TEST_F(StreamIO, PerformResponderHandshake)
     chord_mesh::StreamIO streamIO(false, &manager, &streamBufWriter);
     ASSERT_EQ (chord_mesh::IOState::Initial, streamIO.getIOState());
 
-    ASSERT_THAT (streamIO.start(), tempo_test::IsOk());
+    ASSERT_THAT (streamIO.start(false), tempo_test::IsOk());
     ASSERT_EQ (chord_mesh::IOState::Insecure, streamIO.getIOState());
 
     std::shared_ptr<chord_mesh::Handshake> initiatorHandshake;

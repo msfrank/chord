@@ -22,6 +22,11 @@ namespace chord_mesh {
         void (*cleanup)(void *) = nullptr;
     };
 
+    struct StreamAcceptorOptions {
+        bool allowInsecure = false;
+        void *data = nullptr;
+    };
+
     class StreamAcceptor {
     public:
         virtual ~StreamAcceptor();
@@ -40,7 +45,7 @@ namespace chord_mesh {
 
         AcceptorState getAcceptorState() const;
 
-        tempo_utils::Status listen(const StreamAcceptorOps &ops, void *data = nullptr);
+        tempo_utils::Status listen(const StreamAcceptorOps &ops, const StreamAcceptorOptions &options = {});
         void shutdown();
 
     private:
@@ -48,7 +53,7 @@ namespace chord_mesh {
 
         AcceptorState m_state;
         StreamAcceptorOps m_ops;
-        void *m_data;
+        StreamAcceptorOptions m_options;
 
         explicit StreamAcceptor(StreamHandle *handle);
         void emitError(const tempo_utils::Status &status);

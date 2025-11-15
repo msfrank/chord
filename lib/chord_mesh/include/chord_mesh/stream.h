@@ -32,7 +32,7 @@ namespace chord_mesh {
 
     class Stream : public AbstractStreamBufWriter {
     public:
-        Stream(StreamHandle *handle, bool initiator);
+        Stream(StreamHandle *handle, bool initiator, bool secure);
         virtual ~Stream();
 
         tempo_utils::UUID getId() const;
@@ -51,6 +51,7 @@ namespace chord_mesh {
     private:
         StreamHandle *m_handle;
         bool m_initiator;
+        bool m_secure;
 
         tempo_utils::UUID m_id;
         StreamState m_state;

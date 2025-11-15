@@ -32,6 +32,10 @@ namespace chord_mesh {
         void (*cleanup)(void *) = nullptr;
     };
 
+    struct StreamManagerOptions {
+        std::string protocolName = {};
+        void *data = nullptr;
+    };
     class StreamManager {
     public:
         StreamManager(
@@ -39,11 +43,13 @@ namespace chord_mesh {
             const tempo_security::CertificateKeyPair &keypair,
             std::shared_ptr<tempo_security::X509Store> trustStore,
             const StreamManagerOps &ops,
-            void *data = nullptr);
+            const StreamManagerOptions &options = {});
 
         uv_loop_t *getLoop() const;
         std::shared_ptr<tempo_security::X509Store> getTrustStore() const;
         tempo_security::CertificateKeyPair getKeypair() const;
+
+        std::string getProtocolName() const;
 
         StreamHandle *allocateHandle(uv_stream_t *stream, void *data = nullptr);
         void shutdown();
@@ -53,7 +59,8 @@ namespace chord_mesh {
         tempo_security::CertificateKeyPair m_keypair;
         std::shared_ptr<tempo_security::X509Store> m_trustStore;
         StreamManagerOps m_ops;
-        void *m_data;
+        StreamManagerOptions m_options;
+
         StreamHandle *m_handles;
         bool m_running;
 

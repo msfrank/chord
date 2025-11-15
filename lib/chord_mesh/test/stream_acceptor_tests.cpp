@@ -112,7 +112,11 @@ TEST_F(StreamAcceptor, ConnectToUnixAcceptor)
         auto *data = (Data *) ptr;
         data->stream = std::move(stream);
     };
-    ASSERT_THAT (acceptor->listen(acceptorOps, &data), tempo_test::IsOk()) << "acceptor listen error";
+
+    chord_mesh::StreamAcceptorOptions acceptorOptions;
+    acceptorOptions.data = &data;
+
+    ASSERT_THAT (acceptor->listen(acceptorOps, acceptorOptions), tempo_test::IsOk()) << "acceptor listen error";
 
     ASSERT_THAT (startUVThread(), tempo_test::IsOk()) << "failed to start UV thread";
     uv_sleep(500);
@@ -164,7 +168,10 @@ TEST_F(StreamAcceptor, ReadAndWaitForUnixAcceptorClose)
         data->stream = std::move(stream);
     };
 
-    ASSERT_THAT (acceptor->listen(acceptorOps, &data), tempo_test::IsOk()) << "acceptor listen error";
+    chord_mesh::StreamAcceptorOptions acceptorOptions;
+    acceptorOptions.data = &data;
+
+    ASSERT_THAT (acceptor->listen(acceptorOps, acceptorOptions), tempo_test::IsOk()) << "acceptor listen error";
 
     ASSERT_THAT (startUVThread(), tempo_test::IsOk()) << "failed to start UV thread";
     uv_sleep(500);
@@ -244,7 +251,11 @@ TEST_F(StreamAcceptor, ConnectToTcp4Acceptor)
         auto *data = (Data *) ptr;
         data->stream = std::move(stream);
     };
-    ASSERT_THAT (acceptor->listen(acceptorOps, &data), tempo_test::IsOk()) << "acceptor listen error";
+
+    chord_mesh::StreamAcceptorOptions acceptorOptions;
+    acceptorOptions.data = &data;
+
+    ASSERT_THAT (acceptor->listen(acceptorOps, acceptorOptions), tempo_test::IsOk()) << "acceptor listen error";
 
     ASSERT_THAT (startUVThread(), tempo_test::IsOk()) << "failed to start UV thread";
     uv_sleep(500);
@@ -296,7 +307,10 @@ TEST_F(StreamAcceptor, ReadAndWaitForTcp4AcceptorClose)
         data->stream = std::move(stream);
     };
 
-    ASSERT_THAT (acceptor->listen(acceptorOps, &data), tempo_test::IsOk()) << "acceptor listen error";
+    chord_mesh::StreamAcceptorOptions acceptorOptions;
+    acceptorOptions.data = &data;
+
+    ASSERT_THAT (acceptor->listen(acceptorOps, acceptorOptions), tempo_test::IsOk()) << "acceptor listen error";
 
     ASSERT_THAT (startUVThread(), tempo_test::IsOk()) << "failed to start UV thread";
     uv_sleep(500);

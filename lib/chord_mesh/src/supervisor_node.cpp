@@ -184,13 +184,21 @@ chord_mesh::SupervisorNode::start()
     connectorOps.connect = on_supervisor_connector_connect;
     connectorOps.error = on_supervisor_connector_error;
     connectorOps.cleanup = on_supervisor_connector_cleanup;
-    m_connector = std::make_unique<StreamConnector>(m_manager, connectorOps, this);
+
+    StreamConnectorOptions connectorOptions;
+    connectorOptions.data = this;
+
+    m_connector = std::make_unique<StreamConnector>(m_manager, connectorOps, connectorOptions);
 
     StreamAcceptorOps acceptorOps;
     acceptorOps.accept = on_supervisor_acceptor_accept;
     acceptorOps.error = on_supervisor_acceptor_error;
     acceptorOps.cleanup = on_supervisor_acceptor_cleanup;
-    TU_RETURN_IF_NOT_OK (m_acceptor->listen(acceptorOps, this));
+
+    StreamAcceptorOptions acceptorOptions;
+    acceptorOptions.data = this;
+
+    TU_RETURN_IF_NOT_OK (m_acceptor->listen(acceptorOps, acceptorOptions));
 
     return {};
 }

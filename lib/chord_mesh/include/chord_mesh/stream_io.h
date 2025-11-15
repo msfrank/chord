@@ -29,24 +29,40 @@ namespace chord_mesh {
         virtual tempo_utils::Status take(Message &message) = 0;
     };
 
+    class Pending {
+    public:
+        Pending();
+        ~Pending();
+
+        void pushIncoming(std::span<const tu_uint8> incoming);
+        bool hasIncoming() const;
+        std::shared_ptr<const tempo_utils::ImmutableBytes> popIncoming();
+        void pushOutgoing(StreamBuf *streamBuf);
+        bool hasOutgoing() const;
+        StreamBuf *popOutgoing();
+
+    private:
+        std::unique_ptr<tempo_utils::BytesAppender> m_incoming;
+        std::queue<StreamBuf *> m_outgoing;
+    };
+
     class InitialStreamBehavior : public AbstractStreamBehavior {
     public:
-        InitialStreamBehavior() = default;
+        InitialStreamBehavior();
         tempo_utils::Status read(const tu_uint8 *data, ssize_t size) override;
         tempo_utils::Status write(AbstractStreamBufWriter *writer, StreamBuf *streamBuf) override;
         tempo_utils::Status check(bool &ready) override;
         tempo_utils::Status take(Message &message) override;
 
-        bool hasOutgoing() const;
-        StreamBuf *takeOutgoing();
+        std::unique_ptr<Pending>&& takePending();
 
     private:
-        std::queue<StreamBuf *> m_outgoing;
+        std::unique_ptr<Pending> m_pending;
     };
 
     class InsecureStreamBehavior : public AbstractStreamBehavior {
     public:
-        InsecureStreamBehavior() = default;
+        explicit InsecureStreamBehavior(bool secure);
         tempo_utils::Status read(const tu_uint8 *data, ssize_t size) override;
         tempo_utils::Status write(AbstractStreamBufWriter *writer, StreamBuf *streamBuf) override;
         tempo_utils::Status check(bool &ready) override;
@@ -55,10 +71,13 @@ namespace chord_mesh {
         tempo_utils::Status negotiate(
             std::shared_ptr<const tempo_utils::ImmutableBytes> bytes,
             AbstractStreamBufWriter *writer);
-        std::shared_ptr<const tempo_utils::ImmutableBytes> takePending();
+        tempo_utils::Status applyPending(std::unique_ptr<Pending> &&pending, AbstractStreamBufWriter *writer);
+        std::unique_ptr<Pending>&& takePending();
 
     private:
+        bool m_secure;
         MessageParser m_parser;
+        std::unique_ptr<Pending> m_pending;
     };
 
     class PendingLocalStreamBehavior : public AbstractStreamBehavior {
@@ -66,7 +85,7 @@ namespace chord_mesh {
         PendingLocalStreamBehavior(
             std::string_view protocolName,
             std::span<const tu_uint8> remotePublicKey,
-            std::span<const tu_uint8> pending);
+            std::unique_ptr<Pending> &&pending);
         tempo_utils::Status read(const tu_uint8 *data, ssize_t size) override;
         tempo_utils::Status write(AbstractStreamBufWriter *writer, StreamBuf *streamBuf) override;
         tempo_utils::Status check(bool &ready) override;
@@ -78,10 +97,12 @@ namespace chord_mesh {
             std::shared_ptr<const tempo_utils::ImmutableBytes> bytes,
             AbstractStreamBufWriter *writer);
 
+        std::unique_ptr<Pending>&& takePending();
+
     private:
         std::string m_protocolName;
         std::vector<tu_uint8> m_remotePublicKey;
-        tempo_utils::BytesAppender m_pending;
+        std::unique_ptr<Pending> m_pending;
     };
 
     class PendingRemoteStreamBehavior : public AbstractStreamBehavior {
@@ -89,7 +110,7 @@ namespace chord_mesh {
         PendingRemoteStreamBehavior(
             std::string_view protocolName,
             std::span<const tu_uint8> localPrivateKey,
-            std::span<const tu_uint8> pending);
+            std::unique_ptr<Pending> &&pending);
         tempo_utils::Status read(const tu_uint8 *data, ssize_t size) override;
         tempo_utils::Status write(AbstractStreamBufWriter *writer, StreamBuf *streamBuf) override;
         tempo_utils::Status check(bool &ready) override;
@@ -98,15 +119,18 @@ namespace chord_mesh {
         std::string getLocalProtocolName() const;
         std::span<const tu_uint8> getLocalPrivateKey() const;
 
+        std::unique_ptr<Pending>&& takePending();
+
     private:
         std::string m_protocolName;
         std::vector<tu_uint8> m_localPrivateKey;
-        tempo_utils::BytesAppender m_pending;
+        std::unique_ptr<Pending> m_pending;
+        MessageParser m_parser;
     };
 
     class HandshakingStreamBehavior : public AbstractStreamBehavior {
     public:
-        explicit HandshakingStreamBehavior(std::shared_ptr<Handshake> handshake);
+        HandshakingStreamBehavior(std::shared_ptr<Handshake> handshake, std::unique_ptr<Pending> &&pending);
         tempo_utils::Status read(const tu_uint8 *data, ssize_t size) override;
         tempo_utils::Status write(AbstractStreamBufWriter *writer, StreamBuf *streamBuf) override;
         tempo_utils::Status check(bool &ready) override;
@@ -115,26 +139,29 @@ namespace chord_mesh {
         tempo_utils::Status start(AbstractStreamBufWriter *writer);
         tempo_utils::Status process(std::span<const tu_uint8> data, AbstractStreamBufWriter *writer, bool &finished);
         tempo_utils::Result<std::shared_ptr<Cipher>> finish();
-        std::shared_ptr<const tempo_utils::ImmutableBytes> takePending();
+
+        std::unique_ptr<Pending>&& takePending();
 
     private:
         std::shared_ptr<Handshake> m_handshake;
+        std::unique_ptr<Pending> m_pending;
         MessageParser m_parser;
     };
 
     class SecureStreamBehavior : public AbstractStreamBehavior {
     public:
-        explicit SecureStreamBehavior(std::shared_ptr<Cipher> cipher);
+        SecureStreamBehavior(std::shared_ptr<Cipher> cipher, std::unique_ptr<Pending> &&pending);
         tempo_utils::Status read(const tu_uint8 *data, ssize_t size) override;
         tempo_utils::Status write(AbstractStreamBufWriter *writer, StreamBuf *streamBuf) override;
         tempo_utils::Status check(bool &ready) override;
         tempo_utils::Status take(Message &message) override;
 
-        tempo_utils::Status start(std::span<const tu_uint8> pending);
+        tempo_utils::Status start(AbstractStreamBufWriter *writer);
         std::shared_ptr<const tempo_utils::ImmutableBytes> takePending();
 
     private:
         std::shared_ptr<Cipher> m_cipher;
+        std::unique_ptr<Pending> m_pending;
         MessageParser m_parser;
     };
 
@@ -144,7 +171,7 @@ namespace chord_mesh {
 
         IOState getIOState() const;
 
-        tempo_utils::Status start();
+        tempo_utils::Status start(bool secure);
         tempo_utils::Status negotiateRemote(
             std::string_view protocolName,
             std::string_view pemCertificateString,

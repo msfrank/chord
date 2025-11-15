@@ -2,18 +2,19 @@
 #include <chord_mesh/stream_manager.h>
 
 #include "chord_mesh/mesh_result.h"
+#include "chord_mesh/noise.h"
 
 chord_mesh::StreamManager::StreamManager(
     uv_loop_t *loop,
     const tempo_security::CertificateKeyPair &keypair,
     std::shared_ptr<tempo_security::X509Store> trustStore,
     const StreamManagerOps &ops,
-    void *data)
+    const StreamManagerOptions &options)
     : m_loop(loop),
       m_keypair(keypair),
       m_trustStore(std::move(trustStore)),
       m_ops(ops),
-      m_data(data),
+      m_options(options),
       m_handles(nullptr),
       m_running(true)
 {
@@ -38,6 +39,14 @@ tempo_security::CertificateKeyPair
 chord_mesh::StreamManager::getKeypair() const
 {
     return m_keypair;
+}
+
+std::string
+chord_mesh::StreamManager::getProtocolName() const
+{
+    if (!m_options.protocolName.empty())
+        return m_options.protocolName;
+    return kDefaultNoiseProtocol;
 }
 
 chord_mesh::StreamHandle *
@@ -129,7 +138,7 @@ void
 chord_mesh::StreamManager::emitError(const tempo_utils::Status &status)
 {
     if (m_ops.error != nullptr) {
-        m_ops.error(status, m_data);
+        m_ops.error(status, m_options.data);
     }
 }
 

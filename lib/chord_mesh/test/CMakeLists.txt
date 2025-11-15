@@ -11,6 +11,7 @@ set(TEST_CASES
     insecure_stream_tests.cpp
     message_builder_tests.cpp
     message_parser_tests.cpp
+    secure_stream_tests.cpp
     stream_acceptor_tests.cpp
     stream_connector_tests.cpp
     stream_io_tests.cpp

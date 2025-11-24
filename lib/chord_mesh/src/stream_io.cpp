@@ -575,7 +575,7 @@ inline tempo_utils::Result<std::shared_ptr<const tempo_utils::ImmutableBytes>>
 build_stream_negotiate_message(
     std::string_view protocolName,
     std::span<const tu_uint8> publicKey,
-    std::string_view certificate,
+    std::shared_ptr<tempo_security::X509Certificate> certificate,
     const tempo_security::Digest &digest)
 {
     // construct the StreamNegotiate payload
@@ -584,7 +584,7 @@ build_stream_negotiate_message(
     auto streamNegotiate = root.initMessage().initStreamNegotiate();
     streamNegotiate.setProtocol(std::string(protocolName));
     streamNegotiate.setPublicKey(capnp::Data::Reader(publicKey.data(), publicKey.size()));
-    streamNegotiate.setCertificate(std::string(certificate));
+    streamNegotiate.setCertificate(certificate->toPem());
     streamNegotiate.setDigest(capnp::Data::Reader(digest.getData(), digest.getSize()));
 
     // serialize the payload
@@ -601,13 +601,11 @@ build_stream_negotiate_message(
 tempo_utils::Status
 chord_mesh::StreamIO::negotiateRemote(
     std::string_view protocolName,
-    std::string_view pemCertificateString,
+    std::shared_ptr<tempo_security::X509Certificate> certificate,
     std::span<const tu_uint8> remotePublicKey,
     const tempo_security::Digest &digest)
 {
     // validate the public key is signed by a trusted certificate
-    std::shared_ptr<tempo_security::X509Certificate> certificate;
-    TU_ASSIGN_OR_RETURN (certificate, tempo_security::X509Certificate::fromString(pemCertificateString));
     auto trustStore = m_manager->getTrustStore();
     TU_RETURN_IF_NOT_OK (validate_static_key(remotePublicKey, certificate, trustStore, digest));
 
@@ -647,6 +645,10 @@ chord_mesh::StreamIO::negotiateRemote(
             break;
         }
 
+        case IOState::PendingLocal:
+            // remote negotiation has already happened, so do nothing
+            return {};
+
         default:
             return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
                 "invalid stream IO state");
@@ -658,7 +660,7 @@ chord_mesh::StreamIO::negotiateRemote(
 tempo_utils::Status
 chord_mesh::StreamIO::negotiateLocal(
     std::string_view protocolName,
-    std::string_view pemCertificateString,
+    std::shared_ptr<tempo_security::X509Certificate> certificate,
     const StaticKeypair &localKeypair)
 {
     switch (m_state) {
@@ -668,7 +670,7 @@ chord_mesh::StreamIO::negotiateLocal(
             auto *insecure = (InsecureStreamBehavior *) prev.get();
             std::shared_ptr<const tempo_utils::ImmutableBytes> negotiateBytes;
             TU_ASSIGN_OR_RETURN (negotiateBytes, build_stream_negotiate_message(
-                protocolName, localKeypair.publicKey, pemCertificateString, localKeypair.digest));
+                protocolName, localKeypair.publicKey, certificate, localKeypair.digest));
             TU_RETURN_IF_NOT_OK (insecure->negotiate(negotiateBytes, m_writer));
             auto pending = insecure->takePending();
             m_behavior = std::make_unique<PendingRemoteStreamBehavior>(
@@ -686,7 +688,7 @@ chord_mesh::StreamIO::negotiateLocal(
 
             std::shared_ptr<const tempo_utils::ImmutableBytes> negotiateBytes;
             TU_ASSIGN_OR_RETURN (negotiateBytes, build_stream_negotiate_message(
-                protocolName, localKeypair.publicKey, pemCertificateString, localKeypair.digest));
+                protocolName, localKeypair.publicKey, certificate, localKeypair.digest));
             TU_RETURN_IF_NOT_OK (pendingLocal->negotiate(negotiateBytes, m_writer));
 
             if (protocolName != pendingLocal->getRemoteProtocolName())
@@ -705,6 +707,10 @@ chord_mesh::StreamIO::negotiateLocal(
             TU_LOG_V << "stream " << this << " moves from PendingLocal to Handshaking state";
             break;
         }
+
+        case IOState::PendingRemote:
+            // local negotiation has already happened, so do nothing
+            return {};
 
         default:
             return MeshStatus::forCondition(MeshCondition::kMeshInvariant,

@@ -174,12 +174,12 @@ namespace chord_mesh {
         tempo_utils::Status start(bool secure);
         tempo_utils::Status negotiateRemote(
             std::string_view protocolName,
-            std::string_view pemCertificateString,
+            std::shared_ptr<tempo_security::X509Certificate> certificate,
             std::span<const tu_uint8> remotePublicKey,
             const tempo_security::Digest &digest);
         tempo_utils::Status negotiateLocal(
             std::string_view protocolName,
-            std::string_view pemCertificateString,
+            std::shared_ptr<tempo_security::X509Certificate> certificate,
             const StaticKeypair &localKeypair);
         tempo_utils::Status processHandshake(std::span<const tu_uint8> data, bool &finished);
 

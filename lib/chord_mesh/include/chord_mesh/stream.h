@@ -25,7 +25,7 @@ namespace chord_mesh {
 
     struct StreamOps {
         void (*receive)(const Message &, void *) = nullptr;
-        bool (*negotiate)(std::string_view, std::string_view, void *) = nullptr;
+        bool (*negotiate)(std::string_view, std::shared_ptr<tempo_security::X509Certificate>, void *) = nullptr;
         void (*error)(const tempo_utils::Status &, void *) = nullptr;
         void (*cleanup)(void *) = nullptr;
     };
@@ -34,6 +34,9 @@ namespace chord_mesh {
     public:
         Stream(StreamHandle *handle, bool initiator, bool secure);
         virtual ~Stream();
+
+        bool isInitiator() const;
+        bool isSecure() const;
 
         tempo_utils::UUID getId() const;
         StreamState getStreamState() const;

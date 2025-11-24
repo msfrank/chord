@@ -23,7 +23,7 @@ protected:
     std::unique_ptr<tempo_utils::TempdirMaker> tempdir;
     tempo_security::CertificateKeyPair caKeypair;
     tempo_security::CertificateKeyPair streamKeypair;
-    std::string pemCertificateString;
+    std::shared_ptr<tempo_security::X509Certificate> certificate;
     std::shared_ptr<tempo_security::PrivateKey> privateKey;
     chord_mesh::StaticKeypair initiatorKeypair;
     chord_mesh::StaticKeypair responderKeypair;
@@ -63,9 +63,7 @@ protected:
             tempo_utils::generate_name("test_stream_key_XXXXXXXX")).orElseThrow();
         TU_ASSERT (streamKeypair.isValid());
 
-        tempo_utils::FileReader certificateReader(streamKeypair.getPemCertificateFile());
-        TU_RAISE_IF_NOT_OK (certificateReader.getStatus());
-        pemCertificateString = std::string(certificateReader.getBytes()->getStringView());
+        TU_ASSIGN_OR_RAISE (certificate, tempo_security::X509Certificate::readFile(streamKeypair.getPemCertificateFile()));
 
         TU_ASSIGN_OR_RAISE (privateKey, tempo_security::PrivateKey::readFile(streamKeypair.getPemPrivateKeyFile()));
 
@@ -227,7 +225,7 @@ TEST_F(StreamIO, PerformInitiatorHandshake)
     ASSERT_THAT (streamIO.start(false), tempo_test::IsOk());
     ASSERT_EQ (chord_mesh::IOState::Insecure, streamIO.getIOState());
 
-    ASSERT_THAT (streamIO.negotiateLocal(chord_mesh::kDefaultNoiseProtocol, pemCertificateString, initiatorKeypair),
+    ASSERT_THAT (streamIO.negotiateLocal(chord_mesh::kDefaultNoiseProtocol, certificate, initiatorKeypair),
         tempo_test::IsOk());
     ASSERT_EQ (chord_mesh::IOState::PendingRemote, streamIO.getIOState());
 
@@ -248,7 +246,7 @@ TEST_F(StreamIO, PerformInitiatorHandshake)
     auto streamNegotiate = streamMessage1.getMessage().getStreamNegotiate();
     ASSERT_EQ (std::string_view(chord_mesh::kDefaultNoiseProtocol), streamNegotiate.getProtocol().cStr());
 
-    ASSERT_THAT (streamIO.negotiateRemote(chord_mesh::kDefaultNoiseProtocol, pemCertificateString,
+    ASSERT_THAT (streamIO.negotiateRemote(chord_mesh::kDefaultNoiseProtocol, certificate,
         responderKeypair.publicKey, responderKeypair.digest), tempo_test::IsOk());
     ASSERT_EQ (chord_mesh::IOState::Handshaking, streamIO.getIOState());
 
@@ -301,11 +299,11 @@ TEST_F(StreamIO, PerformResponderHandshake)
     ASSERT_THAT (initiatorHandshake->start(), tempo_test::IsOk());
     ASSERT_EQ (chord_mesh::HandshakeState::Waiting, initiatorHandshake->getHandshakeState());
 
-    ASSERT_THAT (streamIO.negotiateRemote(chord_mesh::kDefaultNoiseProtocol, pemCertificateString,
+    ASSERT_THAT (streamIO.negotiateRemote(chord_mesh::kDefaultNoiseProtocol, certificate,
         initiatorKeypair.publicKey, initiatorKeypair.digest), tempo_test::IsOk());
     ASSERT_EQ (chord_mesh::IOState::PendingLocal, streamIO.getIOState());
 
-    ASSERT_THAT (streamIO.negotiateLocal(chord_mesh::kDefaultNoiseProtocol, pemCertificateString, responderKeypair),
+    ASSERT_THAT (streamIO.negotiateLocal(chord_mesh::kDefaultNoiseProtocol, certificate, responderKeypair),
         tempo_test::IsOk());
     ASSERT_EQ (chord_mesh::IOState::Handshaking, streamIO.getIOState());
 

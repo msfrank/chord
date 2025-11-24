@@ -141,9 +141,11 @@ TEST_F(InsecureStream, ReadAndWriteStream)
     chord_mesh::StreamConnectorOptions connectorOptions;
     connectorOptions.startInsecure = true;
     connectorOptions.data = &data;
-    chord_mesh::StreamConnector connector(&manager, connectorOps, connectorOptions);
+    auto createConnectorResult = chord_mesh::StreamConnector::create(&manager, connectorOps, connectorOptions);
+    ASSERT_THAT (createConnectorResult, tempo_test::IsResult());
+    auto connector = createConnectorResult.getResult();;
 
-    data.connector = &connector;
+    data.connector = connector.get();
     data.ipAddress = ipAddress;
     data.tcpPort = tcpPort;
     data.numRounds = 3;
@@ -151,7 +153,7 @@ TEST_F(InsecureStream, ReadAndWriteStream)
 
     uv_async_init(loop, &data.async, [](uv_async_t *async) {
         auto *data = (Data *) async->data;
-        TU_RAISE_IF_NOT_OK (data->connector->connectTcp4(data->ipAddress, data->tcpPort));
+        TU_RAISE_IF_STATUS (data->connector->connectTcp4(data->ipAddress, data->tcpPort));
     });
 
     ASSERT_THAT (startUVThread(), tempo_test::IsOk()) << "failed to start UV thread";

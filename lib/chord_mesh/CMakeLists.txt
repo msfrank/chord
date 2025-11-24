@@ -43,6 +43,7 @@ add_custom_command (
 )
 
 set(CHORD_MESH_INCLUDES
+    include/chord_mesh/flood.h
     include/chord_mesh/noise.h
     include/chord_mesh/mesh_result.h
     include/chord_mesh/message.h
@@ -52,11 +53,11 @@ set(CHORD_MESH_INCLUDES
     include/chord_mesh/stream_connector.h
     include/chord_mesh/stream_io.h
     include/chord_mesh/stream_manager.h
-    include/chord_mesh/supervisor_node.h
     )
 set_target_properties(chord_mesh PROPERTIES PUBLIC_HEADER "${CHORD_MESH_INCLUDES}")
 
 target_sources(chord_mesh PRIVATE
+    src/flood.cpp
     src/noise.cpp
     src/mesh_result.cpp
     src/message.cpp
@@ -66,7 +67,6 @@ target_sources(chord_mesh PRIVATE
     src/stream_connector.cpp
     src/stream_io.cpp
     src/stream_manager.cpp
-    src/supervisor_node.cpp
 
     # generated sources
     ${CMAKE_CURRENT_BINARY_DIR}/include/chord_mesh/generated/ensemble_messages.capnp.c++
@@ -106,6 +106,7 @@ target_link_libraries(chord_mesh
     tempo::tempo_security
     tempo::tempo_utils
     absl::flat_hash_map
+    absl::random_random
     CapnProto::capnp
     noise-c::noise-c
     uv::uv

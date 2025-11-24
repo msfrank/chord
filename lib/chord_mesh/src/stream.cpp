@@ -30,6 +30,18 @@ chord_mesh::Stream::~Stream()
     shutdown();
 }
 
+bool
+chord_mesh::Stream::isInitiator() const
+{
+    return m_initiator;
+}
+
+bool
+chord_mesh::Stream::isSecure() const
+{
+    return m_secure;
+}
+
 tempo_utils::UUID
 chord_mesh::Stream::getId() const
 {
@@ -125,7 +137,7 @@ chord_mesh::Stream::negotiate(std::string_view protocolName)
     TU_RETURN_IF_NOT_OK (generate_static_key(privateKey, localKeypair));
 
     // perform the local handshake
-    TU_RETURN_IF_NOT_OK (m_io->negotiateLocal(protocolName, certificate->toPem(), localKeypair));
+    TU_RETURN_IF_NOT_OK (m_io->negotiateLocal(protocolName, certificate, localKeypair));
 
     return {};
 }
@@ -247,13 +259,21 @@ chord_mesh::Stream::processStreamMessage(const Message &message)
 
             std::string_view protocolName(protocolString.cStr());
             std::span publicKey(publicKeyBytes.begin(), publicKeyBytes.end());
-            std::string_view certificate(certificateString.cStr());
             tempo_security::Digest digest(std::span(digestBytes.begin(), digestBytes.end()));
+
+            auto readCertificateResult = tempo_security::X509Certificate::fromString(certificateString.cStr());
+            if (readCertificateResult.isStatus()) {
+                emitError(readCertificateResult.getStatus());
+                return;
+            }
+            auto certificate = readCertificateResult.getResult();
+
 
             if (m_ops.negotiate != nullptr) {
                 if (!m_ops.negotiate(protocolName, certificate, m_data)) {
                     emitError(MeshStatus::forCondition(MeshCondition::kMeshInvariant,
-                        "negotiation failure"));
+                        "negotiation was rejected"));
+                    return;
                 }
             }
 

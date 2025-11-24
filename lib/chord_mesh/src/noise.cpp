@@ -1,7 +1,8 @@
 
+#include <noise/protocol/errors.h>
+
 #include <chord_mesh/noise.h>
 #include <chord_mesh/mesh_result.h>
-#include <chord_mesh/supervisor_node.h>
 #include <tempo_utils/big_endian.h>
 
 chord_mesh::Handshake::Handshake()

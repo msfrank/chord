@@ -4,7 +4,6 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#include <chord_mesh/stream_acceptor.h>
 #include <chord_mesh/stream_connector.h>
 #include <tempo_config/program_config.h>
 #include <tempo_security/ed25519_private_key_generator.h>
@@ -89,11 +88,15 @@ TEST_F(StreamConnector, ConnectToUnixSocket)
 
     chord_mesh::StreamManagerOps managerOps;
     chord_mesh::StreamManager manager(loop, streamKeypair, trustStore, managerOps);
+
     chord_mesh::StreamConnectorOps connectorOps;
     connectorOps.connect = [](std::shared_ptr<chord_mesh::Stream> stream, void *ptr) {
         stream->shutdown();
     };
-    chord_mesh::StreamConnector connector(&manager, connectorOps);
+
+    auto createConnectorResult = chord_mesh::StreamConnector::create(&manager, connectorOps);
+    ASSERT_THAT (createConnectorResult, tempo_test::IsResult());
+    auto connector = createConnectorResult.getResult();;
 
     struct Data {
         uv_async_t async;
@@ -101,7 +104,7 @@ TEST_F(StreamConnector, ConnectToUnixSocket)
         std::string socketPath;
     } data;
 
-    data.connector = &connector;
+    data.connector = connector.get();
     data.socketPath = socketPath;
     data.async.data = &data;
 
@@ -158,7 +161,10 @@ TEST_F(StreamConnector, ReadAndWaitForUnixConnectorClose)
     };
     chord_mesh::StreamConnectorOptions connectorOptions;
     connectorOptions.startInsecure = true;
-    chord_mesh::StreamConnector connector(&manager, connectorOps, connectorOptions);
+
+    auto createConnectorResult = chord_mesh::StreamConnector::create(&manager, connectorOps, connectorOptions);
+    ASSERT_THAT (createConnectorResult, tempo_test::IsResult());
+    auto connector = createConnectorResult.getResult();;
 
     struct Data {
         uv_async_t async;
@@ -166,7 +172,7 @@ TEST_F(StreamConnector, ReadAndWaitForUnixConnectorClose)
         std::string socketPath;
     } data;
 
-    data.connector = &connector;
+    data.connector = connector.get();
     data.socketPath = socketPath;
     data.async.data = &data;
 
@@ -223,7 +229,10 @@ TEST_F(StreamConnector, ConnectToTcp4Socket)
     connectorOps.connect = [](std::shared_ptr<chord_mesh::Stream> stream, void *ptr) {
         stream->shutdown();
     };
-    chord_mesh::StreamConnector connector(&manager, connectorOps);
+
+    auto createConnectorResult = chord_mesh::StreamConnector::create(&manager, connectorOps);
+    ASSERT_THAT (createConnectorResult, tempo_test::IsResult());
+    auto connector = createConnectorResult.getResult();;
 
     struct Data {
         uv_async_t async;
@@ -232,7 +241,7 @@ TEST_F(StreamConnector, ConnectToTcp4Socket)
         tu_uint16 tcpPort;
     } data;
 
-    data.connector = &connector;
+    data.connector = connector.get();
     data.ipAddress = ipAddress;
     data.tcpPort = tcpPort;
     data.async.data = &data;
@@ -290,7 +299,10 @@ TEST_F(StreamConnector, ReadAndWaitForTcp4ConnectorClose)
     };
     chord_mesh::StreamConnectorOptions connectorOptions;
     connectorOptions.startInsecure = true;
-    chord_mesh::StreamConnector connector(&manager, connectorOps, connectorOptions);
+
+    auto createConnectorResult = chord_mesh::StreamConnector::create(&manager, connectorOps, connectorOptions);
+    ASSERT_THAT (createConnectorResult, tempo_test::IsResult());
+    auto connector = createConnectorResult.getResult();;
 
     struct Data {
         uv_async_t async;
@@ -299,7 +311,7 @@ TEST_F(StreamConnector, ReadAndWaitForTcp4ConnectorClose)
         tu_uint16 tcpPort;
     } data;
 
-    data.connector = &connector;
+    data.connector = connector.get();
     data.ipAddress = ipAddress;
     data.tcpPort = tcpPort;
     data.async.data = &data;

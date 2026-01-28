@@ -13,6 +13,8 @@ set(CHORD_TOOLING_INCLUDES
     include/chord_tooling/signer_store.h
     include/chord_tooling/tooling_conversions.h
     include/chord_tooling/tooling_result.h
+    include/chord_tooling/zone.h
+    include/chord_tooling/zone_config.h
     )
 set_target_properties(chord_tooling PROPERTIES PUBLIC_HEADER "${CHORD_TOOLING_INCLUDES}")
 
@@ -23,6 +25,8 @@ target_sources(chord_tooling PRIVATE
     src/signer_store.cpp
     src/tooling_conversions.cpp
     src/tooling_result.cpp
+    src/zone.cpp
+    src/zone_config.cpp
     )
 
 # set the library version
@@ -49,13 +53,14 @@ target_compile_definitions(chord_tooling PRIVATE
     "DISTRIBUTION_ROOT=\"${DISTRIBUTION_ROOT}\""
     "CONFIG_DIR_PREFIX=\"${CONFIG_DIR_PREFIX}\""
     "VENDOR_CONFIG_DIR_PREFIX=\"${VENDOR_CONFIG_DIR_PREFIX}\""
-)
+    )
 
 target_link_libraries(chord_tooling
     PUBLIC
     chord::chord_common
     tempo::tempo_config
     tempo::tempo_utils
+    zuri::zuri_tooling
     absl::flat_hash_map
     )
 

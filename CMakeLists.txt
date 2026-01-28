@@ -165,12 +165,6 @@ find_package(absl REQUIRED)
 # find required CapnProto dependency
 find_package(CapnProto REQUIRED)
 
-# find required gRPC dependency
-find_package(grpc REQUIRED)
-
-# find required Protobuf dependency
-find_package(protobuf REQUIRED)
-
 # find required Curl dependency
 find_package(CURL REQUIRED)
 

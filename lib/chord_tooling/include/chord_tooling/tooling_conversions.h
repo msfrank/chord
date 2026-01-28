@@ -9,13 +9,6 @@
 
 namespace chord_tooling {
 
-    class SecurityConfigParser : public tempo_config::AbstractConverter<SecurityConfig> {
-    public:
-        tempo_utils::Status convertValue(
-            const tempo_config::ConfigNode &node,
-            SecurityConfig &securityConfig) const override;
-    };
-
     class SignerEntryParser : public tempo_config::AbstractConverter<SignerEntry> {
     public:
         tempo_utils::Status parseLocalSigner(const tempo_config::ConfigMap &map, SignerEntry &signerEntry) const;

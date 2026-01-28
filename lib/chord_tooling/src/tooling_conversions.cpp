@@ -9,32 +9,6 @@
 #include <tempo_config/time_conversions.h>
 
 tempo_utils::Status
-chord_tooling::SecurityConfigParser::convertValue(
-      const tempo_config::ConfigNode &node,
-      SecurityConfig &securityConfig) const
-{
-    if (node.getNodeType() != tempo_config::ConfigNodeType::kMap)
-        return tempo_config::ConfigStatus::forCondition(
-            tempo_config::ConfigCondition::kWrongType, "security config must be a map");
-    auto securityMap = node.toMap();
-
-    tempo_config::PathParser pemRootCABundleFileParser;
-    tempo_config::PathParser pemSigningCertificateFileParser;
-    tempo_config::PathParser pemSigningPrivateKeyFileParser;
-
-    TU_RETURN_IF_NOT_OK (tempo_config::parse_config(securityConfig.pemRootCABundleFile,
-        pemRootCABundleFileParser, securityMap, "pemRootCABundleFile"));
-
-    TU_RETURN_IF_NOT_OK (tempo_config::parse_config(securityConfig.pemSigningCertificateFile,
-        pemSigningCertificateFileParser, securityMap, "pemSigningCertificateFile"));
-
-    TU_RETURN_IF_NOT_OK (tempo_config::parse_config(securityConfig.pemSigningPrivateKeyFile,
-        pemSigningPrivateKeyFileParser, securityMap, "pemSigningPrivateKeyFile"));
-
-    return {};
-}
-
-tempo_utils::Status
 chord_tooling::SignerEntryParser::parseLocalSigner(const tempo_config::ConfigMap &map, SignerEntry &signerEntry) const
 {
     tempo_config::PathParser pemRootCABundleFileParser;

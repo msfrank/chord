@@ -45,11 +45,9 @@ class Chord(ConanFile):
         'curl/8.15.0@timbre',
         'fmt/12.0.0@timbre',
         'flatbuffers/25.2.10@timbre',
-        'grpc/1.74.1@timbre',
         'gtest/1.17.0@timbre',
         'noise-c/20231206.1@timbre',
         'openssl/3.5.2@timbre',
-        'protobuf/32.0@timbre',
         'rocksdb/10.4.2@timbre',
         'sqlite/3.49.2@timbre',
         'uv/1.51.0@timbre',
@@ -71,14 +69,11 @@ class Chord(ConanFile):
         cmake_layout(self)
 
     def generate(self):
-        protobuf = self.dependencies['protobuf'].buildenv_info.vars(self)
-        grpc = self.dependencies['grpc'].buildenv_info.vars(self)
+        capnproto = self.dependencies['capnproto'].buildenv_info.vars(self)
 
         tc = CMakeToolchain(self)
         tc.cache_variables['CHORD_PACKAGE_VERSION'] = self.version
-        tc.cache_variables['PROTOBUF_PROTOC'] = protobuf.get('PROTOBUF_PROTOC')
-        tc.cache_variables['GRPC_CPP_PLUGIN'] = grpc.get('GRPC_CPP_PLUGIN')
-        tc.cache_variables['CAPNPROTO_CAPNP'] = protobuf.get('CAPNPROTO_CAPNP')
+        tc.cache_variables['CAPNPROTO_CAPNP'] = capnproto.get('CAPNPROTO_CAPNP')
 
         if self.options.runtime_distribution_root:
             tc.cache_variables['RUNTIME_DISTRIBUTION_ROOT'] = self.options.runtime_distribution_root

@@ -7,12 +7,23 @@
 
 namespace chord_tooling {
 
-    struct SecurityConfig {
-        std::filesystem::path pemRootCABundleFile;
-        std::filesystem::path pemSigningCertificateFile;
-        std::filesystem::path pemSigningPrivateKeyFile;
+    class SecurityConfig {
+    public:
+        explicit SecurityConfig(const tempo_config::ConfigMap &securityMap);
 
-        tempo_utils::Result<tempo_security::CertificateKeyPair> getSigningKeypair() const;
+        tempo_utils::Status configure();
+
+        std::filesystem::path getPemRootCABundleFile() const;
+        std::filesystem::path getPemSigningCertificateFile() const;
+        std::filesystem::path getPemSigningPrivateKeyFile() const;
+
+        tempo_security::CertificateKeyPair getSigningKeypair() const;
+
+    private:
+        tempo_config::ConfigMap m_securityMap;
+
+        std::filesystem::path m_pemRootCABundleFile;
+        tempo_security::CertificateKeyPair m_signingKeypair;
     };
 }
 #endif // CHORD_TOOLING_SECURITY_CONFIG_H

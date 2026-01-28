@@ -5,11 +5,11 @@
 
 #include <uv.h>
 
+#include <chord_common/transport_location.h>
 #include <tempo_utils/result.h>
 
 #include "stream.h"
 #include "stream_manager.h"
-#include "chord_common/transport_location.h"
 
 namespace chord_mesh {
 

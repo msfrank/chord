@@ -5,7 +5,6 @@
 #include <sys/un.h>
 
 #include <chord_mesh/stream_connector.h>
-#include <tempo_config/program_config.h>
 #include <tempo_security/ed25519_private_key_generator.h>
 #include <tempo_security/generate_utils.h>
 #include <tempo_test/tempo_test.h>

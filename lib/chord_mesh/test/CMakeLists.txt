@@ -12,11 +12,29 @@ set(TEST_CASES
     insecure_stream_tests.cpp
     message_builder_tests.cpp
     message_parser_tests.cpp
+    req_protocol_tests.cpp
     secure_stream_tests.cpp
     stream_acceptor_tests.cpp
     stream_connector_tests.cpp
     stream_io_tests.cpp
     )
+
+# generate test messages
+add_custom_command (
+    OUTPUT
+      ${CMAKE_CURRENT_BINARY_DIR}/generated/test_messages.capnp.c++
+      ${CMAKE_CURRENT_BINARY_DIR}/generated/test_messages.capnp.h
+    COMMAND
+      cmake -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/generated
+    COMMAND
+      ${CAPNP_EXECUTABLE} compile
+      -I${CAPNP_INCLUDE_DIRECTORY}
+      --src-prefix=${CMAKE_CURRENT_SOURCE_DIR}
+      --output=${CAPNPC_CXX_EXECUTABLE}:${CMAKE_CURRENT_BINARY_DIR}/generated
+      ${CMAKE_CURRENT_SOURCE_DIR}/test_messages.capnp
+    DEPENDS
+      ${CMAKE_CURRENT_SOURCE_DIR}/test_messages.capnp
+)
 
 # define test suite driver
 
@@ -24,6 +42,8 @@ add_executable(chord_mesh_testsuite
     ${TEST_CASES}
     base_mesh_fixture.cpp base_mesh_fixture.h
     test_mocks.h
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/test_messages.capnp.c++
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/test_messages.capnp.h
     )
 target_link_libraries(chord_mesh_testsuite PUBLIC
     chord::chord_mesh
@@ -38,6 +58,8 @@ add_library(ChordMeshTestSuite OBJECT
     ${TEST_CASES}
     base_mesh_fixture.cpp base_mesh_fixture.h
     test_mocks.h
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/test_messages.capnp.c++
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/test_messages.capnp.h
     )
 target_link_libraries(ChordMeshTestSuite PUBLIC
     chord::chord_mesh

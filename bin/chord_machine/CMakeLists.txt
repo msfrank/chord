@@ -36,9 +36,8 @@ target_include_directories(ChordMachineRuntime PUBLIC
     )
 
 target_link_libraries(ChordMachineRuntime PUBLIC
-    chord::chord_invoke
     chord::chord_common
-    chord::chord_remoting
+    chord::chord_mesh
     lyric::lyric_bootstrap
     lyric::lyric_runtime
     tempo::tempo_command

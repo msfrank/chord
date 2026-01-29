@@ -6,11 +6,10 @@
 
 #include <chord_mesh/generated/stream_messages.capnp.h>
 #include <chord_mesh/mesh_result.h>
+#include <chord_mesh/noise.h>
 #include <chord_mesh/stream.h>
 #include <chord_mesh/stream_io.h>
 #include <tempo_utils/big_endian.h>
-
-#include "chord_mesh/noise.h"
 
 chord_mesh::Stream::Stream(StreamHandle *handle, bool initiator, bool secure)
     : m_handle(handle),

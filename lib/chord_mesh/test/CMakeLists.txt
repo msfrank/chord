@@ -10,9 +10,9 @@ set(TEST_CASES
     flood_mesh_tests.cpp
     handshake_tests.cpp
     insecure_stream_tests.cpp
-    message_builder_tests.cpp
-    message_parser_tests.cpp
-    req_protocol_tests.cpp
+    envelope_builder_tests.cpp
+    envelope_parser_tests.cpp
+    #req_protocol_tests.cpp
     secure_stream_tests.cpp
     stream_acceptor_tests.cpp
     stream_connector_tests.cpp

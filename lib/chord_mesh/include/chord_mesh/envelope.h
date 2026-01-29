@@ -1,5 +1,5 @@
-#ifndef CHORD_MESH_MESSAGE_H
-#define CHORD_MESH_MESSAGE_H
+#ifndef CHORD_MESH_ENVELOPE_H
+#define CHORD_MESH_ENVELOPE_H
 
 #include <tempo_security/certificate_key_pair.h>
 #include <tempo_security/digest_utils.h>
@@ -9,31 +9,31 @@
 
 namespace chord_mesh {
 
-    constexpr tu_uint32 kMessageVersionStream = 0xFF;
-    constexpr tu_uint32 kMessageVersion1 = 1;
-    constexpr tu_uint32 kMessageSignedFlag = 1;
+    constexpr tu_uint32 kEnvelopeVersionStream = 0xFF;
+    constexpr tu_uint32 kEnvelopeVersion1 = 1;
+    constexpr tu_uint32 kEnvelopeSignedFlag = 1;
     constexpr tu_uint32 kMaxPayloadSize = 16777216;     // 2^24
 
-    enum class MessageVersion {
+    enum class EnvelopeVersion {
         Invalid,
         Stream,
         Version1,
     };
 
-    class Message {
+    class Envelope {
     public:
-        Message();
-        explicit Message(
+        Envelope();
+        explicit Envelope(
             tu_uint8 version,
             tu_uint8 flags,
             absl::Time timestamp,
             std::shared_ptr<const tempo_utils::ImmutableBytes> payload = {},
             const tempo_security::Digest &digest = {});
-        Message(const Message &other);
+        Envelope(const Envelope &other);
 
         bool isValid() const;
 
-        MessageVersion getVersion() const;
+        EnvelopeVersion getVersion() const;
         bool isSigned() const;
 
         absl::Time getTimestamp() const;
@@ -61,12 +61,12 @@ namespace chord_mesh {
     /**
      *
      */
-    class MessageBuilder {
+    class EnvelopeBuilder {
     public:
-        explicit MessageBuilder(std::shared_ptr<const tempo_utils::ImmutableBytes> payload = {});
+        explicit EnvelopeBuilder(std::shared_ptr<const tempo_utils::ImmutableBytes> payload = {});
 
-        MessageVersion getVersion() const;
-        void setVersion(MessageVersion version);
+        EnvelopeVersion getVersion() const;
+        void setVersion(EnvelopeVersion version);
 
         absl::Time getTimestamp() const;
         void setTimestamp(absl::Time timestamp);
@@ -82,15 +82,15 @@ namespace chord_mesh {
         void reset();
 
     private:
-        MessageVersion m_version;
+        EnvelopeVersion m_version;
         absl::Time m_timestamp;
         std::shared_ptr<const tempo_utils::ImmutableBytes> m_payload;
         std::shared_ptr<tempo_security::PrivateKey> m_privateKey;
     };
 
-    class MessageParser {
+    class EnvelopeParser {
     public:
-        MessageParser();
+        EnvelopeParser();
 
         std::shared_ptr<tempo_security::X509Certificate> getCertificate() const;
         void setCertificate(std::shared_ptr<tempo_security::X509Certificate> certificate);
@@ -98,7 +98,7 @@ namespace chord_mesh {
         tempo_utils::Status pushBytes(std::span<const tu_uint8> bytes);
 
         tempo_utils::Status checkReady(bool &ready);
-        tempo_utils::Status takeReady(Message &message);
+        tempo_utils::Status takeReady(Envelope &message);
 
         bool hasPending() const;
         std::shared_ptr<const tempo_utils::MemoryBytes> popPending();
@@ -109,12 +109,12 @@ namespace chord_mesh {
         std::shared_ptr<tempo_security::X509Certificate> m_certificate;
         std::unique_ptr<tempo_utils::BytesAppender> m_pending;
         bool m_ready;
-        tu_uint8 m_messageVersion;
-        tu_uint8 m_messageFlags;
+        tu_uint8 m_envelopeVersion;
+        tu_uint8 m_envelopeFlags;
         tu_uint32 m_timestamp;
         tu_uint32 m_payloadSize;
         tu_uint8 m_digestSize;
     };
 }
 
-#endif // CHORD_MESH_MESSAGE_H
+#endif // CHORD_MESH_ENVELOPE_H

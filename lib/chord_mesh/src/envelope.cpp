@@ -1,14 +1,14 @@
 
 #include <chord_mesh/mesh_result.h>
-#include <chord_mesh/message.h>
+#include <chord_mesh/envelope.h>
 #include <tempo_utils/big_endian.h>
 #include <tempo_utils/bytes_appender.h>
 
-chord_mesh::Message::Message()
+chord_mesh::Envelope::Envelope()
 {
 }
 
-chord_mesh::Message::Message(
+chord_mesh::Envelope::Envelope(
     tu_uint8 version,
     tu_uint8 flags,
     absl::Time timestamp,
@@ -23,42 +23,42 @@ chord_mesh::Message::Message(
     m_priv->digest = digest;
 }
 
-chord_mesh::Message::Message(const Message &other)
+chord_mesh::Envelope::Envelope(const Envelope &other)
     : m_priv(other.m_priv)
 {
 }
 
 bool
-chord_mesh::Message::isValid() const
+chord_mesh::Envelope::isValid() const
 {
     return m_priv != nullptr;
 }
 
-chord_mesh::MessageVersion
-chord_mesh::Message::getVersion() const
+chord_mesh::EnvelopeVersion
+chord_mesh::Envelope::getVersion() const
 {
     if (m_priv == nullptr)
-        return MessageVersion::Invalid;
+        return EnvelopeVersion::Invalid;
     switch (m_priv->version) {
-        case kMessageVersionStream:
-            return MessageVersion::Stream;
-        case kMessageVersion1:
-            return MessageVersion::Version1;
+        case kEnvelopeVersionStream:
+            return EnvelopeVersion::Stream;
+        case kEnvelopeVersion1:
+            return EnvelopeVersion::Version1;
         default:
-            return MessageVersion::Invalid;
+            return EnvelopeVersion::Invalid;
     }
 }
 
 bool
-chord_mesh::Message::isSigned() const
+chord_mesh::Envelope::isSigned() const
 {
     if (m_priv == nullptr)
         return false;
-    return m_priv->flags & kMessageSignedFlag;
+    return m_priv->flags & kEnvelopeSignedFlag;
 }
 
 absl::Time
-chord_mesh::Message::getTimestamp() const
+chord_mesh::Envelope::getTimestamp() const
 {
     if (m_priv == nullptr)
         return {};
@@ -66,7 +66,7 @@ chord_mesh::Message::getTimestamp() const
 }
 
 void
-chord_mesh::Message::setTimestamp(absl::Time timestamp)
+chord_mesh::Envelope::setTimestamp(absl::Time timestamp)
 {
     if (m_priv == nullptr) {
         m_priv = std::make_shared<Priv>();
@@ -75,7 +75,7 @@ chord_mesh::Message::setTimestamp(absl::Time timestamp)
 }
 
 std::shared_ptr<const tempo_utils::ImmutableBytes>
-chord_mesh::Message::getPayload() const
+chord_mesh::Envelope::getPayload() const
 {
     if (m_priv == nullptr)
         return {};
@@ -83,7 +83,7 @@ chord_mesh::Message::getPayload() const
 }
 
 void
-chord_mesh::Message::setPayload(std::shared_ptr<const tempo_utils::ImmutableBytes> payload)
+chord_mesh::Envelope::setPayload(std::shared_ptr<const tempo_utils::ImmutableBytes> payload)
 {
     if (m_priv == nullptr) {
         m_priv = std::make_shared<Priv>();
@@ -92,7 +92,7 @@ chord_mesh::Message::setPayload(std::shared_ptr<const tempo_utils::ImmutableByte
 }
 
 tempo_security::Digest
-chord_mesh::Message::getDigest() const
+chord_mesh::Envelope::getDigest() const
 {
     if (m_priv == nullptr)
         return {};
@@ -100,7 +100,7 @@ chord_mesh::Message::getDigest() const
 }
 
 void
-chord_mesh::Message::setDigest(const tempo_security::Digest &digest)
+chord_mesh::Envelope::setDigest(const tempo_security::Digest &digest)
 {
     if (m_priv == nullptr) {
         m_priv = std::make_shared<Priv>();
@@ -108,93 +108,93 @@ chord_mesh::Message::setDigest(const tempo_security::Digest &digest)
     m_priv->digest = digest;
 }
 
-chord_mesh::MessageBuilder::MessageBuilder(std::shared_ptr<const tempo_utils::ImmutableBytes> payload)
-    : m_version(MessageVersion::Invalid),
+chord_mesh::EnvelopeBuilder::EnvelopeBuilder(std::shared_ptr<const tempo_utils::ImmutableBytes> payload)
+    : m_version(EnvelopeVersion::Invalid),
       m_payload(std::move(payload))
 {
 }
 
-chord_mesh::MessageVersion
-chord_mesh::MessageBuilder::getVersion() const
+chord_mesh::EnvelopeVersion
+chord_mesh::EnvelopeBuilder::getVersion() const
 {
     return m_version;
 }
 
 void
-chord_mesh::MessageBuilder::setVersion(MessageVersion version)
+chord_mesh::EnvelopeBuilder::setVersion(EnvelopeVersion version)
 {
     m_version = version;
 }
 
 absl::Time
-chord_mesh::MessageBuilder::getTimestamp() const
+chord_mesh::EnvelopeBuilder::getTimestamp() const
 {
     return m_timestamp;
 }
 
 void
-chord_mesh::MessageBuilder::setTimestamp(absl::Time timestamp)
+chord_mesh::EnvelopeBuilder::setTimestamp(absl::Time timestamp)
 {
     m_timestamp = timestamp;
 }
 
 std::shared_ptr<const tempo_utils::ImmutableBytes>
-chord_mesh::MessageBuilder::getPayload() const
+chord_mesh::EnvelopeBuilder::getPayload() const
 {
     return m_payload;
 }
 
 tempo_utils::Status
-chord_mesh::MessageBuilder::setPayload(std::shared_ptr<const tempo_utils::ImmutableBytes> payload)
+chord_mesh::EnvelopeBuilder::setPayload(std::shared_ptr<const tempo_utils::ImmutableBytes> payload)
 {
     m_payload = payload;
     return {};
 }
 
 std::shared_ptr<tempo_security::PrivateKey>
-chord_mesh::MessageBuilder::getPrivateKey() const
+chord_mesh::EnvelopeBuilder::getPrivateKey() const
 {
     return m_privateKey;
 }
 
 void
-chord_mesh::MessageBuilder::setPrivateKey(std::shared_ptr<tempo_security::PrivateKey> privateKey)
+chord_mesh::EnvelopeBuilder::setPrivateKey(std::shared_ptr<tempo_security::PrivateKey> privateKey)
 {
     m_privateKey = privateKey;
 }
 
 tempo_utils::Result<std::shared_ptr<const tempo_utils::ImmutableBytes>>
-chord_mesh::MessageBuilder::toBytes() const
+chord_mesh::EnvelopeBuilder::toBytes() const
 {
     if (m_payload == nullptr)
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
-            "missing message payload");
+            "missing envelope payload");
     tu_uint32 payloadSize = m_payload->getSize();
     if (payloadSize > kMaxPayloadSize)
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
-            "message payload is too large");
+            "envelope payload is too large");
 
     tempo_utils::BytesAppender appender;
 
     // append the version field
     tu_uint8 version;
     switch (m_version) {
-        case MessageVersion::Stream:
-            version = kMessageVersionStream;
+        case EnvelopeVersion::Stream:
+            version = kEnvelopeVersionStream;
             break;
-        case MessageVersion::Version1:
-            version = kMessageVersion1;
+        case EnvelopeVersion::Version1:
+            version = kEnvelopeVersion1;
             break;
         default:
             return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
-                "invalid message version");
+                "invalid envelope version");
     }
     appender.appendU8(version);
 
     // append the flags field
     tu_uint8 flags = 0;
     if (m_privateKey != nullptr) {
-        flags |= kMessageSignedFlag;
+        flags |= kEnvelopeSignedFlag;
     }
     appender.appendU8(flags);
 
@@ -211,8 +211,8 @@ chord_mesh::MessageBuilder::toBytes() const
     // append the payload
     appender.appendBytes(m_payload->getSpan());
 
-    // if message is signed then generate the signature
-    if (flags & kMessageSignedFlag) {
+    // if envelope is signed then generate the signature
+    if (flags & kEnvelopeSignedFlag) {
         std::span data(appender.getData(), appender.getSize());
 
         tempo_security::Digest digest;
@@ -235,37 +235,37 @@ chord_mesh::MessageBuilder::toBytes() const
 }
 
 void
-chord_mesh::MessageBuilder::reset()
+chord_mesh::EnvelopeBuilder::reset()
 {
     m_payload = {};
 }
 
-chord_mesh::MessageParser::MessageParser()
+chord_mesh::EnvelopeParser::EnvelopeParser()
 {
     reset();
 }
 
 std::shared_ptr<tempo_security::X509Certificate>
-chord_mesh::MessageParser::getCertificate() const
+chord_mesh::EnvelopeParser::getCertificate() const
 {
     return m_certificate;
 }
 
 void
-chord_mesh::MessageParser::setCertificate(std::shared_ptr<tempo_security::X509Certificate> certificate)
+chord_mesh::EnvelopeParser::setCertificate(std::shared_ptr<tempo_security::X509Certificate> certificate)
 {
     m_certificate = certificate;
 }
 
 tempo_utils::Status
-chord_mesh::MessageParser::pushBytes(std::span<const tu_uint8> bytes)
+chord_mesh::EnvelopeParser::pushBytes(std::span<const tu_uint8> bytes)
 {
     m_pending->appendBytes(bytes);
     return {};
 }
 
 tempo_utils::Status
-chord_mesh::MessageParser::checkReady(bool &ready)
+chord_mesh::EnvelopeParser::checkReady(bool &ready)
 {
     if (m_ready) {
         ready = true;
@@ -274,30 +274,30 @@ chord_mesh::MessageParser::checkReady(bool &ready)
 
     ready = false;
 
-    // get the message version if we have read enough input
-    if (m_messageVersion == 0) {
+    // get the envelope version if we have read enough input
+    if (m_envelopeVersion == 0) {
         if (m_pending->getSize() < 2)
             return {};
         auto *ptr = m_pending->getData();
-        m_messageVersion = tempo_utils::read_u8_and_advance(ptr);
+        m_envelopeVersion = tempo_utils::read_u8_and_advance(ptr);
     }
 
-    // validate message version
-    switch (m_messageVersion) {
-        case kMessageVersionStream:
-        case kMessageVersion1:
+    // validate envelope version
+    switch (m_envelopeVersion) {
+        case kEnvelopeVersionStream:
+        case kEnvelopeVersion1:
             break;
         default:
             return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
-                "invalid message version");
+                "invalid envelope version");
     }
 
-    // get the message version and payload size if we have read enough input
+    // get the envelope version and payload size if we have read enough input
     if (m_payloadSize == 0) {
         if (m_pending->getSize() < 10)
             return {};
         auto *ptr = m_pending->getData() + 1;
-        m_messageFlags = tempo_utils::read_u8_and_advance(ptr);
+        m_envelopeFlags = tempo_utils::read_u8_and_advance(ptr);
         m_timestamp = tempo_utils::read_u32_and_advance(ptr);
         m_payloadSize = tempo_utils::read_u32_and_advance(ptr);
         if (m_payloadSize == 0)
@@ -305,12 +305,12 @@ chord_mesh::MessageParser::checkReady(bool &ready)
                 "payload size must be greater than 0");
     }
 
-    bool verificationRequired = m_messageFlags & kMessageSignedFlag;
+    bool verificationRequired = m_envelopeFlags & kEnvelopeSignedFlag;
 
-    // fail if message is signed and no certificate is present
+    // fail if envelope is signed and no certificate is present
     if (verificationRequired && m_certificate == nullptr)
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
-            "cannot verify signed message");
+            "cannot verify signed envelope");
 
     // we haven't read enough input to parse the payload
     if (m_pending->getSize() < 10 + m_payloadSize)
@@ -340,36 +340,36 @@ chord_mesh::MessageParser::checkReady(bool &ready)
 }
 
 tempo_utils::Status
-chord_mesh::MessageParser::takeReady(Message &message)
+chord_mesh::EnvelopeParser::takeReady(Envelope &envelope)
 {
     if (!m_ready)
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
-            "no ready message available");
+            "no ready envelope available");
 
     // finish the appender
     auto pending = m_pending->finish()->toSlice();
 
     // copy parser state before reset
     auto trailerSize = m_digestSize > 0? m_digestSize + 1 : 0;
-    auto messageSize = 10 + m_payloadSize + trailerSize;
+    auto envelopeSize = 10 + m_payloadSize + trailerSize;
     auto payloadSize = m_payloadSize;
     auto digestSize = m_digestSize;
-    auto messageVersion = m_messageVersion;
-    auto messageFlags = m_messageFlags;
+    auto envelopeVersion = m_envelopeVersion;
+    auto envelopeFlags = m_envelopeFlags;
     auto timestamp = absl::FromUnixSeconds(m_timestamp);
-    bool verificationRequired = messageFlags & kMessageSignedFlag;
+    bool verificationRequired = envelopeFlags & kEnvelopeSignedFlag;
 
     // reset parser state
     reset();
 
     // if there is additional data then add it to the appender
-    auto remainder = pending.slice(messageSize, pending.getSize() - messageSize);
+    auto remainder = pending.slice(envelopeSize, pending.getSize() - envelopeSize);
     if (!remainder.isEmpty()) {
         m_pending->appendBytes(remainder.sliceView());
     }
 
-    // construct the message
-    Message message_(messageVersion, messageFlags, timestamp);
+    // construct the envelope
+    Envelope envelope_(envelopeVersion, envelopeFlags, timestamp);
     auto payloadBytes = pending.slice(10, payloadSize).sliceView();
 
     // verify the signature against the public key
@@ -383,23 +383,23 @@ chord_mesh::MessageParser::takeReady(Message &message)
         if (!verified)
             return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
                 "signature verification failed");
-        message_.setDigest(digest);
+        envelope_.setDigest(digest);
     }
 
-    message_.setPayload(tempo_utils::MemoryBytes::copy(payloadBytes));
-    message = message_;
+    envelope_.setPayload(tempo_utils::MemoryBytes::copy(payloadBytes));
+    envelope = envelope_;
 
     return {};
 }
 
 bool
-chord_mesh::MessageParser::hasPending() const
+chord_mesh::EnvelopeParser::hasPending() const
 {
     return m_pending->getSize() > 0;
 }
 
 std::shared_ptr<const tempo_utils::MemoryBytes>
-chord_mesh::MessageParser::popPending()
+chord_mesh::EnvelopeParser::popPending()
 {
     auto pending = m_pending->finish();
     reset();
@@ -407,12 +407,12 @@ chord_mesh::MessageParser::popPending()
 }
 
 void
-chord_mesh::MessageParser::reset()
+chord_mesh::EnvelopeParser::reset()
 {
     m_pending = std::make_unique<tempo_utils::BytesAppender>();
     m_ready = false;
-    m_messageVersion = 0;
-    m_messageFlags = 0;
+    m_envelopeVersion = 0;
+    m_envelopeFlags = 0;
     m_timestamp = 0;
     m_payloadSize = 0;
     m_digestSize = 0;

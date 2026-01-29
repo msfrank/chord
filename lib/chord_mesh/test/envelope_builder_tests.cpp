@@ -1,8 +1,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-
-#include <chord_mesh/message.h>
+#include <chord_mesh/envelope.h>
 #include <tempo_security/ed25519_private_key_generator.h>
 #include <tempo_security/generate_utils.h>
 #include <tempo_test/tempo_test.h>
@@ -12,7 +11,7 @@
 
 #include "base_mesh_fixture.h"
 
-class MessageBuilder : public BaseMeshFixture {
+class EnvelopeBuilder : public BaseMeshFixture {
 protected:
 
     void SetUp() override {
@@ -46,13 +45,13 @@ private:
     tempo_security::CertificateKeyPair m_keyPair;
 };
 
-TEST_F(MessageBuilder, BuildUnsignedMessage)
+TEST_F(EnvelopeBuilder, BuildUnsignedEnvelope)
 {
     auto now = absl::Now();
     auto payload = tempo_utils::MemoryBytes::copy("hello, world!");
 
-    chord_mesh::MessageBuilder builder;
-    builder.setVersion(chord_mesh::MessageVersion::Version1);
+    chord_mesh::EnvelopeBuilder builder;
+    builder.setVersion(chord_mesh::EnvelopeVersion::Version1);
     builder.setPayload(payload);
     builder.setTimestamp(now);
 
@@ -62,11 +61,11 @@ TEST_F(MessageBuilder, BuildUnsignedMessage)
     ASSERT_LE (5, bytes->getSize());
     auto *ptr = bytes->getData();
 
-    tu_uint8 messageVersion = tempo_utils::read_u8_and_advance(ptr);
-    ASSERT_EQ (1, messageVersion);
+    tu_uint8 envelopeVersion = tempo_utils::read_u8_and_advance(ptr);
+    ASSERT_EQ (1, envelopeVersion);
 
-    tu_uint8 messageFlags = tempo_utils::read_u8_and_advance(ptr);
-    ASSERT_FALSE (messageFlags & chord_mesh::kMessageSignedFlag);
+    tu_uint8 envelopeFlags = tempo_utils::read_u8_and_advance(ptr);
+    ASSERT_FALSE (envelopeFlags & chord_mesh::kEnvelopeSignedFlag);
 
     tu_uint32 timestamp = tempo_utils::read_u32_and_advance(ptr);
     ASSERT_EQ (absl::ToUnixSeconds(now), timestamp);
@@ -81,7 +80,7 @@ TEST_F(MessageBuilder, BuildUnsignedMessage)
     ASSERT_EQ (bytes->getSize(), ptr - bytes->getData());
 }
 
-TEST_F(MessageBuilder, BuildSignedMessage)
+TEST_F(EnvelopeBuilder, BuildSignedEnvelope)
 {
     auto now = absl::Now();
     auto payload = tempo_utils::MemoryBytes::copy("hello, world!");
@@ -92,8 +91,8 @@ TEST_F(MessageBuilder, BuildSignedMessage)
     std::shared_ptr<tempo_security::X509Certificate> certificate;
     TU_ASSIGN_OR_RAISE (certificate, tempo_security::X509Certificate::readFile(keyPair.getPemCertificateFile()));
 
-    chord_mesh::MessageBuilder builder;
-    builder.setVersion(chord_mesh::MessageVersion::Version1);
+    chord_mesh::EnvelopeBuilder builder;
+    builder.setVersion(chord_mesh::EnvelopeVersion::Version1);
     builder.setPayload(payload);
     builder.setTimestamp(now);
     builder.setPrivateKey(privateKey);
@@ -104,11 +103,11 @@ TEST_F(MessageBuilder, BuildSignedMessage)
     ASSERT_LE (5, bytes->getSize());
     auto *ptr = bytes->getData();
 
-    tu_uint8 messageVersion = tempo_utils::read_u8_and_advance(ptr);
-    ASSERT_EQ (1, messageVersion);
+    tu_uint8 envelopeVersion = tempo_utils::read_u8_and_advance(ptr);
+    ASSERT_EQ (1, envelopeVersion);
 
-    tu_uint8 messageFlags = tempo_utils::read_u8_and_advance(ptr);
-    ASSERT_TRUE (messageFlags & chord_mesh::kMessageSignedFlag);
+    tu_uint8 envelopeFlags = tempo_utils::read_u8_and_advance(ptr);
+    ASSERT_TRUE (envelopeFlags & chord_mesh::kEnvelopeSignedFlag);
 
     tu_uint32 timestamp = tempo_utils::read_u32_and_advance(ptr);
     ASSERT_EQ (absl::ToUnixSeconds(now), timestamp);

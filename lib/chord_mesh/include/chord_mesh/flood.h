@@ -14,7 +14,7 @@ namespace chord_mesh {
     struct FloodCallbacks {
         void (*join)(std::string_view, void *) = nullptr;
         void (*leave)(std::string_view, void *) = nullptr;
-        void (*receive)(const Message &, void *) = nullptr;
+        void (*receive)(const Envelope &, void *) = nullptr;
         void (*error)(const tempo_utils::Status &, void *) = nullptr;
         void (*cleanup)(void *) = nullptr;
     };
@@ -87,7 +87,7 @@ namespace chord_mesh {
         friend void peer_accepted(std::shared_ptr<Stream> stream, void *data);
         friend void peer_connected(std::shared_ptr<Stream> stream, void *data);
         friend bool peer_negotiate(std::string_view protocolName, std::shared_ptr<tempo_security::X509Certificate> certificate, void *data);
-        friend void peer_receive(const Message &message, void *data);
+        friend void peer_receive(const Envelope &message, void *data);
         friend void accept_error(const tempo_utils::Status &status, void *data);
         friend void connect_error(const tempo_utils::Status &status, void *data);
         friend void retry_connect(uv_timer_t *handle);

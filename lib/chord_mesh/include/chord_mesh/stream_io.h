@@ -5,7 +5,7 @@
 #include <tempo_utils/status.h>
 
 #include "noise.h"
-#include "message.h"
+#include "envelope.h"
 #include "stream_buf.h"
 #include "stream_manager.h"
 
@@ -26,7 +26,7 @@ namespace chord_mesh {
         virtual tempo_utils::Status read(const tu_uint8 *data, ssize_t size) = 0;
         virtual tempo_utils::Status write(AbstractStreamBufWriter *writer, StreamBuf *streamBuf) = 0;
         virtual tempo_utils::Status check(bool &ready) = 0;
-        virtual tempo_utils::Status take(Message &message) = 0;
+        virtual tempo_utils::Status take(Envelope &message) = 0;
     };
 
     class Pending {
@@ -52,7 +52,7 @@ namespace chord_mesh {
         tempo_utils::Status read(const tu_uint8 *data, ssize_t size) override;
         tempo_utils::Status write(AbstractStreamBufWriter *writer, StreamBuf *streamBuf) override;
         tempo_utils::Status check(bool &ready) override;
-        tempo_utils::Status take(Message &message) override;
+        tempo_utils::Status take(Envelope &message) override;
 
         std::unique_ptr<Pending>&& takePending();
 
@@ -66,7 +66,7 @@ namespace chord_mesh {
         tempo_utils::Status read(const tu_uint8 *data, ssize_t size) override;
         tempo_utils::Status write(AbstractStreamBufWriter *writer, StreamBuf *streamBuf) override;
         tempo_utils::Status check(bool &ready) override;
-        tempo_utils::Status take(Message &message) override;
+        tempo_utils::Status take(Envelope &message) override;
 
         tempo_utils::Status negotiate(
             std::shared_ptr<const tempo_utils::ImmutableBytes> bytes,
@@ -76,7 +76,7 @@ namespace chord_mesh {
 
     private:
         bool m_secure;
-        MessageParser m_parser;
+        EnvelopeParser m_parser;
         std::unique_ptr<Pending> m_pending;
     };
 
@@ -89,7 +89,7 @@ namespace chord_mesh {
         tempo_utils::Status read(const tu_uint8 *data, ssize_t size) override;
         tempo_utils::Status write(AbstractStreamBufWriter *writer, StreamBuf *streamBuf) override;
         tempo_utils::Status check(bool &ready) override;
-        tempo_utils::Status take(Message &message) override;
+        tempo_utils::Status take(Envelope &message) override;
 
         std::string getRemoteProtocolName() const;
         std::span<const tu_uint8> getRemotePublicKey() const;
@@ -114,7 +114,7 @@ namespace chord_mesh {
         tempo_utils::Status read(const tu_uint8 *data, ssize_t size) override;
         tempo_utils::Status write(AbstractStreamBufWriter *writer, StreamBuf *streamBuf) override;
         tempo_utils::Status check(bool &ready) override;
-        tempo_utils::Status take(Message &message) override;
+        tempo_utils::Status take(Envelope &message) override;
 
         std::string getLocalProtocolName() const;
         std::span<const tu_uint8> getLocalPrivateKey() const;
@@ -125,7 +125,7 @@ namespace chord_mesh {
         std::string m_protocolName;
         std::vector<tu_uint8> m_localPrivateKey;
         std::unique_ptr<Pending> m_pending;
-        MessageParser m_parser;
+        EnvelopeParser m_parser;
     };
 
     class HandshakingStreamBehavior : public AbstractStreamBehavior {
@@ -134,7 +134,7 @@ namespace chord_mesh {
         tempo_utils::Status read(const tu_uint8 *data, ssize_t size) override;
         tempo_utils::Status write(AbstractStreamBufWriter *writer, StreamBuf *streamBuf) override;
         tempo_utils::Status check(bool &ready) override;
-        tempo_utils::Status take(Message &message) override;
+        tempo_utils::Status take(Envelope &message) override;
 
         tempo_utils::Status start(AbstractStreamBufWriter *writer);
         tempo_utils::Status process(std::span<const tu_uint8> data, AbstractStreamBufWriter *writer, bool &finished);
@@ -145,7 +145,7 @@ namespace chord_mesh {
     private:
         std::shared_ptr<Handshake> m_handshake;
         std::unique_ptr<Pending> m_pending;
-        MessageParser m_parser;
+        EnvelopeParser m_parser;
     };
 
     class SecureStreamBehavior : public AbstractStreamBehavior {
@@ -154,7 +154,7 @@ namespace chord_mesh {
         tempo_utils::Status read(const tu_uint8 *data, ssize_t size) override;
         tempo_utils::Status write(AbstractStreamBufWriter *writer, StreamBuf *streamBuf) override;
         tempo_utils::Status check(bool &ready) override;
-        tempo_utils::Status take(Message &message) override;
+        tempo_utils::Status take(Envelope &message) override;
 
         tempo_utils::Status start(AbstractStreamBufWriter *writer);
         std::shared_ptr<const tempo_utils::ImmutableBytes> takePending();
@@ -162,7 +162,7 @@ namespace chord_mesh {
     private:
         std::shared_ptr<Cipher> m_cipher;
         std::unique_ptr<Pending> m_pending;
-        MessageParser m_parser;
+        EnvelopeParser m_parser;
     };
 
     class StreamIO {
@@ -188,7 +188,7 @@ namespace chord_mesh {
         tempo_utils::Status write(std::shared_ptr<const tempo_utils::ImmutableBytes> bytes);
 
         tempo_utils::Status checkReady(bool &ready);
-        tempo_utils::Status takeReady(Message &message);
+        tempo_utils::Status takeReady(Envelope &message);
 
     private:
         bool m_initiator;

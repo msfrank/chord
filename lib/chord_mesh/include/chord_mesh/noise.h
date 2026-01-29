@@ -10,7 +10,7 @@
 #include <tempo_security/x509_store.h>
 #include <tempo_utils/bytes_appender.h>
 
-#include "message.h"
+#include "envelope.h"
 #include "stream_buf.h"
 
 namespace chord_mesh {

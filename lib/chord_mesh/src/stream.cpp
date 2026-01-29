@@ -181,20 +181,20 @@ chord_mesh::Stream::write(StreamBuf *streamBuf)
 
 tempo_utils::Status
 chord_mesh::Stream::send(
-    MessageVersion version,
+    EnvelopeVersion version,
     std::shared_ptr<const tempo_utils::ImmutableBytes> payload,
     absl::Time timestamp)
 {
     if (m_state == StreamState::Closed)
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
             "stream is closed");
-    MessageBuilder builder;
+    EnvelopeBuilder builder;
     builder.setVersion(version);
     builder.setPayload(payload);
     builder.setTimestamp(timestamp);
-    std::shared_ptr<const tempo_utils::ImmutableBytes> message;
-    TU_ASSIGN_OR_RETURN (message, builder.toBytes());
-    return m_io->write(message);
+    std::shared_ptr<const tempo_utils::ImmutableBytes> bytes;
+    TU_ASSIGN_OR_RETURN (bytes, builder.toBytes());
+    return m_io->write(bytes);
 }
 
 void
@@ -213,22 +213,22 @@ chord_mesh::Stream::processReadyMessages()
         if (!ready)
             break;
 
-        Message message;
-        status = m_io->takeReady(message);
+        Envelope envelope;
+        status = m_io->takeReady(envelope);
         if (status.notOk()) {
             emitError(status);
             return;
         }
 
-        switch (message.getVersion()) {
-            case MessageVersion::Stream:
+        switch (envelope.getVersion()) {
+            case EnvelopeVersion::Stream:
                 // handle stream messages internally
-                processStreamMessage(message);
+                processStreamMessage(envelope);
                 break;
             default:
                 // invoke the receive callback any other message
                 if (m_ops.receive != nullptr) {
-                    m_ops.receive(message, m_data);
+                    m_ops.receive(envelope, m_data);
                 }
                 break;
         }
@@ -236,11 +236,11 @@ chord_mesh::Stream::processReadyMessages()
 }
 
 void
-chord_mesh::Stream::processStreamMessage(const Message &message)
+chord_mesh::Stream::processStreamMessage(const Envelope &envelope)
 {
-    TU_ASSERT (message.getVersion() == MessageVersion::Stream);
+    TU_ASSERT (envelope.getVersion() == EnvelopeVersion::Stream);
 
-    auto payload = message.getPayload();
+    auto payload = envelope.getPayload();
     auto arrayPtr = kj::arrayPtr(payload->getData(), payload->getSize());
     kj::ArrayInputStream inputStream(arrayPtr);
     capnp::MallocMessageBuilder builder;

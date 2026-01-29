@@ -89,20 +89,20 @@ TEST_F(InsecureStream, ReadAndWriteStream)
         chord_mesh::StreamConnector *connector;
         std::shared_ptr<chord_mesh::Stream> acceptorStream;
         std::shared_ptr<chord_mesh::Stream> connectorStream;
-        std::vector<chord_mesh::Message> acceptorReceived;
-        std::vector<chord_mesh::Message> connectorReceived;
+        std::vector<chord_mesh::Envelope> acceptorReceived;
+        std::vector<chord_mesh::Envelope> connectorReceived;
         absl::Notification notifyComplete;
     } data;
 
     chord_mesh::StreamAcceptorOps acceptorOps;
     acceptorOps.accept = [](std::shared_ptr<chord_mesh::Stream> stream, void *ptr) {
         chord_mesh::StreamOps streamOps;
-        streamOps.receive = [](const chord_mesh::Message &message, void *ptr) {
+        streamOps.receive = [](const chord_mesh::Envelope &envelope, void *ptr) {
             auto *data = (Data *) ptr;
-            data->acceptorReceived.push_back(message);
+            data->acceptorReceived.push_back(envelope);
             auto &stream = data->acceptorStream;
             TU_RAISE_IF_NOT_OK (stream->send(
-                chord_mesh::MessageVersion::Version1, tempo_utils::MemoryBytes::copy("pong!")));
+                chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("pong!")));
         };
         TU_RAISE_IF_NOT_OK (stream->start(streamOps, ptr));
         auto *data = (Data *) ptr;
@@ -118,13 +118,13 @@ TEST_F(InsecureStream, ReadAndWriteStream)
     chord_mesh::StreamConnectorOps connectorOps;
     connectorOps.connect = [](std::shared_ptr<chord_mesh::Stream> stream, void *ptr) {
         chord_mesh::StreamOps streamOps;
-        streamOps.receive = [](const chord_mesh::Message &message, void *ptr) {
+        streamOps.receive = [](const chord_mesh::Envelope &envelope, void *ptr) {
             auto *data = (Data *) ptr;
-            data->connectorReceived.push_back(message);
+            data->connectorReceived.push_back(envelope);
             auto &stream = data->connectorStream;
             if (data->connectorReceived.size() < data->numRounds) {
                 TU_RAISE_IF_NOT_OK (stream->send(
-                    chord_mesh::MessageVersion::Version1, tempo_utils::MemoryBytes::copy("ping!")));
+                    chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("ping!")));
             } else {
                 stream->shutdown();
                 data->notifyComplete.Notify();
@@ -132,7 +132,7 @@ TEST_F(InsecureStream, ReadAndWriteStream)
         };
         TU_RAISE_IF_NOT_OK (stream->start(streamOps, ptr));
         TU_RAISE_IF_NOT_OK (stream->send(
-            chord_mesh::MessageVersion::Version1, tempo_utils::MemoryBytes::copy("ping!")));
+            chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("ping!")));
         auto *data = (Data *) ptr;
         data->connectorStream = std::move(stream);
     };
@@ -166,12 +166,12 @@ TEST_F(InsecureStream, ReadAndWriteStream)
     acceptor->shutdown();
 
     ASSERT_EQ (data.numRounds, data.acceptorReceived.size());
-    for (const auto &message : data.acceptorReceived) {
-        ASSERT_EQ ("ping!", message.getPayload()->getStringView());
+    for (const auto &envelope : data.acceptorReceived) {
+        ASSERT_EQ ("ping!", envelope.getPayload()->getStringView());
     }
 
     ASSERT_EQ (data.numRounds, data.connectorReceived.size());
-    for (const auto &message : data.connectorReceived) {
-        ASSERT_EQ ("pong!", message.getPayload()->getStringView());
+    for (const auto &envelope : data.connectorReceived) {
+        ASSERT_EQ ("pong!", envelope.getPayload()->getStringView());
     }
 }

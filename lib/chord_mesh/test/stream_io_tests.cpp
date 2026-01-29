@@ -3,7 +3,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include <chord_mesh/message.h>
+#include <chord_mesh/envelope.h>
 #include <kj/common.h>
 #include <kj/io.h>
 #include <tempo_security/ed25519_private_key_generator.h>
@@ -147,8 +147,8 @@ TEST_F(StreamIO, SendAndReceiveInsecure)
     std::string goodbye = "goodbye!";
     auto now = absl::Now();
 
-    chord_mesh::MessageBuilder builder;
-    builder.setVersion(chord_mesh::MessageVersion::Version1);
+    chord_mesh::EnvelopeBuilder builder;
+    builder.setVersion(chord_mesh::EnvelopeVersion::Version1);
     builder.setTimestamp(now);
     builder.setPayload(tempo_utils::MemoryBytes::copy(goodbye));
     auto toBytesResult = builder.toBytes();
@@ -161,11 +161,11 @@ TEST_F(StreamIO, SendAndReceiveInsecure)
     ASSERT_THAT (streamIO.checkReady(ready), tempo_test::IsOk());
     ASSERT_TRUE (ready);
 
-    chord_mesh::Message message;
+    chord_mesh::Envelope message;
     ASSERT_THAT (streamIO.takeReady(message), tempo_test::IsOk());
     ASSERT_TRUE (message.isValid());
     ASSERT_FALSE (message.isSigned());
-    ASSERT_EQ (chord_mesh::MessageVersion::Version1, message.getVersion());
+    ASSERT_EQ (chord_mesh::EnvelopeVersion::Version1, message.getVersion());
     ASSERT_EQ (absl::ToUnixSeconds(now), absl::ToUnixSeconds(message.getTimestamp()));
     ASSERT_EQ (goodbye, message.getPayload()->getStringView());
 }
@@ -180,7 +180,7 @@ public:
 };
 
 chord_mesh::generated::StreamMessage::Builder
-parse_stream_message(const chord_mesh::Message &message)
+parse_stream_message(const chord_mesh::Envelope &message)
 {
     auto payload = message.getPayload();
     auto arrayPtr = kj::arrayPtr(payload->getData(), payload->getSize());
@@ -193,13 +193,13 @@ parse_stream_message(const chord_mesh::Message &message)
 std::shared_ptr<const tempo_utils::ImmutableBytes>
 parse_handshake_message(std::span<const tu_uint8> data)
 {
-    chord_mesh::MessageParser parser;
+    chord_mesh::EnvelopeParser parser;
     TU_RAISE_IF_NOT_OK (parser.pushBytes(data));
     bool ready;
     TU_RAISE_IF_NOT_OK (parser.checkReady(ready));
     if (!ready)
         return {};
-    chord_mesh::Message message;
+    chord_mesh::Envelope message;
     TU_RAISE_IF_NOT_OK (parser.takeReady(message));
     auto payload = message.getPayload();
     auto arrayPtr = kj::arrayPtr(payload->getData(), payload->getSize());
@@ -233,12 +233,12 @@ TEST_F(StreamIO, PerformInitiatorHandshake)
     auto *buf1 = streamBufWriter.bufs.front();
     streamBufWriter.bufs.pop();
 
-    chord_mesh::MessageParser parser;
+    chord_mesh::EnvelopeParser parser;
     ASSERT_THAT (parser.pushBytes(buf1->getSpan()), tempo_test::IsOk());
     chord_mesh::free_stream_buf(buf1);
     bool ready;
     ASSERT_THAT (parser.checkReady(ready), tempo_test::IsOk());
-    chord_mesh::Message message1;
+    chord_mesh::Envelope message1;
     ASSERT_THAT (parser.takeReady(message1), tempo_test::IsOk());
 
     auto streamMessage1 = parse_stream_message(message1);
@@ -311,12 +311,12 @@ TEST_F(StreamIO, PerformResponderHandshake)
     auto *buf1 = streamBufWriter.bufs.front();
     streamBufWriter.bufs.pop();
 
-    chord_mesh::MessageParser parser;
+    chord_mesh::EnvelopeParser parser;
     ASSERT_THAT (parser.pushBytes(buf1->getSpan()), tempo_test::IsOk());
     chord_mesh::free_stream_buf(buf1);
     bool ready;
     ASSERT_THAT (parser.checkReady(ready), tempo_test::IsOk());
-    chord_mesh::Message message1;
+    chord_mesh::Envelope message1;
     ASSERT_THAT (parser.takeReady(message1), tempo_test::IsOk());
 
     auto streamMessage1 = parse_stream_message(message1);

@@ -45,14 +45,14 @@ BaseMeshFixture::stopUVThread()
     return {};
 }
 
-chord_mesh::Message
-parse_raw_message(std::span<const tu_uint8> raw)
+chord_mesh::Envelope
+parse_raw_envelope(std::span<const tu_uint8> raw)
 {
-    chord_mesh::MessageParser parser;
+    chord_mesh::EnvelopeParser parser;
     parser.pushBytes(raw);
     bool ready;
     TU_RAISE_IF_NOT_OK (parser.checkReady(ready));
-    chord_mesh::Message message;
+    chord_mesh::Envelope message;
     TU_RAISE_IF_NOT_OK (parser.takeReady(message));
     return message;
 }

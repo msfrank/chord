@@ -101,7 +101,7 @@ chord_mesh::InitialStreamBehavior::check(bool &ready)
 }
 
 tempo_utils::Status
-chord_mesh::InitialStreamBehavior::take(Message &message)
+chord_mesh::InitialStreamBehavior::take(Envelope &envelope)
 {
     return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
         "stream IO cannot take in Initial state");
@@ -143,17 +143,17 @@ chord_mesh::InsecureStreamBehavior::check(bool &ready)
 }
 
 tempo_utils::Status
-chord_mesh::InsecureStreamBehavior::take(Message &message)
+chord_mesh::InsecureStreamBehavior::take(Envelope &envelope)
 {
-    Message m;
-    TU_RETURN_IF_NOT_OK (m_parser.takeReady(m));
+    Envelope envelope_;
+    TU_RETURN_IF_NOT_OK (m_parser.takeReady(envelope_));
 
     // if we are operating in secure mode then we only permit stream messages
-    if (m_secure && m.getVersion() != MessageVersion::Stream)
+    if (m_secure && envelope_.getVersion() != EnvelopeVersion::Stream)
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
             "stream IO cannot take message in Insecure state");
 
-    message = m;
+    envelope = envelope_;
     return {};
 }
 
@@ -220,7 +220,7 @@ chord_mesh::PendingLocalStreamBehavior::check(bool &ready)
 }
 
 tempo_utils::Status
-chord_mesh::PendingLocalStreamBehavior::take(Message &message)
+chord_mesh::PendingLocalStreamBehavior::take(Envelope &envelope)
 {
     return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
         "stream IO cannot take in PendingLocal state");
@@ -286,9 +286,9 @@ chord_mesh::PendingRemoteStreamBehavior::check(bool &ready)
 }
 
 tempo_utils::Status
-chord_mesh::PendingRemoteStreamBehavior::take(Message &message)
+chord_mesh::PendingRemoteStreamBehavior::take(Envelope &envelope)
 {
-    return m_parser.takeReady(message);
+    return m_parser.takeReady(envelope);
 }
 
 std::string
@@ -331,11 +331,11 @@ build_stream_handshake_message(std::span<const tu_uint8> data)
     auto flatArray = capnp::messageToFlatArray(capnpBuilder);
     auto arrayPtr = flatArray.asBytes();
 
-    // construct the message
-    chord_mesh::MessageBuilder messageBuilder;
-    messageBuilder.setVersion(chord_mesh::MessageVersion::Stream);
-    messageBuilder.setPayload(tempo_utils::MemoryBytes::copy(std::span(arrayPtr.begin(), arrayPtr.end())));
-    return messageBuilder.toBytes();
+    // construct the envelope
+    chord_mesh::EnvelopeBuilder envelopeBuilder;
+    envelopeBuilder.setVersion(chord_mesh::EnvelopeVersion::Stream);
+    envelopeBuilder.setPayload(tempo_utils::MemoryBytes::copy(std::span(arrayPtr.begin(), arrayPtr.end())));
+    return envelopeBuilder.toBytes();
 }
 
 tempo_utils::Status
@@ -439,15 +439,15 @@ chord_mesh::HandshakingStreamBehavior::check(bool &ready)
 }
 
 tempo_utils::Status
-chord_mesh::HandshakingStreamBehavior::take(Message &message)
+chord_mesh::HandshakingStreamBehavior::take(Envelope &envelope)
 {
-    Message ready;
+    Envelope ready;
     TU_RETURN_IF_NOT_OK (m_parser.takeReady(ready));
 
-    if (ready.getVersion() != MessageVersion::Stream)
+    if (ready.getVersion() != EnvelopeVersion::Stream)
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
             "invalid message while in Handshaking state");
-    message = ready;
+    envelope = ready;
     return {};
 }
 
@@ -517,9 +517,9 @@ chord_mesh::SecureStreamBehavior::check(bool &ready)
 }
 
 tempo_utils::Status
-chord_mesh::SecureStreamBehavior::take(Message &message)
+chord_mesh::SecureStreamBehavior::take(Envelope &envelope)
 {
-    return m_parser.takeReady(message);
+    return m_parser.takeReady(envelope);
 }
 
 std::shared_ptr<const tempo_utils::ImmutableBytes>
@@ -592,10 +592,10 @@ build_stream_negotiate_message(
     auto arrayPtr = flatArray.asBytes();
 
     // construct the message
-    chord_mesh::MessageBuilder messageBuilder;
-    messageBuilder.setVersion(chord_mesh::MessageVersion::Stream);
-    messageBuilder.setPayload(tempo_utils::MemoryBytes::copy(std::span(arrayPtr.begin(), arrayPtr.end())));
-    return messageBuilder.toBytes();
+    chord_mesh::EnvelopeBuilder envelopeBuilder;
+    envelopeBuilder.setVersion(chord_mesh::EnvelopeVersion::Stream);
+    envelopeBuilder.setPayload(tempo_utils::MemoryBytes::copy(std::span(arrayPtr.begin(), arrayPtr.end())));
+    return envelopeBuilder.toBytes();
 }
 
 tempo_utils::Status
@@ -787,10 +787,10 @@ chord_mesh::StreamIO::checkReady(bool &ready)
 }
 
 tempo_utils::Status
-chord_mesh::StreamIO::takeReady(Message &message)
+chord_mesh::StreamIO::takeReady(Envelope &envelope)
 {
     if (m_behavior == nullptr)
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
             "invalid stream IO state");
-    return m_behavior->take(message);
+    return m_behavior->take(envelope);
 }

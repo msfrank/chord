@@ -36,6 +36,7 @@ namespace chord_mesh {
         std::string protocolName = {};
         void *data = nullptr;
     };
+
     class StreamManager {
     public:
         StreamManager(

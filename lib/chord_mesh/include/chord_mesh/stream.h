@@ -10,7 +10,7 @@
 #include <tempo_utils/result.h>
 #include <tempo_utils/uuid.h>
 
-#include "message.h"
+#include "envelope.h"
 #include "stream_buf.h"
 #include "stream_io.h"
 #include "stream_manager.h"
@@ -24,7 +24,7 @@ namespace chord_mesh {
     };
 
     struct StreamOps {
-        void (*receive)(const Message &, void *) = nullptr;
+        void (*receive)(const Envelope &, void *) = nullptr;
         bool (*negotiate)(std::string_view, std::shared_ptr<tempo_security::X509Certificate>, void *) = nullptr;
         void (*error)(const tempo_utils::Status &, void *) = nullptr;
         void (*cleanup)(void *) = nullptr;
@@ -44,7 +44,7 @@ namespace chord_mesh {
         tempo_utils::Status start(const StreamOps &ops, void *data = nullptr);
         tempo_utils::Status negotiate(std::string_view protocolName);
         tempo_utils::Status send(
-            MessageVersion version,
+            EnvelopeVersion version,
             std::shared_ptr<const tempo_utils::ImmutableBytes> payload,
             absl::Time timestamp = {});
         void shutdown();
@@ -66,7 +66,7 @@ namespace chord_mesh {
         friend class StreamConnector;
 
         void processReadyMessages();
-        void processStreamMessage(const Message &message);
+        void processStreamMessage(const Envelope &envelope);
         void emitError(const tempo_utils::Status &status);
 
         friend void allocate_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf);

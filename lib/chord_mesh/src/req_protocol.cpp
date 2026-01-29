@@ -15,7 +15,7 @@ chord_mesh::ReqProtocolImpl::ReqProtocolImpl(
 }
 
 void
-chord_mesh::on_stream_receive(const Message &message, void *data)
+chord_mesh::on_stream_receive(const Envelope &message, void *data)
 {
     auto *impl = static_cast<ReqProtocolImpl *>(data);
     impl->receive(0, message.getPayload());
@@ -30,7 +30,7 @@ chord_mesh::on_connect_complete(std::shared_ptr<Stream> stream, void *data)
     stream->start(ops);
     while (!impl->m_pending.empty()) {
         auto pending = impl->m_pending.front();
-        stream->send(MessageVersion::Version1, pending.second);
+        stream->send(EnvelopeVersion::Version1, pending.second);
         impl->m_pending.pop();
     }
     impl->m_stream = std::move(stream);
@@ -67,7 +67,7 @@ chord_mesh::ReqProtocolImpl::send(::capnp::MessageBuilder &builder)
 
     auto id = m_currId++;
     if (m_stream != nullptr) {
-        TU_RETURN_IF_NOT_OK (m_stream->send(MessageVersion::Version1, payload, absl::Now()));
+        TU_RETURN_IF_NOT_OK (m_stream->send(EnvelopeVersion::Version1, payload, absl::Now()));
     } else {
         m_pending.emplace(id, payload);
     }

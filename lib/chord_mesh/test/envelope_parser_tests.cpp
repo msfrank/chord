@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include <chord_mesh/message.h>
+#include <chord_mesh/envelope.h>
 #include <tempo_security/ed25519_private_key_generator.h>
 #include <tempo_security/generate_utils.h>
 #include <tempo_test/tempo_test.h>
@@ -10,7 +10,7 @@
 
 #include "base_mesh_fixture.h"
 
-class MessageParser : public BaseMeshFixture {
+class EnvelopeParser : public BaseMeshFixture {
 protected:
 
     void SetUp() override {
@@ -44,13 +44,13 @@ private:
     tempo_security::CertificateKeyPair m_keyPair;
 };
 
-TEST_F(MessageParser, ParseUnsignedMessage)
+TEST_F(EnvelopeParser, ParseUnsignedEnvelope)
 {
     auto now = absl::Now();
     auto payload = tempo_utils::MemoryBytes::copy("hello, world!");
 
-    chord_mesh::MessageBuilder builder;
-    builder.setVersion(chord_mesh::MessageVersion::Version1);
+    chord_mesh::EnvelopeBuilder builder;
+    builder.setVersion(chord_mesh::EnvelopeVersion::Version1);
     builder.setTimestamp(now);
     builder.setPayload(payload);
 
@@ -58,24 +58,24 @@ TEST_F(MessageParser, ParseUnsignedMessage)
     ASSERT_THAT (toBytesResult, tempo_test::IsResult());
     auto bytes = toBytesResult.getResult();
 
-    chord_mesh::MessageParser parser;
+    chord_mesh::EnvelopeParser parser;
     ASSERT_THAT (parser.pushBytes(bytes->getSpan()), tempo_test::IsOk());
     bool ready;
     ASSERT_THAT (parser.checkReady(ready), tempo_test::IsOk());
     ASSERT_TRUE (ready);
-    chord_mesh::Message message;
-    ASSERT_THAT (parser.takeReady(message), tempo_test::IsOk());
+    chord_mesh::Envelope envelope;
+    ASSERT_THAT (parser.takeReady(envelope), tempo_test::IsOk());
 
-    ASSERT_EQ (absl::ToUnixSeconds(now), absl::ToUnixSeconds(message.getTimestamp()));
+    ASSERT_EQ (absl::ToUnixSeconds(now), absl::ToUnixSeconds(envelope.getTimestamp()));
 
-    auto payloadString = message.getPayload()->getStringView();
+    auto payloadString = envelope.getPayload()->getStringView();
     ASSERT_EQ ("hello, world!", payloadString);
 
-    auto digest = message.getDigest();
+    auto digest = envelope.getDigest();
     ASSERT_FALSE (digest.isValid());
 }
 
-TEST_F(MessageParser, ParseSignedMessage)
+TEST_F(EnvelopeParser, ParseSignedEnvelope)
 {
     auto now = absl::Now();
     auto payload = tempo_utils::MemoryBytes::copy("hello, world!");
@@ -86,8 +86,8 @@ TEST_F(MessageParser, ParseSignedMessage)
     std::shared_ptr<tempo_security::X509Certificate> certificate;
     TU_ASSIGN_OR_RAISE (certificate, tempo_security::X509Certificate::readFile(keyPair.getPemCertificateFile()));
 
-    chord_mesh::MessageBuilder builder;
-    builder.setVersion(chord_mesh::MessageVersion::Version1);
+    chord_mesh::EnvelopeBuilder builder;
+    builder.setVersion(chord_mesh::EnvelopeVersion::Version1);
     builder.setTimestamp(now);
     builder.setPayload(payload);
     builder.setPrivateKey(privateKey);
@@ -96,20 +96,20 @@ TEST_F(MessageParser, ParseSignedMessage)
     ASSERT_THAT (toBytesResult, tempo_test::IsResult());
     auto bytes = toBytesResult.getResult();
 
-    chord_mesh::MessageParser parser;
+    chord_mesh::EnvelopeParser parser;
     parser.setCertificate(certificate);
     ASSERT_THAT (parser.pushBytes(bytes->getSpan()), tempo_test::IsOk());
     bool ready;
     ASSERT_THAT (parser.checkReady(ready), tempo_test::IsOk());
     ASSERT_TRUE (ready);
-    chord_mesh::Message message;
-    ASSERT_THAT (parser.takeReady(message), tempo_test::IsOk());
+    chord_mesh::Envelope envelope;
+    ASSERT_THAT (parser.takeReady(envelope), tempo_test::IsOk());
 
-    ASSERT_EQ (absl::ToUnixSeconds(now), absl::ToUnixSeconds(message.getTimestamp()));
+    ASSERT_EQ (absl::ToUnixSeconds(now), absl::ToUnixSeconds(envelope.getTimestamp()));
 
-    auto payloadString = message.getPayload()->getStringView();
+    auto payloadString = envelope.getPayload()->getStringView();
     ASSERT_EQ ("hello, world!", payloadString);
 
-    auto digest = message.getDigest();
+    auto digest = envelope.getDigest();
     ASSERT_TRUE (digest.isValid());
 }

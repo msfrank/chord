@@ -52,7 +52,7 @@ namespace chord_mesh {
 
         friend void on_connect_complete(std::shared_ptr<Stream> stream, void *data);
         friend void on_connect_error(const tempo_utils::Status &status, void *data);
-        friend void on_stream_receive(const Message &message, void *data);
+        friend void on_stream_receive(const Envelope &message, void *data);
     };
 
     /**

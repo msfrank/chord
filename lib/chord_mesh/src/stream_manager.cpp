@@ -1,8 +1,7 @@
 
+#include <chord_mesh/mesh_result.h>
+#include <chord_mesh/noise.h>
 #include <chord_mesh/stream_manager.h>
-
-#include "chord_mesh/mesh_result.h"
-#include "chord_mesh/noise.h"
 
 chord_mesh::StreamManager::StreamManager(
     uv_loop_t *loop,

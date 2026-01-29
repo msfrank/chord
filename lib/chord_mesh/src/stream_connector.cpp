@@ -1,7 +1,6 @@
 
+#include <chord_mesh/mesh_result.h>
 #include <chord_mesh/stream_connector.h>
-
-#include "chord_mesh/mesh_result.h"
 
 chord_mesh::StreamConnector::StreamConnector(
     StreamManager *manager,

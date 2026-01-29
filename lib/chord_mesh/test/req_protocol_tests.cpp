@@ -132,7 +132,7 @@ TEST_F(ReqProtocol, ReadAndWaitForUnixConnectorClose)
     memset(buffer, 0, sizeof(buffer));
     ret = read(connfd, buffer, 127);
     ASSERT_LE (0, ret) << "read() error: " << strerror(errno);
-    auto message = parse_raw_message(std::span(buffer, ret));
+    auto message = parse_raw_envelope(std::span(buffer, ret));
     ASSERT_EQ ("hello, world!", message.getPayload()->getStringView());
     ret = read(connfd, buffer, 127);
     ASSERT_EQ (0, ret) << "expected EOF but read returned " << ret;

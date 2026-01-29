@@ -13,7 +13,7 @@ chord_mesh::FloodMesh::~FloodMesh()
 }
 
 void
-chord_mesh::peer_receive(const Message &message, void *data)
+chord_mesh::peer_receive(const Envelope &envelope, void *data)
 {
     auto *peerPtr = (FloodMesh::PeerHandle *) data;
     auto &network = peerPtr->network;
@@ -23,7 +23,7 @@ chord_mesh::peer_receive(const Message &message, void *data)
     const auto &callbacks = priv->callbacks;
     if (callbacks.receive != nullptr) {
         const auto &options = priv->options;
-        callbacks.receive(message, options.data);
+        callbacks.receive(envelope, options.data);
     }
 }
 
@@ -293,7 +293,7 @@ chord_mesh::FloodMesh::sendMessage(
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
             "peer '{}' is not active", peerId);
 
-    TU_RETURN_IF_NOT_OK (peer->stream->send(MessageVersion::Version1, payload));
+    TU_RETURN_IF_NOT_OK (peer->stream->send(EnvelopeVersion::Version1, payload));
     return {};
 }
 
@@ -310,7 +310,7 @@ chord_mesh::FloodMesh::broadcastMessage(std::shared_ptr<const tempo_utils::Immut
         auto &peer = entry.second;
         if (peer->state != PeerHandle::State::Active)
             continue;
-        TU_RETURN_IF_NOT_OK (peer->stream->send(MessageVersion::Version1, payload, timestamp));
+        TU_RETURN_IF_NOT_OK (peer->stream->send(EnvelopeVersion::Version1, payload, timestamp));
     }
 
     return {};

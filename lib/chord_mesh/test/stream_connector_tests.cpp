@@ -155,7 +155,7 @@ TEST_F(StreamConnector, ReadAndWaitForUnixConnectorClose)
     connectorOps.connect = [](std::shared_ptr<chord_mesh::Stream> stream, void *ptr) {
         chord_mesh::StreamOps streamOps;
         stream->start(streamOps, ptr);
-        stream->send(chord_mesh::MessageVersion::Version1, tempo_utils::MemoryBytes::copy("hello, world!"));
+        stream->send(chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("hello, world!"));
         stream->shutdown();
     };
     chord_mesh::StreamConnectorOptions connectorOptions;
@@ -193,8 +193,8 @@ TEST_F(StreamConnector, ReadAndWaitForUnixConnectorClose)
     memset(buffer, 0, sizeof(buffer));
     ret = read(connfd, buffer, 127);
     ASSERT_LE (0, ret) << "read() error: " << strerror(errno);
-    auto message = parse_raw_message(std::span(buffer, ret));
-    ASSERT_EQ ("hello, world!", message.getPayload()->getStringView());
+    auto envelope = parse_raw_envelope(std::span(buffer, ret));
+    ASSERT_EQ ("hello, world!", envelope.getPayload()->getStringView());
     ret = read(connfd, buffer, 127);
     ASSERT_EQ (0, ret) << "expected EOF but read returned " << ret;
 
@@ -293,7 +293,7 @@ TEST_F(StreamConnector, ReadAndWaitForTcp4ConnectorClose)
     connectorOps.connect = [](std::shared_ptr<chord_mesh::Stream> stream, void *ptr) {
         chord_mesh::StreamOps streamOps;
         stream->start(streamOps, ptr);
-        stream->send(chord_mesh::MessageVersion::Version1, tempo_utils::MemoryBytes::copy("hello, world!"));
+        stream->send(chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("hello, world!"));
         stream->shutdown();
     };
     chord_mesh::StreamConnectorOptions connectorOptions;
@@ -333,8 +333,8 @@ TEST_F(StreamConnector, ReadAndWaitForTcp4ConnectorClose)
     memset(buffer, 0, sizeof(buffer));
     ret = read(connfd, buffer, 127);
     ASSERT_LE (0, ret) << "read() error: " << strerror(errno);
-    auto message = parse_raw_message(std::span(buffer, ret));
-    ASSERT_EQ ("hello, world!", message.getPayload()->getStringView());
+    auto envelope = parse_raw_envelope(std::span(buffer, ret));
+    ASSERT_EQ ("hello, world!", envelope.getPayload()->getStringView());
     ret = read(connfd, buffer, 127);
     ASSERT_EQ (0, ret) << "expected EOF but read returned " << ret;
 

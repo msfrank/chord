@@ -197,6 +197,8 @@ chord_mesh::StreamConnector::connectLocation(const chord_common::TransportLocati
     switch (endpoint.getType()) {
         case chord_common::TransportType::Unix:
             return connectUnix(endpoint.getUnixPath().c_str(), 0, data);
+        case chord_common::TransportType::Tcp4:
+            return connectTcp4(endpoint.getTcp4Address(), endpoint.getTcp4Port(), data);
         default:
             return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
                 "invalid connect endpoint");

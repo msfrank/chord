@@ -12,7 +12,7 @@ set(TEST_CASES
     insecure_stream_tests.cpp
     envelope_builder_tests.cpp
     envelope_parser_tests.cpp
-    #req_protocol_tests.cpp
+    req_protocol_tests.cpp
     secure_stream_tests.cpp
     stream_acceptor_tests.cpp
     stream_connector_tests.cpp
@@ -45,6 +45,7 @@ add_executable(chord_mesh_testsuite
     ${CMAKE_CURRENT_BINARY_DIR}/generated/test_messages.capnp.c++
     ${CMAKE_CURRENT_BINARY_DIR}/generated/test_messages.capnp.h
     )
+target_include_directories(chord_mesh_testsuite PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
 target_link_libraries(chord_mesh_testsuite PUBLIC
     chord::chord_mesh
     tempo::tempo_test
@@ -61,6 +62,7 @@ add_library(ChordMeshTestSuite OBJECT
     ${CMAKE_CURRENT_BINARY_DIR}/generated/test_messages.capnp.c++
     ${CMAKE_CURRENT_BINARY_DIR}/generated/test_messages.capnp.h
     )
+target_include_directories(chord_mesh_testsuite PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
 target_link_libraries(ChordMeshTestSuite PUBLIC
     chord::chord_mesh
     tempo::tempo_test

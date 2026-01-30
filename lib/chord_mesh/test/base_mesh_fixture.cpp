@@ -56,3 +56,20 @@ parse_raw_envelope(std::span<const tu_uint8> raw)
     TU_RAISE_IF_NOT_OK (parser.takeReady(message));
     return message;
 }
+
+ssize_t
+read_until_eof(int fd, std::vector<tu_uint8> &buf)
+{
+    TU_ASSERT (fd >= 0);
+
+    tu_uint8 buffer[128];
+    ssize_t ret;
+    do {
+        ret = read(fd, buffer, 128);
+        if (ret < 0)
+            return ret;
+        buf.insert(buf.end(), buffer, buffer + ret);
+    } while (ret > 0);
+
+    return static_cast<ssize_t>(buf.size());
+}

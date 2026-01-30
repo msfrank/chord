@@ -12,8 +12,9 @@
 #include <tempo_utils/tempdir_maker.h>
 
 #include "base_mesh_fixture.h"
-#include "../../../build/Debug/lib/chord_mesh/test/generated/test_messages.capnp.h"
+#include "chord_mesh/message.h"
 #include "chord_mesh/req_protocol.h"
+#include "test_messages.capnp.h"
 
 class ReqProtocol : public BaseMeshFixture {
 protected:
@@ -90,22 +91,27 @@ TEST_F(ReqProtocol, ReadAndWaitForUnixConnectorClose)
     chord_mesh::StreamManagerOps managerOps;
     chord_mesh::StreamManager manager(loop, streamKeypair, trustStore, managerOps);
 
-    chord_mesh::ReqProtocol<
-        test_generated::Request,
-        test_generated::Reply
-    >::Callbacks reqCallbacks;
-    reqCallbacks.receive = [](const auto &reply, void *ptr) {
+    using TestRequest = chord_mesh::Message<test_generated::Request>;
+    using TestReply = chord_mesh::Message<test_generated::Reply>;
+    using TestReqProtocol = chord_mesh::ReqProtocol<TestRequest,TestReply>;
+
+    TestReqProtocol::Callbacks reqCallbacks;
+    reqCallbacks.receive = [](const TestReply &reply, void *ptr) {
+    };
+    reqCallbacks.error = [](const auto &status, void *ptr) {
+        TU_CONSOLE_ERR << "req error: " << status;
     };
     chord_mesh::ReqProtocolOptions reqOptions;
     reqOptions.startInsecure = true;
 
-    auto createReqResult = chord_mesh::ReqProtocol<test_generated::Request,test_generated::Reply>::create(
-        &manager, reqCallbacks, reqOptions);
+    auto createReqResult = chord_mesh::ReqProtocol<
+        chord_mesh::Message<test_generated::Request>,
+        chord_mesh::Message<test_generated::Reply>>::create(&manager, reqCallbacks, reqOptions);
     ASSERT_THAT (createReqResult, tempo_test::IsResult());
     auto req = createReqResult.getResult();;
 
     struct Data {
-        chord_mesh::ReqProtocol<test_generated::Request,test_generated::Reply> *req;
+        TestReqProtocol *req;
         chord_common::TransportLocation endpoint;
         uv_async_t async;
     } data;
@@ -117,6 +123,11 @@ TEST_F(ReqProtocol, ReadAndWaitForUnixConnectorClose)
     uv_async_init(loop, &data.async, [](uv_async_t *async) {
         auto *data = (Data *) async->data;
         data->req->connect(data->endpoint);
+        TestRequest msg;
+        auto root = msg.getRoot();
+        root.setValue("hello, world!");
+        data->req->send(std::move(msg));
+        data->req->shutdown();
     });
 
     ASSERT_THAT (startUVThread(), tempo_test::IsOk());
@@ -128,14 +139,16 @@ TEST_F(ReqProtocol, ReadAndWaitForUnixConnectorClose)
     auto connfd = accept(listenfd, (sockaddr *) &addr, &socklen);
     ASSERT_LE (0, connfd) << "accept() error: " << strerror(errno);
 
-    tu_uint8 buffer[128];
-    memset(buffer, 0, sizeof(buffer));
-    ret = read(connfd, buffer, 127);
-    ASSERT_LE (0, ret) << "read() error: " << strerror(errno);
-    auto message = parse_raw_envelope(std::span(buffer, ret));
-    ASSERT_EQ ("hello, world!", message.getPayload()->getStringView());
-    ret = read(connfd, buffer, 127);
-    ASSERT_EQ (0, ret) << "expected EOF but read returned " << ret;
+    std::vector<tu_uint8> buffer;
+    ASSERT_GE (0, read_until_eof(connfd, buffer));
+
+    chord_mesh::EnvelopeParser parser;
+    ASSERT_THAT (parser.pushBytes(buffer), tempo_test::IsOk());
+
+    ASSERT_TRUE (parser.hasPending());
+    auto pending = parser.popPending();
+    TestRequest request;
+    ASSERT_THAT (request.parse(pending), tempo_test::IsOk());
 
     stopUVThread();
 }

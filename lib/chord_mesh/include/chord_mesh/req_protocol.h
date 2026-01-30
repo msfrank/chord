@@ -27,14 +27,17 @@ namespace chord_mesh {
         ReqProtocolImpl(
             StreamManager *manager,
             ReqProtocolErrorCallback error,
-            ReqProtocolCleanupCallback cleanup);
+            ReqProtocolCleanupCallback cleanup,
+            const ReqProtocolOptions &options);
         virtual ~ReqProtocolImpl() = default;
 
         tempo_utils::Status connect(const chord_common::TransportLocation &location);
         void shutdown();
 
     protected:
-        tempo_utils::Result<tu_uint32> send(::capnp::MessageBuilder &builder);
+        ReqProtocolOptions m_options;
+
+        tempo_utils::Result<tu_uint32> send(std::shared_ptr<const tempo_utils::ImmutableBytes> payload);
 
         virtual tempo_utils::Status receive(
             tu_uint32 id,
@@ -48,11 +51,14 @@ namespace chord_mesh {
         tempo_utils::UUID m_connectId;
         std::shared_ptr<Stream> m_stream;
         tu_uint32 m_currId = 0;
-        std::queue<std::pair<tu_uint32,std::shared_ptr<tempo_utils::ImmutableBytes>>> m_pending;
+        std::queue<std::pair<tu_uint32,std::shared_ptr<const tempo_utils::ImmutableBytes>>> m_pending;
+
+        void emitError(const tempo_utils::Status &status);
 
         friend void on_connect_complete(std::shared_ptr<Stream> stream, void *data);
         friend void on_connect_error(const tempo_utils::Status &status, void *data);
         friend void on_stream_receive(const Envelope &message, void *data);
+        friend void on_cleanup(void *data);
     };
 
     /**
@@ -65,7 +71,7 @@ namespace chord_mesh {
     public:
 
         struct Callbacks {
-            void (*receive)(const typename RspMessage::Reader &, void *) = nullptr;
+            void (*receive)(const RspMessage &, void *) = nullptr;
             void (*error)(const tempo_utils::Status &, void *) = nullptr;
             void (*cleanup)(void *) = nullptr;
         };
@@ -79,15 +85,13 @@ namespace chord_mesh {
             const Callbacks &callbacks,
             const ReqProtocolOptions &options,
             Private)
-                : ReqProtocolImpl(manager, callbacks.error, callbacks.cleanup),
-                  m_callbacks(callbacks),
-                  m_options(options)
+                : ReqProtocolImpl(manager, callbacks.error, callbacks.cleanup, options),
+                  m_callbacks(callbacks)
         {
         }
 
         /**
          *
-         * @param endpoint
          * @param manager
          * @param callbacks
          * @param options
@@ -106,11 +110,11 @@ namespace chord_mesh {
          * @param req
          * @return
          */
-        tempo_utils::Result<tu_uint32> send(ReqMessage::Reader &&req)
+        tempo_utils::Result<tu_uint32> send(ReqMessage &&req)
         {
-            ::capnp::MallocMessageBuilder builder;
-            builder.setRoot(std::move(req));
-            return send(builder);
+            std::shared_ptr<const tempo_utils::ImmutableBytes> bytes;
+            TU_ASSIGN_OR_RETURN (bytes, req.toBytes());
+            return ReqProtocolImpl::send(bytes);
         }
 
     protected:
@@ -118,18 +122,14 @@ namespace chord_mesh {
             tu_uint32 id,
             std::shared_ptr<const tempo_utils::ImmutableBytes> payload) override
         {
-            auto arrayPtr = kj::arrayPtr(payload->getData(), payload->getSize());
-            kj::ArrayInputStream inputStream(arrayPtr);
-            capnp::MallocMessageBuilder builder;
-            capnp::readMessageCopy(inputStream, builder);
-            auto root = builder.getRoot<RspMessage>();
-            m_callbacks.receive(root.asReader(), m_options.data);
+            RspMessage message;
+            TU_RETURN_IF_NOT_OK (message.parse(payload));
+            m_callbacks.receive(message, m_options.data);
             return {};
         }
 
     private:
         Callbacks m_callbacks;
-        ReqProtocolOptions m_options;
     };
 }
 

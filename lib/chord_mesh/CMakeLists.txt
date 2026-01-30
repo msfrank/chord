@@ -46,6 +46,7 @@ set(CHORD_MESH_INCLUDES
     include/chord_mesh/flood.h
     include/chord_mesh/noise.h
     include/chord_mesh/mesh_result.h
+    include/chord_mesh/message.h
     include/chord_mesh/envelope.h
     include/chord_mesh/req_protocol.h
     include/chord_mesh/stream.h
@@ -59,8 +60,9 @@ set_target_properties(chord_mesh PROPERTIES PUBLIC_HEADER "${CHORD_MESH_INCLUDES
 
 target_sources(chord_mesh PRIVATE
     src/flood.cpp
-    src/noise.cpp
     src/mesh_result.cpp
+    src/message.cpp
+    src/noise.cpp
     src/envelope.cpp
     src/req_protocol.cpp
     src/stream.cpp

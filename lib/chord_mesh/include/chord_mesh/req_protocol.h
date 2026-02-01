@@ -1,18 +1,12 @@
 #ifndef CHORD_MESH_REQ_PROTOCOL_H
 #define CHORD_MESH_REQ_PROTOCOL_H
 
-#include <capnp/message.h>
-#include <capnp/serialize.h>
-
 #include <chord_common/transport_location.h>
 
 #include "stream.h"
 #include "stream_connector.h"
 
 namespace chord_mesh {
-
-    typedef void (*ReqProtocolErrorCallback)(const tempo_utils::Status &, void *);
-    typedef void (*ReqProtocolCleanupCallback)(void *);
 
     struct ReqProtocolOptions {
         bool startInsecure = false;
@@ -22,13 +16,9 @@ namespace chord_mesh {
     /**
      *
      */
-    class ReqProtocolImpl {
+    class ReqProtocolImpl : public std::enable_shared_from_this<ReqProtocolImpl> {
     public:
-        ReqProtocolImpl(
-            StreamManager *manager,
-            ReqProtocolErrorCallback error,
-            ReqProtocolCleanupCallback cleanup,
-            const ReqProtocolOptions &options);
+        ReqProtocolImpl(std::shared_ptr<StreamConnector> connector, const ReqProtocolOptions &options);
         virtual ~ReqProtocolImpl() = default;
 
         tempo_utils::Status connect(const chord_common::TransportLocation &location);
@@ -43,22 +33,31 @@ namespace chord_mesh {
             tu_uint32 id,
             std::shared_ptr<const tempo_utils::ImmutableBytes> payload) = 0;
 
+        virtual void emitError(const tempo_utils::Status &status);
+
     private:
-        StreamManager *m_manager;
-        ReqProtocolErrorCallback m_error;
-        ReqProtocolCleanupCallback m_cleanup;
         std::shared_ptr<StreamConnector> m_connector;
-        tempo_utils::UUID m_connectId;
+        std::shared_ptr<Connect> m_connect;
         std::shared_ptr<Stream> m_stream;
         tu_uint32 m_currId = 0;
         std::queue<std::pair<tu_uint32,std::shared_ptr<const tempo_utils::ImmutableBytes>>> m_pending;
 
-        void emitError(const tempo_utils::Status &status);
 
-        friend void on_connect_complete(std::shared_ptr<Stream> stream, void *data);
-        friend void on_connect_error(const tempo_utils::Status &status, void *data);
+        class ReqConnectContext : public AbstractConnectContext {
+        public:
+            ReqConnectContext(std::weak_ptr<ReqProtocolImpl> impl);
+
+            void connect(std::shared_ptr<Stream> stream) override;
+            void error(const tempo_utils::Status &status) override;
+            void cleanup() override;
+
+        private:
+            std::weak_ptr<ReqProtocolImpl> m_impl;
+        };
+
+        friend class ReqConnectContext;
         friend void on_stream_receive(const Envelope &message, void *data);
-        friend void on_cleanup(void *data);
+        friend void on_stream_error(const tempo_utils::Status &status, void *data);
     };
 
     /**
@@ -70,10 +69,12 @@ namespace chord_mesh {
     class ReqProtocol : public ReqProtocolImpl {
     public:
 
-        struct Callbacks {
-            void (*receive)(const RspMessage &, void *) = nullptr;
-            void (*error)(const tempo_utils::Status &, void *) = nullptr;
-            void (*cleanup)(void *) = nullptr;
+        class AbstractContext {
+        public:
+            virtual ~AbstractContext() = default;
+            virtual void receive(const RspMessage &message) = 0;
+            virtual void error(const tempo_utils::Status &status) = 0;
+            virtual void cleanup() = 0;
         };
 
     private:
@@ -81,28 +82,31 @@ namespace chord_mesh {
 
     public:
         ReqProtocol(
-            StreamManager *manager,
-            const Callbacks &callbacks,
+            std::shared_ptr<StreamConnector> connector,
+            std::unique_ptr<AbstractContext> &&ctx,
             const ReqProtocolOptions &options,
             Private)
-                : ReqProtocolImpl(manager, callbacks.error, callbacks.cleanup, options),
-                  m_callbacks(callbacks)
+                : ReqProtocolImpl(connector, options),
+                  m_ctx(std::move(ctx))
         {
+            TU_ASSERT (m_ctx != nullptr);
         }
+
+        ~ReqProtocol() override { m_ctx->cleanup(); }
 
         /**
          *
-         * @param manager
-         * @param callbacks
+         * @param connector
+         * @param ctx
          * @param options
          * @return
          */
         static tempo_utils::Result<std::shared_ptr<ReqProtocol>> create(
-            StreamManager *manager,
-            const Callbacks &callbacks,
+            std::shared_ptr<StreamConnector> connector,
+            std::unique_ptr<AbstractContext> &&ctx,
             const ReqProtocolOptions &options = {})
         {
-            return std::make_shared<ReqProtocol>(manager, callbacks, options, Private{});
+            return std::make_shared<ReqProtocol>(std::move(connector), std::move(ctx), options, Private{});
         }
 
         /**
@@ -124,12 +128,12 @@ namespace chord_mesh {
         {
             RspMessage message;
             TU_RETURN_IF_NOT_OK (message.parse(payload));
-            m_callbacks.receive(message, m_options.data);
+            m_ctx->receive(message);
             return {};
         }
 
     private:
-        Callbacks m_callbacks;
+        std::unique_ptr<AbstractContext> m_ctx;
     };
 }
 

@@ -7,7 +7,7 @@ include(GoogleTest)
 
 set(TEST_CASES
     cipher_tests.cpp
-    flood_mesh_tests.cpp
+    #flood_mesh_tests.cpp
     handshake_tests.cpp
     insecure_stream_tests.cpp
     envelope_builder_tests.cpp

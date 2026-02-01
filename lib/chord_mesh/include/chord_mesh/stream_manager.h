@@ -6,10 +6,50 @@
 #include <tempo_security/certificate_key_pair.h>
 #include <tempo_security/x509_store.h>
 #include <tempo_utils/result.h>
+#include <tempo_utils/uuid.h>
 
 namespace chord_mesh {
 
     class StreamManager;
+    class Stream;
+
+    enum class ConnectState {
+        Pending,
+        Complete,
+        Failed,
+        Aborted,
+    };
+
+    class AbstractConnectContext {
+    public:
+        virtual ~AbstractConnectContext() = default;
+        virtual void connect(std::shared_ptr<Stream> stream) = 0;
+        virtual void error(const tempo_utils::Status &status) = 0;
+        virtual void cleanup() = 0;
+    };
+
+    struct ConnectHandle {
+        uv_connect_t *req;
+        StreamManager *manager;
+        bool insecure;
+        std::unique_ptr<AbstractConnectContext> ctx;
+        tempo_utils::UUID id;
+        ConnectState state;
+        bool shared;
+        ConnectHandle *prev;
+        ConnectHandle *next;
+
+        ConnectHandle(
+            uv_connect_t *req,
+            StreamManager *manager,
+            bool insecure,
+            std::unique_ptr<AbstractConnectContext> &&ctx);
+        ~ConnectHandle();
+
+        void connect(std::shared_ptr<Stream> stream);
+        void error(const tempo_utils::Status &status);
+        void abort();
+    };
 
     struct StreamHandle {
         uv_stream_t *stream;
@@ -52,7 +92,11 @@ namespace chord_mesh {
 
         std::string getProtocolName() const;
 
-        StreamHandle *allocateHandle(uv_stream_t *stream, void *data = nullptr);
+        ConnectHandle *allocateConnectHandle(
+            uv_connect_t *connect,
+            bool insecure,
+            std::unique_ptr<AbstractConnectContext> &&ctx);
+        StreamHandle *allocateStreamHandle(uv_stream_t *stream, void *data = nullptr);
         void shutdown();
 
     private:
@@ -62,13 +106,17 @@ namespace chord_mesh {
         StreamManagerOps m_ops;
         StreamManagerOptions m_options;
 
-        StreamHandle *m_handles;
+        ConnectHandle *m_connects;
+        StreamHandle *m_streams;
         bool m_running;
 
-        void freeHandle(StreamHandle *handle);
+        void freeConnectHandle(ConnectHandle *handle);
+        void freeStreamHandle(StreamHandle *handle);
         void emitError(const tempo_utils::Status &status);
 
+        friend struct ConnectHandle;
         friend struct StreamHandle;
+        friend void close_connect(uv_handle_t *connect);
         friend void shutdown_stream(uv_shutdown_t *req, int err);
         friend void close_stream(uv_handle_t *stream);
     };

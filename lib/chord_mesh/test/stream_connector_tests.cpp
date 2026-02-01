@@ -88,28 +88,30 @@ TEST_F(StreamConnector, ConnectToUnixSocket)
     chord_mesh::StreamManagerOps managerOps;
     chord_mesh::StreamManager manager(loop, streamKeypair, trustStore, managerOps);
 
-    chord_mesh::StreamConnectorOps connectorOps;
-    connectorOps.connect = [](std::shared_ptr<chord_mesh::Stream> stream, void *ptr) {
-        stream->shutdown();
+    class ConnectContext : public chord_mesh::AbstractConnectContext {
+    public:
+        void connect(std::shared_ptr<chord_mesh::Stream> stream) override { stream->shutdown(); }
+        void error(const tempo_utils::Status &status) override { TU_RAISE_IF_NOT_OK (status); }
+        void cleanup() override {}
     };
 
-    auto createConnectorResult = chord_mesh::StreamConnector::create(&manager, connectorOps);
+    auto createConnectorResult = chord_mesh::StreamConnector::create(&manager);
     ASSERT_THAT (createConnectorResult, tempo_test::IsResult());
-    auto connector = createConnectorResult.getResult();;
 
     struct Data {
         uv_async_t async;
-        chord_mesh::StreamConnector *connector;
+        std::shared_ptr<chord_mesh::StreamConnector> connector;
         std::string socketPath;
     } data;
 
-    data.connector = connector.get();
+    data.connector = createConnectorResult.getResult();;
     data.socketPath = socketPath;
     data.async.data = &data;
 
     uv_async_init(loop, &data.async, [](uv_async_t *async) {
         auto *data = (Data *) async->data;
-        data->connector->connectUnix(data->socketPath, 0);
+        auto ctx = std::make_unique<ConnectContext>();
+        data->connector->connectUnix(data->socketPath, 0, std::move(ctx));
     });
 
     ASSERT_THAT (startUVThread(), tempo_test::IsOk());
@@ -151,33 +153,39 @@ TEST_F(StreamConnector, ReadAndWaitForUnixConnectorClose)
 
     chord_mesh::StreamManagerOps managerOps;
     chord_mesh::StreamManager manager(loop, streamKeypair, trustStore, managerOps);
-    chord_mesh::StreamConnectorOps connectorOps;
-    connectorOps.connect = [](std::shared_ptr<chord_mesh::Stream> stream, void *ptr) {
-        chord_mesh::StreamOps streamOps;
-        stream->start(streamOps, ptr);
-        stream->send(chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("hello, world!"));
-        stream->shutdown();
+
+    class ConnectContext : public chord_mesh::AbstractConnectContext {
+    public:
+        void connect(std::shared_ptr<chord_mesh::Stream> stream) override {
+            chord_mesh::StreamOps streamOps;
+            stream->start(streamOps);
+            stream->send(chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("hello, world!"));
+            stream->shutdown();
+        }
+        void error(const tempo_utils::Status &status) override { TU_RAISE_IF_NOT_OK (status); }
+        void cleanup() override {}
     };
+
     chord_mesh::StreamConnectorOptions connectorOptions;
     connectorOptions.startInsecure = true;
 
-    auto createConnectorResult = chord_mesh::StreamConnector::create(&manager, connectorOps, connectorOptions);
+    auto createConnectorResult = chord_mesh::StreamConnector::create(&manager, connectorOptions);
     ASSERT_THAT (createConnectorResult, tempo_test::IsResult());
-    auto connector = createConnectorResult.getResult();;
 
     struct Data {
         uv_async_t async;
-        chord_mesh::StreamConnector *connector;
+        std::shared_ptr<chord_mesh::StreamConnector> connector;
         std::string socketPath;
     } data;
 
-    data.connector = connector.get();
+    data.connector = createConnectorResult.getResult();;
     data.socketPath = socketPath;
     data.async.data = &data;
 
     uv_async_init(loop, &data.async, [](uv_async_t *async) {
         auto *data = (Data *) async->data;
-        data->connector->connectUnix(data->socketPath, 0);
+        auto ctx = std::make_unique<ConnectContext>();
+        data->connector->connectUnix(data->socketPath, 0, std::move(ctx));
     });
 
     ASSERT_THAT (startUVThread(), tempo_test::IsOk());
@@ -224,30 +232,33 @@ TEST_F(StreamConnector, ConnectToTcp4Socket)
 
     chord_mesh::StreamManagerOps managerOps;
     chord_mesh::StreamManager manager(loop, streamKeypair, trustStore, managerOps);
-    chord_mesh::StreamConnectorOps connectorOps;
-    connectorOps.connect = [](std::shared_ptr<chord_mesh::Stream> stream, void *ptr) {
-        stream->shutdown();
+
+    class ConnectContext : public chord_mesh::AbstractConnectContext {
+    public:
+        void connect(std::shared_ptr<chord_mesh::Stream> stream) override { stream->shutdown(); }
+        void error(const tempo_utils::Status &status) override { TU_RAISE_IF_NOT_OK (status); }
+        void cleanup() override {}
     };
 
-    auto createConnectorResult = chord_mesh::StreamConnector::create(&manager, connectorOps);
+    auto createConnectorResult = chord_mesh::StreamConnector::create(&manager);
     ASSERT_THAT (createConnectorResult, tempo_test::IsResult());
-    auto connector = createConnectorResult.getResult();;
 
     struct Data {
         uv_async_t async;
-        chord_mesh::StreamConnector *connector;
+        std::shared_ptr<chord_mesh::StreamConnector> connector;
         std::string ipAddress;
         tu_uint16 tcpPort;
     } data;
 
-    data.connector = connector.get();
+    data.connector = createConnectorResult.getResult();;
     data.ipAddress = ipAddress;
     data.tcpPort = tcpPort;
     data.async.data = &data;
 
     uv_async_init(loop, &data.async, [](uv_async_t *async) {
         auto *data = (Data *) async->data;
-        data->connector->connectTcp4(data->ipAddress, data->tcpPort);
+        auto ctx = std::make_unique<ConnectContext>();
+        data->connector->connectTcp4(data->ipAddress, data->tcpPort, std::move(ctx));
     });
 
     ASSERT_THAT (startUVThread(), tempo_test::IsOk());
@@ -289,35 +300,41 @@ TEST_F(StreamConnector, ReadAndWaitForTcp4ConnectorClose)
 
     chord_mesh::StreamManagerOps managerOps;
     chord_mesh::StreamManager manager(loop, streamKeypair, trustStore, managerOps);
-    chord_mesh::StreamConnectorOps connectorOps;
-    connectorOps.connect = [](std::shared_ptr<chord_mesh::Stream> stream, void *ptr) {
-        chord_mesh::StreamOps streamOps;
-        stream->start(streamOps, ptr);
-        stream->send(chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("hello, world!"));
-        stream->shutdown();
+
+    class ConnectContext : public chord_mesh::AbstractConnectContext {
+    public:
+        void connect(std::shared_ptr<chord_mesh::Stream> stream) override {
+            chord_mesh::StreamOps streamOps;
+            stream->start(streamOps);
+            stream->send(chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("hello, world!"));
+            stream->shutdown();
+        }
+        void error(const tempo_utils::Status &status) override { TU_RAISE_IF_NOT_OK (status); }
+        void cleanup() override {}
     };
+
     chord_mesh::StreamConnectorOptions connectorOptions;
     connectorOptions.startInsecure = true;
 
-    auto createConnectorResult = chord_mesh::StreamConnector::create(&manager, connectorOps, connectorOptions);
+    auto createConnectorResult = chord_mesh::StreamConnector::create(&manager, connectorOptions);
     ASSERT_THAT (createConnectorResult, tempo_test::IsResult());
-    auto connector = createConnectorResult.getResult();;
 
     struct Data {
         uv_async_t async;
-        chord_mesh::StreamConnector *connector;
+        std::shared_ptr<chord_mesh::StreamConnector> connector;
         std::string ipAddress;
         tu_uint16 tcpPort;
     } data;
 
-    data.connector = connector.get();
+    data.connector = createConnectorResult.getResult();;
     data.ipAddress = ipAddress;
     data.tcpPort = tcpPort;
     data.async.data = &data;
 
     uv_async_init(loop, &data.async, [](uv_async_t *async) {
         auto *data = (Data *) async->data;
-        data->connector->connectTcp4(data->ipAddress, data->tcpPort);
+        auto ctx = std::make_unique<ConnectContext>();
+        data->connector->connectTcp4(data->ipAddress, data->tcpPort, std::move(ctx));
     });
 
     ASSERT_THAT (startUVThread(), tempo_test::IsOk());

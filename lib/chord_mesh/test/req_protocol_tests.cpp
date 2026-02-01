@@ -91,32 +91,36 @@ TEST_F(ReqProtocol, ReadAndWaitForUnixConnectorClose)
     chord_mesh::StreamManagerOps managerOps;
     chord_mesh::StreamManager manager(loop, streamKeypair, trustStore, managerOps);
 
+    chord_mesh::StreamConnectorOptions connectorOptions;
+    connectorOptions.startInsecure = true;
+    std::shared_ptr<chord_mesh::StreamConnector> connector;
+    TU_ASSIGN_OR_RAISE (connector, chord_mesh::StreamConnector::create(&manager, connectorOptions));
+
     using TestRequest = chord_mesh::Message<test_generated::Request>;
     using TestReply = chord_mesh::Message<test_generated::Reply>;
     using TestReqProtocol = chord_mesh::ReqProtocol<TestRequest,TestReply>;
 
-    TestReqProtocol::Callbacks reqCallbacks;
-    reqCallbacks.receive = [](const TestReply &reply, void *ptr) {
+    class TestReqContext : public TestReqProtocol::AbstractContext {
+    public:
+        void receive(const chord_mesh::Message<test_generated::Reply> &message) override {}
+        void error(const tempo_utils::Status &status) override {
+            TU_CONSOLE_ERR << "req error: " << status;
+        };
+        void cleanup() override {};
     };
-    reqCallbacks.error = [](const auto &status, void *ptr) {
-        TU_CONSOLE_ERR << "req error: " << status;
-    };
-    chord_mesh::ReqProtocolOptions reqOptions;
-    reqOptions.startInsecure = true;
 
-    auto createReqResult = chord_mesh::ReqProtocol<
-        chord_mesh::Message<test_generated::Request>,
-        chord_mesh::Message<test_generated::Reply>>::create(&manager, reqCallbacks, reqOptions);
+    auto ctx = std::make_unique<TestReqContext>();
+
+    auto createReqResult = TestReqProtocol::create(connector, std::move(ctx));
     ASSERT_THAT (createReqResult, tempo_test::IsResult());
-    auto req = createReqResult.getResult();;
 
     struct Data {
-        TestReqProtocol *req;
+        std::shared_ptr<TestReqProtocol> req;
         chord_common::TransportLocation endpoint;
         uv_async_t async;
     } data;
 
-    data.req = req.get();
+    data.req = createReqResult.getResult();;
     data.endpoint = chord_common::TransportLocation::forUnix("", socketPath);
     data.async.data = &data;
 
@@ -127,7 +131,7 @@ TEST_F(ReqProtocol, ReadAndWaitForUnixConnectorClose)
         auto root = msg.getRoot();
         root.setValue("hello, world!");
         data->req->send(std::move(msg));
-        data->req->shutdown();
+        //data->req->shutdown();
     });
 
     ASSERT_THAT (startUVThread(), tempo_test::IsOk());

@@ -43,6 +43,7 @@ add_custom_command (
 )
 
 set(CHORD_MESH_INCLUDES
+    include/chord_mesh/connect.h
     include/chord_mesh/flood.h
     include/chord_mesh/noise.h
     include/chord_mesh/mesh_result.h
@@ -59,6 +60,7 @@ set(CHORD_MESH_INCLUDES
 set_target_properties(chord_mesh PROPERTIES PUBLIC_HEADER "${CHORD_MESH_INCLUDES}")
 
 target_sources(chord_mesh PRIVATE
+    src/connect.cpp
     src/flood.cpp
     src/mesh_result.cpp
     src/message.cpp

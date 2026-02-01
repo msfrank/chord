@@ -86,7 +86,7 @@ TEST_F(SecureStream, ReadAndWriteStream)
         std::string ipAddress;
         tu_uint16 tcpPort;
         int numRounds;
-        chord_mesh::StreamConnector *connector;
+        std::shared_ptr<chord_mesh::StreamConnector> connector;
         std::shared_ptr<chord_mesh::Stream> acceptorStream;
         std::shared_ptr<chord_mesh::Stream> connectorStream;
         std::vector<chord_mesh::Envelope> acceptorReceived;
@@ -118,36 +118,40 @@ TEST_F(SecureStream, ReadAndWriteStream)
 
     ASSERT_THAT (acceptor->listen(acceptorOps, acceptorOptions), tempo_test::IsOk()) << "acceptor listen error";
 
-    chord_mesh::StreamConnectorOps connectorOps;
-    connectorOps.connect = [](std::shared_ptr<chord_mesh::Stream> stream, void *ptr) {
-        chord_mesh::StreamOps streamOps;
-        streamOps.receive = [](const chord_mesh::Envelope &envelope, void *ptr) {
-            auto *data = (Data *) ptr;
-            data->connectorReceived.push_back(envelope);
-            auto &stream = data->connectorStream;
-            if (data->connectorReceived.size() < data->numRounds) {
-                TU_RAISE_IF_NOT_OK (stream->send(
-                    chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("ping!")));
-            } else {
-                stream->shutdown();
-                data->notifyComplete.Notify();
-            }
-        };
-        TU_RAISE_IF_NOT_OK (stream->start(streamOps, ptr));
-        TU_RAISE_IF_NOT_OK (stream->send(
-            chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("ping!")));
-        auto *data = (Data *) ptr;
-        data->connectorStream = std::move(stream);
+    class ConnectContext : public chord_mesh::AbstractConnectContext {
+    public:
+        ConnectContext(Data *data) : m_data(data) {};
+        void connect(std::shared_ptr<chord_mesh::Stream> stream) override {
+            chord_mesh::StreamOps streamOps;
+            streamOps.receive = [](const chord_mesh::Envelope &envelope, void *ptr) {
+                auto *data = (Data *) ptr;
+                data->connectorReceived.push_back(envelope);
+                auto &stream = data->connectorStream;
+                if (data->connectorReceived.size() < data->numRounds) {
+                    TU_RAISE_IF_NOT_OK (stream->send(
+                        chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("ping!")));
+                } else {
+                    stream->shutdown();
+                    data->notifyComplete.Notify();
+                }
+            };
+            TU_RAISE_IF_NOT_OK (stream->start(streamOps, m_data));
+            TU_RAISE_IF_NOT_OK (stream->send(
+                chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("ping!")));
+            m_data->connectorStream = std::move(stream);
+        }
+        void error(const tempo_utils::Status &status) override { TU_RAISE_IF_NOT_OK (status); }
+        void cleanup() override {}
+    private:
+        Data *m_data;
     };
 
     chord_mesh::StreamConnectorOptions connectorOptions;
     connectorOptions.startInsecure = false;
-    connectorOptions.data = &data;
-    auto createConnectorResult = chord_mesh::StreamConnector::create(&manager, connectorOps, connectorOptions);
+    auto createConnectorResult = chord_mesh::StreamConnector::create(&manager, connectorOptions);
     ASSERT_THAT (createConnectorResult, tempo_test::IsResult());
-    auto connector = createConnectorResult.getResult();;
 
-    data.connector = connector.get();
+    data.connector = createConnectorResult.getResult();;
     data.ipAddress = ipAddress;
     data.tcpPort = tcpPort;
     data.numRounds = 3;
@@ -155,7 +159,8 @@ TEST_F(SecureStream, ReadAndWriteStream)
 
     uv_async_init(loop, &data.async, [](uv_async_t *async) {
         auto *data = (Data *) async->data;
-        TU_RAISE_IF_STATUS (data->connector->connectTcp4(data->ipAddress, data->tcpPort));
+        auto ctx = std::make_unique<ConnectContext>(data);
+        TU_RAISE_IF_STATUS (data->connector->connectTcp4(data->ipAddress, data->tcpPort, std::move(ctx)));
     });
 
     ASSERT_THAT (startUVThread(), tempo_test::IsOk()) << "failed to start UV thread";

@@ -43,7 +43,7 @@ chord_mesh::StreamAcceptor::forUnix(
     }
 
     auto *stream = (uv_stream_t *) pipe;
-    auto *handle = manager->allocateHandle(stream);
+    auto *handle = manager->allocateStreamHandle(stream);
     auto listener = std::shared_ptr<StreamAcceptor>(new StreamAcceptor(handle));
     handle->data = listener.get();
 
@@ -85,7 +85,7 @@ chord_mesh::StreamAcceptor::forTcp4(
     }
 
     auto *stream = (uv_stream_t *) tcp;
-    auto *handle = manager->allocateHandle(stream);
+    auto *handle = manager->allocateStreamHandle(stream);
     auto listener = std::shared_ptr<StreamAcceptor>(new StreamAcceptor(handle));
     handle->data = listener.get();
 
@@ -154,7 +154,7 @@ chord_mesh::new_unix_listener(uv_stream_t *server, int err)
     auto &ops = acceptor->m_ops;
     auto &options = acceptor->m_options;
 
-    auto stream = std::make_shared<Stream>(manager->allocateHandle(client), /* initiator= */ false, !options.allowInsecure);
+    auto stream = std::make_shared<Stream>(manager->allocateStreamHandle(client), /* initiator= */ false, !options.allowInsecure);
     ops.accept(stream, acceptor->m_options.data);
 }
 
@@ -200,7 +200,7 @@ chord_mesh::new_tcp4_listener(uv_stream_t *server, int err)
     auto &ops = acceptor->m_ops;
     auto &options = acceptor->m_options;
 
-    auto stream = std::make_shared<Stream>(manager->allocateHandle(client), /* initiator= */ false, !options.allowInsecure);
+    auto stream = std::make_shared<Stream>(manager->allocateStreamHandle(client), /* initiator= */ false, !options.allowInsecure);
     ops.accept(stream, acceptor->m_options.data);
 }
 

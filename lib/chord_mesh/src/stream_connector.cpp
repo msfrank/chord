@@ -4,10 +4,8 @@
 
 chord_mesh::StreamConnector::StreamConnector(
     StreamManager *manager,
-    const StreamConnectorOps &ops,
     const StreamConnectorOptions &options)
     : m_manager(manager),
-      m_ops(ops),
       m_options(options)
 {
     TU_ASSERT (m_manager != nullptr);
@@ -21,27 +19,21 @@ chord_mesh::StreamConnector::~StreamConnector()
 tempo_utils::Result<std::shared_ptr<chord_mesh::StreamConnector>>
 chord_mesh::StreamConnector::create(
     StreamManager *manager,
-    const StreamConnectorOps &ops,
     const StreamConnectorOptions &options)
 {
     TU_ASSERT (manager != nullptr);
-    return std::shared_ptr<StreamConnector>(new StreamConnector(manager, ops, options));
+    return std::shared_ptr<StreamConnector>(new StreamConnector(manager, options));
 }
 
 void
 chord_mesh::new_unix_connection(uv_connect_t *req, int err)
 {
-    auto *connectingPtr = (StreamConnector::ConnectHandle *) req->data;
-    auto *pipe = req->handle;
-    auto connector = connectingPtr->connector;
-    auto &ops = connector->m_ops;
-    auto &options = connector->m_options;
+    auto *connect = (ConnectHandle *) req->data;
+    auto *manager = connect->manager;
 
-    // remove connect handle from map
-    auto connectingEntry = connector->m_connecting.extract(connectingPtr->id);
-    TU_ASSERT (!connectingEntry.empty());
-    auto connecting = std::move(connectingEntry.mapped());
-    auto *data = connecting->data? connecting->data : options.data;
+    // take ownership of pipe
+    auto *pipe = req->handle;
+    req->handle = nullptr;
 
     // if connect failed then return without allocating a stream
     if (err < 0) {
@@ -50,26 +42,28 @@ chord_mesh::new_unix_connection(uv_connect_t *req, int err)
                 // ECANCELED indicates the connect request was aborted, so we don't invoke the error callback
                 break;
             default:
-                connector->emitError(
+                connect->error(
                     MeshStatus::forCondition(MeshCondition::kMeshInvariant,
-                        "failed to connect: {}", uv_strerror(err)), data);
+                        "failed to connect: {}", uv_strerror(err)));
                 break;
         }
         std::free(pipe);
         return;
     }
 
-    // otherwise allocate a stream handle and wrap it in a stram
-    auto *manager = connector->m_manager;
-    auto *handle = manager->allocateHandle(pipe);
-    auto stream = std::make_shared<Stream>(handle, /* initiator= */ true, !options.startInsecure);
+    // otherwise allocate a stream handle (transferring ownership of pipe) and wrap it in a stream
+    auto *handle = manager->allocateStreamHandle(pipe);
+    auto stream = std::make_shared<Stream>(handle, /* initiator= */ true, !connect->insecure);
 
     // invoke the connect callback
-    ops.connect(stream, data);
+    connect->connect(stream);
 }
 
-tempo_utils::Result<tempo_utils::UUID>
-chord_mesh::StreamConnector::connectUnix(std::string_view pipePath, int pipeFlags, void *data)
+tempo_utils::Result<std::shared_ptr<chord_mesh::Connect>>
+chord_mesh::StreamConnector::connectUnix(
+    std::string_view pipePath,
+    int pipeFlags,
+    std::unique_ptr<AbstractConnectContext> &&ctx)
 {
     auto *loop = m_manager->getLoop();
     int ret;
@@ -85,41 +79,33 @@ chord_mesh::StreamConnector::connectUnix(std::string_view pipePath, int pipeFlag
             "uv_pipe_init failed: {}", uv_strerror(ret));
     }
 
-    auto connecting = std::make_unique<ConnectHandle>();
-    connecting->id = id;
-    connecting->req.data = connecting.get();
-    connecting->aborted = false;
-    connecting->connector = shared_from_this();
-    connecting->data = data;
-    auto *req = &connecting->req;
-
+    auto *req = (uv_connect_t *) std::malloc(sizeof(uv_connect_t));
+    memset(req, 0, sizeof(uv_connect_t));
     ret = uv_pipe_connect2(req, pipe, pipePath.data(), pipePath.size(),
         pipeFlags, new_unix_connection);
     if (ret != 0) {
+        std::free(req);
         std::free(pipe);
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
             "uv_pipe_connect2 failed: {}", uv_strerror(ret));
     }
 
-    m_connecting[id] = std::move(connecting);
+    //auto remote = chord_common::TransportLocation::forUnix({}, pipePath);
+    auto *handle = m_manager->allocateConnectHandle(req, m_options.startInsecure, std::move(ctx));
+    auto connect = std::make_shared<Connect>(handle);
 
-    return id;
+    return connect;
 }
 
 void
 chord_mesh::new_tcp4_connection(uv_connect_t *req, int err)
 {
-    auto connectingPtr = (StreamConnector::ConnectHandle *) req->data;
-    auto *tcp = req->handle;
-    auto connector = connectingPtr->connector;
-    auto &ops = connector->m_ops;
-    auto &options = connector->m_options;
+    auto *connect = (ConnectHandle *) req->data;
+    auto *manager = connect->manager;
 
-    // remove connect handle from map
-    auto connectingEntry = connector->m_connecting.extract(connectingPtr->id);
-    TU_ASSERT (!connectingEntry.empty());
-    auto connecting = std::move(connectingEntry.mapped());
-    auto *data = connecting->data? connecting->data : options.data;
+    // take ownership of tcp
+    auto *tcp = req->handle;
+    req->handle = nullptr;
 
     // if connect failed then return without allocating a stream
     if (err < 0) {
@@ -128,26 +114,28 @@ chord_mesh::new_tcp4_connection(uv_connect_t *req, int err)
                 // ECANCELED indicates the connect request was aborted, so we don't invoke the error callback
                 break;
             default:
-                connector->emitError(
+                connect->error(
                     MeshStatus::forCondition(MeshCondition::kMeshInvariant,
-                        "failed to connect: {}", uv_strerror(err)), data);
+                        "failed to connect: {}", uv_strerror(err)));
                 break;
         }
         std::free(tcp);
         return;
     }
 
-    // otherwise allocate a stream handle and wrap it in a stram
-    auto *manager = connecting->connector->m_manager;
-    auto *handle = manager->allocateHandle(tcp);
-    auto stream = std::make_shared<Stream>(handle, /* initiator= */ true, !options.startInsecure);
+    // otherwise allocate a stream handle (transferring ownership of tcp) and wrap it in a stream
+    auto *handle = manager->allocateStreamHandle(tcp);
+    auto stream = std::make_shared<Stream>(handle, /* initiator= */ true, !connect->insecure);
 
     // invoke the connect callback
-    ops.connect(stream, data);
+    connect->connect(stream);
 }
 
-tempo_utils::Result<tempo_utils::UUID>
-chord_mesh::StreamConnector::connectTcp4(std::string_view ipAddress, tu_uint16 tcpPort, void *data)
+tempo_utils::Result<std::shared_ptr<chord_mesh::Connect>>
+chord_mesh::StreamConnector::connectTcp4(
+    std::string_view ipAddress,
+    tu_uint16 tcpPort,
+    std::unique_ptr<AbstractConnectContext> &&ctx)
 {
     auto *loop = m_manager->getLoop();
     int ret;
@@ -171,69 +159,39 @@ chord_mesh::StreamConnector::connectTcp4(std::string_view ipAddress, tu_uint16 t
             "uv_tcp_init failed: {}", uv_strerror(ret));
     }
 
-    auto connecting = std::make_unique<ConnectHandle>();
-    connecting->id = id;
-    connecting->req.data = connecting.get();
-    connecting->aborted = false;
-    connecting->connector = shared_from_this();
-    connecting->data = data;
-    auto *req = &connecting->req;
-
-    ret = uv_tcp_connect(req, tcp, (const sockaddr *) &addr, new_unix_connection);
+    auto *req = (uv_connect_t *) std::malloc(sizeof(uv_connect_t));
+    memset(req, 0, sizeof(uv_connect_t));
+    ret = uv_tcp_connect(req, tcp, (const sockaddr *) &addr, new_tcp4_connection);
     if (ret != 0) {
+        std::free(req);
         std::free(tcp);
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
             "uv_tcp_connect failed: {}", uv_strerror(ret));
     }
 
-    m_connecting[id] = std::move(connecting);
+    auto *handle = m_manager->allocateConnectHandle(req, m_options.startInsecure, std::move(ctx));
+    auto connect = std::make_shared<Connect>(handle);
 
-    return id;
+    return connect;
 }
 
-tempo_utils::Result<tempo_utils::UUID>
-chord_mesh::StreamConnector::connectLocation(const chord_common::TransportLocation &endpoint, void *data)
+tempo_utils::Result<std::shared_ptr<chord_mesh::Connect>>
+chord_mesh::StreamConnector::connectLocation(
+    const chord_common::TransportLocation &endpoint,
+    std::unique_ptr<AbstractConnectContext> &&ctx)
 {
     switch (endpoint.getType()) {
         case chord_common::TransportType::Unix:
-            return connectUnix(endpoint.getUnixPath().c_str(), 0, data);
+            return connectUnix(endpoint.getUnixPath().c_str(), 0, std::move(ctx));
         case chord_common::TransportType::Tcp4:
-            return connectTcp4(endpoint.getTcp4Address(), endpoint.getTcp4Port(), data);
+            return connectTcp4(endpoint.getTcp4Address(), endpoint.getTcp4Port(), std::move(ctx));
         default:
             return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
                 "invalid connect endpoint");
     }
 }
 
-tempo_utils::Status
-chord_mesh::StreamConnector::abort(const tempo_utils::UUID &connectId)
-{
-    auto connectingEntry = m_connecting.find(connectId);
-    if (connectingEntry == m_connecting.cend())
-        return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
-            "pending connection {} does not exist", connectId.toString());
-    auto &connecting = connectingEntry->second;
-
-    if (!connecting->aborted) {
-        connecting->aborted = true;
-        uv_close((uv_handle_t *) connecting->req.handle, nullptr);
-    }
-
-    return {};
-}
-
 void
 chord_mesh::StreamConnector::shutdown()
 {
-    for (const auto &connectingEntry : m_connecting) {
-        abort(connectingEntry.first);
-    }
-}
-
-void
-chord_mesh::StreamConnector::emitError(const tempo_utils::Status &status, void *data)
-{
-    if (m_ops.error != nullptr) {
-        m_ops.error(status, data);
-    }
 }

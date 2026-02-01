@@ -20,11 +20,27 @@ namespace chord_mesh {
         Aborted,
     };
 
+    enum class AcceptState {
+        Initial,
+        Active,
+        ShuttingDown,
+        Closing,
+        Closed,
+    };
+
     class AbstractConnectContext {
     public:
         virtual ~AbstractConnectContext() = default;
         virtual void connect(std::shared_ptr<Stream> stream) = 0;
         virtual void error(const tempo_utils::Status &status) = 0;
+        virtual void cleanup() = 0;
+    };
+
+    class AbstractAcceptContext {
+    public:
+        virtual ~AbstractAcceptContext() = default;
+        virtual void accept(std::shared_ptr<Stream>) = 0;
+        virtual void error(const tempo_utils::Status &) = 0;
         virtual void cleanup() = 0;
     };
 
@@ -35,7 +51,6 @@ namespace chord_mesh {
         std::unique_ptr<AbstractConnectContext> ctx;
         tempo_utils::UUID id;
         ConnectState state;
-        bool shared;
         ConnectHandle *prev;
         ConnectHandle *next;
 
@@ -49,6 +64,41 @@ namespace chord_mesh {
         void connect(std::shared_ptr<Stream> stream);
         void error(const tempo_utils::Status &status);
         void abort();
+        void release();
+
+    private:
+        bool m_shared;
+
+        friend void close_connect(uv_handle_t *stream);
+    };
+
+    struct AcceptHandle {
+        uv_stream_t *stream;
+        StreamManager *manager;
+        bool insecure;
+        std::unique_ptr<AbstractAcceptContext> ctx;
+        tempo_utils::UUID id;
+        AcceptState state;
+        AcceptHandle *prev;
+        AcceptHandle *next;
+
+        AcceptHandle(
+            uv_stream_t *stream,
+            StreamManager *manager,
+            bool insecure,
+            std::unique_ptr<AbstractAcceptContext> &&ctx);
+        ~AcceptHandle();
+        void accept(std::shared_ptr<Stream> stream);
+        void error(const tempo_utils::Status &status);
+        void shutdown();
+        void close();
+        void release();
+
+    private:
+        bool m_shared;
+        uv_shutdown_t m_req;
+
+        friend void close_accept(uv_handle_t *stream);
     };
 
     struct StreamHandle {
@@ -96,7 +146,13 @@ namespace chord_mesh {
             uv_connect_t *connect,
             bool insecure,
             std::unique_ptr<AbstractConnectContext> &&ctx);
-        StreamHandle *allocateStreamHandle(uv_stream_t *stream, void *data = nullptr);
+        AcceptHandle *allocateAcceptHandle(
+            uv_stream_t *accept,
+            bool insecure,
+            std::unique_ptr<AbstractAcceptContext> &&ctx);
+        StreamHandle *allocateStreamHandle(
+            uv_stream_t *stream,
+            void *data = nullptr);
         void shutdown();
 
     private:
@@ -107,16 +163,21 @@ namespace chord_mesh {
         StreamManagerOptions m_options;
 
         ConnectHandle *m_connects;
+        AcceptHandle *m_accepts;
         StreamHandle *m_streams;
         bool m_running;
 
         void freeConnectHandle(ConnectHandle *handle);
+        void freeAcceptHandle(AcceptHandle *handle);
         void freeStreamHandle(StreamHandle *handle);
         void emitError(const tempo_utils::Status &status);
 
         friend struct ConnectHandle;
+        friend struct AcceptHandle;
         friend struct StreamHandle;
         friend void close_connect(uv_handle_t *connect);
+        friend void shutdown_accept(uv_shutdown_t *req, int err);
+        friend void close_accept(uv_handle_t *stream);
         friend void shutdown_stream(uv_shutdown_t *req, int err);
         friend void close_stream(uv_handle_t *stream);
     };

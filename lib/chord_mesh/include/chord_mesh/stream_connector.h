@@ -1,8 +1,6 @@
 #ifndef CHORD_MESH_STREAM_CONNECTOR_H
 #define CHORD_MESH_STREAM_CONNECTOR_H
 
-#include <queue>
-
 #include <uv.h>
 
 #include <chord_common/transport_location.h>

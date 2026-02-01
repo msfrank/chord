@@ -74,16 +74,23 @@ TEST_F(StreamAcceptor, CreateUnixAcceptor)
 
     chord_mesh::StreamManagerOps managerOps;
     chord_mesh::StreamManager manager(loop, streamKeypair, trustStore, managerOps);
-    auto createAcceptorResult = chord_mesh::StreamAcceptor::forUnix(socketPath.c_str(), 0, &manager);
+    auto createAcceptorResult = chord_mesh::StreamAcceptor::create(&manager);
     ASSERT_THAT (createAcceptorResult, tempo_test::IsResult());
     auto acceptor = createAcceptorResult.getResult();
 
-    chord_mesh::StreamAcceptorOps acceptorOps;
-    ASSERT_THAT (acceptor->listen(acceptorOps), tempo_test::IsOk());
+    class AcceptContext : public chord_mesh::AbstractAcceptContext {
+    public:
+        void accept(std::shared_ptr<chord_mesh::Stream>) override {}
+        void error(const tempo_utils::Status &) override {}
+        void cleanup() override {}
+    };
+
+    auto ctx = std::make_unique<AcceptContext>();
+    ASSERT_THAT (acceptor->listenUnix(socketPath.c_str(), 0, std::move(ctx)), tempo_test::IsOk());
     ASSERT_THAT (startUVThread(), tempo_test::IsOk());
 
-    uv_sleep(500);
-    ASSERT_EQ (chord_mesh::AcceptorState::Active, acceptor->getAcceptorState());
+    uv_sleep(200);
+    ASSERT_EQ (chord_mesh::AcceptState::Active, acceptor->getAcceptState());
 
     stopUVThread();
     acceptor->shutdown();
@@ -98,7 +105,10 @@ TEST_F(StreamAcceptor, ConnectToUnixAcceptor)
 
     chord_mesh::StreamManagerOps managerOps;
     chord_mesh::StreamManager manager(loop, streamKeypair, trustStore, managerOps);
-    auto createAcceptorResult = chord_mesh::StreamAcceptor::forUnix(socketPath.c_str(), 0, &manager);
+
+    chord_mesh::StreamAcceptorOptions acceptorOptions;
+    acceptorOptions.allowInsecure = true;
+    auto createAcceptorResult = chord_mesh::StreamAcceptor::create(&manager, acceptorOptions);
     ASSERT_THAT (createAcceptorResult, tempo_test::IsResult()) << "failed to create acceptor";
     auto acceptor = createAcceptorResult.getResult();
 
@@ -106,16 +116,21 @@ TEST_F(StreamAcceptor, ConnectToUnixAcceptor)
         std::shared_ptr<chord_mesh::Stream> stream;
     } data;
 
-    chord_mesh::StreamAcceptorOps acceptorOps;
-    acceptorOps.accept = [](std::shared_ptr<chord_mesh::Stream> stream, void *ptr) {
-        auto *data = (Data *) ptr;
-        data->stream = std::move(stream);
+
+    class AcceptContext : public chord_mesh::AbstractAcceptContext {
+    public:
+        AcceptContext(Data *data): m_data(data) {}
+        void accept(std::shared_ptr<chord_mesh::Stream> stream) override {
+            m_data->stream = std::move(stream);
+        }
+        void error(const tempo_utils::Status &) override {}
+        void cleanup() override {}
+    private:
+        Data *m_data;
     };
 
-    chord_mesh::StreamAcceptorOptions acceptorOptions;
-    acceptorOptions.data = &data;
-
-    ASSERT_THAT (acceptor->listen(acceptorOps, acceptorOptions), tempo_test::IsOk()) << "acceptor listen error";
+    auto ctx = std::make_unique<AcceptContext>(&data);
+    ASSERT_THAT (acceptor->listenUnix(socketPath.c_str(), 0, std::move(ctx)), tempo_test::IsOk()) << "acceptor listen error";
 
     ASSERT_THAT (startUVThread(), tempo_test::IsOk()) << "failed to start UV thread";
     uv_sleep(500);
@@ -149,7 +164,10 @@ TEST_F(StreamAcceptor, ReadAndWaitForUnixAcceptorClose)
 
     chord_mesh::StreamManagerOps managerOps;
     chord_mesh::StreamManager manager(loop, streamKeypair, trustStore, managerOps);
-    auto createAcceptorResult = chord_mesh::StreamAcceptor::forUnix(socketPath.c_str(), 0, &manager);
+
+    chord_mesh::StreamAcceptorOptions acceptorOptions;
+    acceptorOptions.allowInsecure = true;
+    auto createAcceptorResult = chord_mesh::StreamAcceptor::create(&manager, acceptorOptions);
     ASSERT_THAT (createAcceptorResult, tempo_test::IsResult()) << "failed to create acceptor";
     auto acceptor = createAcceptorResult.getResult();
 
@@ -157,20 +175,24 @@ TEST_F(StreamAcceptor, ReadAndWaitForUnixAcceptorClose)
         std::shared_ptr<chord_mesh::Stream> stream;
     } data;
 
-    chord_mesh::StreamAcceptorOps acceptorOps;
-    acceptorOps.accept = [](std::shared_ptr<chord_mesh::Stream> stream, void *ptr) {
-        chord_mesh::StreamOps streamOps;
-        stream->start(streamOps, ptr);
-        stream->send(chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("hello, world!"));
-        stream->shutdown();
-        auto *data = (Data *) ptr;
-        data->stream = std::move(stream);
+    class AcceptContext : public chord_mesh::AbstractAcceptContext {
+    public:
+        AcceptContext(Data *data) : m_data(data) {}
+        void accept(std::shared_ptr<chord_mesh::Stream> stream) override {
+            chord_mesh::StreamOps streamOps;
+            stream->start(streamOps, m_data);
+            stream->send(chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("hello, world!"));
+            stream->shutdown();
+            m_data->stream = std::move(stream);
+        }
+        void error(const tempo_utils::Status &) override {}
+        void cleanup() override {}
+    private:
+        Data *m_data;
     };
 
-    chord_mesh::StreamAcceptorOptions acceptorOptions;
-    acceptorOptions.data = &data;
-
-    ASSERT_THAT (acceptor->listen(acceptorOps, acceptorOptions), tempo_test::IsOk()) << "acceptor listen error";
+    auto ctx = std::make_unique<AcceptContext>(&data);
+    ASSERT_THAT (acceptor->listenUnix(socketPath.c_str(), 0, std::move(ctx)), tempo_test::IsOk()) << "acceptor listen error";
 
     ASSERT_THAT (startUVThread(), tempo_test::IsOk()) << "failed to start UV thread";
     uv_sleep(500);
@@ -212,16 +234,26 @@ TEST_F(StreamAcceptor, CreateTcp4Acceptor)
 
     chord_mesh::StreamManagerOps managerOps;
     chord_mesh::StreamManager manager(loop, streamKeypair, trustStore, managerOps);
-    auto createAcceptorResult = chord_mesh::StreamAcceptor::forTcp4(ipAddress, tcpPort, &manager);
+
+    chord_mesh::StreamAcceptorOptions acceptorOptions;
+    acceptorOptions.allowInsecure = true;
+    auto createAcceptorResult = chord_mesh::StreamAcceptor::create(&manager, acceptorOptions);
     ASSERT_THAT (createAcceptorResult, tempo_test::IsResult());
     auto acceptor = createAcceptorResult.getResult();
 
-    chord_mesh::StreamAcceptorOps acceptorOps;
-    ASSERT_THAT (acceptor->listen(acceptorOps), tempo_test::IsOk());
+    class AcceptContext : public chord_mesh::AbstractAcceptContext {
+    public:
+        void accept(std::shared_ptr<chord_mesh::Stream>) override {}
+        void error(const tempo_utils::Status &) override {}
+        void cleanup() override {}
+    };
+
+    auto ctx = std::make_unique<AcceptContext>();
+    ASSERT_THAT (acceptor->listenTcp4(ipAddress, tcpPort, std::move(ctx)), tempo_test::IsOk());
     ASSERT_THAT (startUVThread(), tempo_test::IsOk());
 
     uv_sleep(500);
-    ASSERT_EQ (chord_mesh::AcceptorState::Active, acceptor->getAcceptorState());
+    ASSERT_EQ (chord_mesh::AcceptState::Active, acceptor->getAcceptState());
 
     stopUVThread();
     acceptor->shutdown();
@@ -237,7 +269,10 @@ TEST_F(StreamAcceptor, ConnectToTcp4Acceptor)
 
     chord_mesh::StreamManagerOps managerOps;
     chord_mesh::StreamManager manager(loop, streamKeypair, trustStore, managerOps);
-    auto createAcceptorResult = chord_mesh::StreamAcceptor::forTcp4(ipAddress, tcpPort, &manager);
+
+    chord_mesh::StreamAcceptorOptions acceptorOptions;
+    acceptorOptions.allowInsecure = true;
+    auto createAcceptorResult = chord_mesh::StreamAcceptor::create(&manager, acceptorOptions);
     ASSERT_THAT (createAcceptorResult, tempo_test::IsResult()) << "failed to create acceptor";
     auto acceptor = createAcceptorResult.getResult();
 
@@ -245,16 +280,20 @@ TEST_F(StreamAcceptor, ConnectToTcp4Acceptor)
         std::shared_ptr<chord_mesh::Stream> stream;
     } data;
 
-    chord_mesh::StreamAcceptorOps acceptorOps;
-    acceptorOps.accept = [](std::shared_ptr<chord_mesh::Stream> stream, void *ptr) {
-        auto *data = (Data *) ptr;
-        data->stream = std::move(stream);
+    class AcceptContext : public chord_mesh::AbstractAcceptContext {
+    public:
+        AcceptContext(Data *data): m_data(data) {}
+        void accept(std::shared_ptr<chord_mesh::Stream> stream) override {
+            m_data->stream = std::move(stream);
+        }
+        void error(const tempo_utils::Status &) override {}
+        void cleanup() override {}
+    private:
+        Data *m_data;
     };
 
-    chord_mesh::StreamAcceptorOptions acceptorOptions;
-    acceptorOptions.data = &data;
-
-    ASSERT_THAT (acceptor->listen(acceptorOps, acceptorOptions), tempo_test::IsOk()) << "acceptor listen error";
+    auto ctx = std::make_unique<AcceptContext>(&data);
+    ASSERT_THAT (acceptor->listenTcp4(ipAddress, tcpPort, std::move(ctx)), tempo_test::IsOk()) << "acceptor listen error";
 
     ASSERT_THAT (startUVThread(), tempo_test::IsOk()) << "failed to start UV thread";
     uv_sleep(500);
@@ -288,7 +327,10 @@ TEST_F(StreamAcceptor, ReadAndWaitForTcp4AcceptorClose)
 
     chord_mesh::StreamManagerOps managerOps;
     chord_mesh::StreamManager manager(loop, streamKeypair, trustStore, managerOps);
-    auto createAcceptorResult = chord_mesh::StreamAcceptor::forTcp4(ipAddress.c_str(), tcpPort, &manager);
+
+    chord_mesh::StreamAcceptorOptions acceptorOptions;
+    acceptorOptions.allowInsecure = true;
+    auto createAcceptorResult = chord_mesh::StreamAcceptor::create(&manager, acceptorOptions);
     ASSERT_THAT (createAcceptorResult, tempo_test::IsResult()) << "failed to create acceptor";
     auto acceptor = createAcceptorResult.getResult();
 
@@ -296,20 +338,24 @@ TEST_F(StreamAcceptor, ReadAndWaitForTcp4AcceptorClose)
         std::shared_ptr<chord_mesh::Stream> stream;
     } data;
 
-    chord_mesh::StreamAcceptorOps acceptorOps;
-    acceptorOps.accept = [](std::shared_ptr<chord_mesh::Stream> stream, void *ptr) {
-        chord_mesh::StreamOps streamOps;
-        stream->start(streamOps, ptr);
-        stream->send(chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("hello, world!"));
-        stream->shutdown();
-        auto *data = (Data *) ptr;
-        data->stream = std::move(stream);
+    class AcceptContext : public chord_mesh::AbstractAcceptContext {
+    public:
+        AcceptContext(Data *data): m_data(data) {}
+        void accept(std::shared_ptr<chord_mesh::Stream> stream) override {
+            chord_mesh::StreamOps streamOps;
+            stream->start(streamOps, m_data);
+            stream->send(chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("hello, world!"));
+            stream->shutdown();
+            m_data->stream = std::move(stream);
+        }
+        void error(const tempo_utils::Status &) override {}
+        void cleanup() override {}
+    private:
+        Data *m_data;
     };
 
-    chord_mesh::StreamAcceptorOptions acceptorOptions;
-    acceptorOptions.data = &data;
-
-    ASSERT_THAT (acceptor->listen(acceptorOps, acceptorOptions), tempo_test::IsOk()) << "acceptor listen error";
+    auto ctx = std::make_unique<AcceptContext>(&data);
+    ASSERT_THAT (acceptor->listenTcp4(ipAddress, tcpPort, std::move(ctx)), tempo_test::IsOk()) << "acceptor listen error";
 
     ASSERT_THAT (startUVThread(), tempo_test::IsOk()) << "failed to start UV thread";
     uv_sleep(500);

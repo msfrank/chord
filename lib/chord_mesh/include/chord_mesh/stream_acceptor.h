@@ -10,53 +10,42 @@
 
 namespace chord_mesh {
 
-    enum class AcceptorState {
-        Initial,
-        Active,
-        Closed,
-    };
-
-    struct StreamAcceptorOps {
-        void (*accept)(std::shared_ptr<Stream>, void *) = nullptr;
-        void (*error)(const tempo_utils::Status &, void *) = nullptr;
-        void (*cleanup)(void *) = nullptr;
-    };
-
     struct StreamAcceptorOptions {
         bool allowInsecure = false;
-        void *data = nullptr;
     };
 
-    class StreamAcceptor {
+    class StreamAcceptor : public std::enable_shared_from_this<StreamAcceptor> {
+
+        struct Private{ explicit Private() = default; };
+
     public:
+        StreamAcceptor(StreamManager *manager, const StreamAcceptorOptions &options, Private);
         virtual ~StreamAcceptor();
 
-        static tempo_utils::Result<std::shared_ptr<StreamAcceptor>> forUnix(
+        static tempo_utils::Result<std::shared_ptr<StreamAcceptor>> create(
+            StreamManager *manager,
+            const StreamAcceptorOptions &options = {});
+
+        AcceptState getAcceptState() const;
+
+        tempo_utils::Status listenUnix(
             std::string_view pipePath,
             int pipeFlags,
-            StreamManager *manager);
-        static tempo_utils::Result<std::shared_ptr<StreamAcceptor>> forTcp4(
+            std::unique_ptr<AbstractAcceptContext> &&ctx);
+        tempo_utils::Status listenTcp4(
             std::string_view ipAddress,
             tu_uint16 tcpPort,
-            StreamManager *manager);
-        static tempo_utils::Result<std::shared_ptr<StreamAcceptor>> forLocation(
-            const chord_common::TransportLocation &endpoint,
-            StreamManager *manager);
+            std::unique_ptr<AbstractAcceptContext> &&ctx);
+        tempo_utils::Status listenLocation(
+            const chord_common::TransportLocation &location,
+            std::unique_ptr<AbstractAcceptContext> &&ctx);
 
-        AcceptorState getAcceptorState() const;
-
-        tempo_utils::Status listen(const StreamAcceptorOps &ops, const StreamAcceptorOptions &options = {});
         void shutdown();
 
     private:
-        StreamHandle *m_handle;
-
-        AcceptorState m_state;
-        StreamAcceptorOps m_ops;
+        StreamManager *m_manager;
         StreamAcceptorOptions m_options;
-
-        explicit StreamAcceptor(StreamHandle *handle);
-        void emitError(const tempo_utils::Status &status);
+        AcceptHandle *m_handle;
 
         friend void new_unix_listener(uv_stream_t *server, int status);
         friend void new_tcp4_listener(uv_stream_t *server, int status);

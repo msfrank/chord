@@ -77,7 +77,10 @@ TEST_F(SecureStream, ReadAndWriteStream)
 
     chord_mesh::StreamManagerOps managerOps;
     chord_mesh::StreamManager manager(loop, streamKeypair, trustStore, managerOps);
-    auto createAcceptorResult = chord_mesh::StreamAcceptor::forTcp4(ipAddress.c_str(), tcpPort, &manager);
+
+    chord_mesh::StreamAcceptorOptions acceptorOptions;
+    acceptorOptions.allowInsecure = false;
+    auto createAcceptorResult = chord_mesh::StreamAcceptor::create(&manager, acceptorOptions);
     ASSERT_THAT (createAcceptorResult, tempo_test::IsResult()) << "failed to create acceptor";
     auto acceptor = createAcceptorResult.getResult();
 
@@ -94,29 +97,32 @@ TEST_F(SecureStream, ReadAndWriteStream)
         absl::Notification notifyComplete;
     } data;
 
-    chord_mesh::StreamAcceptorOps acceptorOps;
-    acceptorOps.accept = [](std::shared_ptr<chord_mesh::Stream> stream, void *ptr) {
-        chord_mesh::StreamOps streamOps;
-        streamOps.negotiate = [](auto protocolName, auto certificate, void *) -> bool {
-            return true;
-        };
-        streamOps.receive = [](const chord_mesh::Envelope &envelope, void *ptr) {
-            auto *data = (Data *) ptr;
-            data->acceptorReceived.push_back(envelope);
-            auto &stream = data->acceptorStream;
-            TU_RAISE_IF_NOT_OK (stream->send(
-                chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("pong!")));
-        };
-        TU_RAISE_IF_NOT_OK (stream->start(streamOps, ptr));
-        auto *data = (Data *) ptr;
-        data->acceptorStream = std::move(stream);
+    class AcceptContext : public chord_mesh::AbstractAcceptContext {
+    public:
+        AcceptContext(Data *data): m_data(data) {}
+        void accept(std::shared_ptr<chord_mesh::Stream> stream) override {
+            chord_mesh::StreamOps streamOps;
+            streamOps.negotiate = [](auto protocolName, auto certificate, void *) -> bool {
+                return true;
+            };
+            streamOps.receive = [](const chord_mesh::Envelope &envelope, void *ptr) {
+                auto *data = (Data *) ptr;
+                data->acceptorReceived.push_back(envelope);
+                auto &stream = data->acceptorStream;
+                TU_RAISE_IF_NOT_OK (stream->send(
+                    chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("pong!")));
+            };
+            TU_RAISE_IF_NOT_OK (stream->start(streamOps, m_data));
+            m_data->acceptorStream = std::move(stream);
+        }
+        void error(const tempo_utils::Status &) override {}
+        void cleanup() override {}
+    private:
+        Data *m_data;
     };
 
-    chord_mesh::StreamAcceptorOptions acceptorOptions;
-    acceptorOptions.allowInsecure = false;
-    acceptorOptions.data = &data;
-
-    ASSERT_THAT (acceptor->listen(acceptorOps, acceptorOptions), tempo_test::IsOk()) << "acceptor listen error";
+    auto ctx = std::make_unique<AcceptContext>(&data);
+    ASSERT_THAT (acceptor->listenTcp4(ipAddress, tcpPort, std::move(ctx)), tempo_test::IsOk()) << "acceptor listen error";
 
     class ConnectContext : public chord_mesh::AbstractConnectContext {
     public:

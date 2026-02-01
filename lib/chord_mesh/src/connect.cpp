@@ -7,13 +7,11 @@ chord_mesh::Connect::Connect(ConnectHandle *handle)
       m_state(ConnectState::Pending)
 {
     TU_ASSERT (m_handle != nullptr);
-    TU_ASSERT (!m_handle->shared);
-    m_handle->shared = true;
 }
 
 chord_mesh::Connect::~Connect()
 {
-    m_handle->shared = false;
+    m_handle->release();
 }
 
 tempo_utils::UUID

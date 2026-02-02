@@ -52,8 +52,8 @@ chord_mesh::new_unix_connection(uv_connect_t *req, int err)
     }
 
     // otherwise allocate a stream handle (transferring ownership of pipe) and wrap it in a stream
-    auto *handle = manager->allocateStreamHandle(pipe);
-    auto stream = std::make_shared<Stream>(handle, /* initiator= */ true, !connect->insecure);
+    auto *handle = manager->allocateStreamHandle(pipe, /* initiator= */ true, connect->insecure);
+    auto stream = std::make_shared<Stream>(handle);
 
     // invoke the connect callback
     connect->connect(stream);
@@ -124,8 +124,8 @@ chord_mesh::new_tcp4_connection(uv_connect_t *req, int err)
     }
 
     // otherwise allocate a stream handle (transferring ownership of tcp) and wrap it in a stream
-    auto *handle = manager->allocateStreamHandle(tcp);
-    auto stream = std::make_shared<Stream>(handle, /* initiator= */ true, !connect->insecure);
+    auto *handle = manager->allocateStreamHandle(tcp, /* initiator= */ true, connect->insecure);
+    auto stream = std::make_shared<Stream>(handle);
 
     // invoke the connect callback
     connect->connect(stream);

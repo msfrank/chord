@@ -1,38 +1,17 @@
 #ifndef CHORD_MESH_STREAM_H
 #define CHORD_MESH_STREAM_H
 
-#include <queue>
-
-#include <noise/protocol.h>
-#include <uv.h>
-
-#include <tempo_utils/bytes_appender.h>
-#include <tempo_utils/result.h>
 #include <tempo_utils/uuid.h>
 
 #include "envelope.h"
-#include "stream_buf.h"
 #include "stream_io.h"
 #include "stream_manager.h"
 
 namespace chord_mesh {
 
-    enum class StreamState {
-        Initial,
-        Active,
-        Closed,
-    };
-
-    struct StreamOps {
-        void (*receive)(const Envelope &, void *) = nullptr;
-        bool (*negotiate)(std::string_view, std::shared_ptr<tempo_security::X509Certificate>, void *) = nullptr;
-        void (*error)(const tempo_utils::Status &, void *) = nullptr;
-        void (*cleanup)(void *) = nullptr;
-    };
-
-    class Stream : public AbstractStreamBufWriter {
+    class Stream {
     public:
-        Stream(StreamHandle *handle, bool initiator, bool secure);
+        explicit Stream(StreamHandle *handle);
         virtual ~Stream();
 
         bool isInitiator() const;
@@ -41,7 +20,7 @@ namespace chord_mesh {
         tempo_utils::UUID getId() const;
         StreamState getStreamState() const;
 
-        tempo_utils::Status start(const StreamOps &ops, void *data = nullptr);
+        tempo_utils::Status start(std::unique_ptr<AbstractStreamContext> &&ctx);
         tempo_utils::Status negotiate(std::string_view protocolName);
         tempo_utils::Status send(
             EnvelopeVersion version,
@@ -49,29 +28,11 @@ namespace chord_mesh {
             absl::Time timestamp = {});
         void shutdown();
 
-        tempo_utils::Status write(StreamBuf *buf) override;
-
     private:
         StreamHandle *m_handle;
-        bool m_initiator;
-        bool m_secure;
-
-        tempo_utils::UUID m_id;
-        StreamState m_state;
-        StreamOps m_ops;
-        void *m_data;
-        std::unique_ptr<StreamIO> m_io;
 
         friend class StreamAcceptor;
         friend class StreamConnector;
-
-        void processReadyMessages();
-        void processStreamMessage(const Envelope &envelope);
-        void emitError(const tempo_utils::Status &status);
-
-        friend void allocate_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf);
-        friend void perform_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf);
-        friend void write_completed(uv_write_t *req, int err);
     };
 }
 

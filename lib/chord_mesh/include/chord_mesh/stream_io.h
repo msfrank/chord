@@ -169,6 +169,7 @@ namespace chord_mesh {
     public:
         StreamIO(bool initiator, StreamManager *manager, AbstractStreamBufWriter *writer);
 
+        bool isInitiator() const;
         IOState getIOState() const;
 
         tempo_utils::Status start(bool secure);

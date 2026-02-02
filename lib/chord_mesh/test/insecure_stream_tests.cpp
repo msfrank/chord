@@ -97,19 +97,30 @@ TEST_F(InsecureStream, ReadAndWriteStream)
         absl::Notification notifyComplete;
     } data;
 
+    class AcceptorStreamContext : public chord_mesh::AbstractStreamContext {
+    public:
+        AcceptorStreamContext(Data *data): m_data(data) {}
+        tempo_utils::Status validate(std::string_view,std::shared_ptr<tempo_security::X509Certificate>) override {
+            return {};
+        }
+        void receive(const chord_mesh::Envelope &envelope) override {
+            m_data->acceptorReceived.push_back(envelope);
+            auto &stream = m_data->acceptorStream;
+            TU_RAISE_IF_NOT_OK (stream->send(
+                chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("pong!")));
+        }
+        void error(const tempo_utils::Status &status) override { TU_RAISE_IF_NOT_OK (status); }
+        void cleanup() override {}
+    private:
+        Data *m_data;
+    };
+
     class AcceptContext : public chord_mesh::AbstractAcceptContext {
     public:
         AcceptContext(Data *data): m_data(data) {}
         void accept(std::shared_ptr<chord_mesh::Stream> stream) override {
-            chord_mesh::StreamOps streamOps;
-            streamOps.receive = [](const chord_mesh::Envelope &envelope, void *ptr) {
-                auto *data = (Data *) ptr;
-                data->acceptorReceived.push_back(envelope);
-                auto &stream = data->acceptorStream;
-                TU_RAISE_IF_NOT_OK (stream->send(
-                    chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("pong!")));
-            };
-            TU_RAISE_IF_NOT_OK (stream->start(streamOps, m_data));
+            auto ctx = std::make_unique<AcceptorStreamContext>(m_data);
+            TU_RAISE_IF_NOT_OK (stream->start(std::move(ctx)));
             m_data->acceptorStream = std::move(stream);
         }
         void error(const tempo_utils::Status &status) override { TU_RAISE_IF_NOT_OK(status); }
@@ -121,24 +132,35 @@ TEST_F(InsecureStream, ReadAndWriteStream)
     auto ctx = std::make_unique<AcceptContext>(&data);
     ASSERT_THAT (acceptor->listenTcp4(ipAddress, tcpPort, std::move(ctx)), tempo_test::IsOk()) << "acceptor listen error";
 
+    class InitiatorStreamContext : public chord_mesh::AbstractStreamContext {
+    public:
+        InitiatorStreamContext(Data *data): m_data(data) {}
+        tempo_utils::Status validate(std::string_view,std::shared_ptr<tempo_security::X509Certificate>) override {
+            return {};
+        }
+        void receive(const chord_mesh::Envelope &envelope) override {
+            m_data->connectorReceived.push_back(envelope);
+            auto &stream = m_data->connectorStream;
+            if (m_data->connectorReceived.size() < m_data->numRounds) {
+                TU_RAISE_IF_NOT_OK (stream->send(
+                    chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("ping!")));
+            } else {
+                stream->shutdown();
+                m_data->notifyComplete.Notify();
+            }
+        }
+        void error(const tempo_utils::Status &status) override { TU_RAISE_IF_NOT_OK (status); }
+        void cleanup() override {}
+    private:
+        Data *m_data;
+    };
+
     class ConnectContext : public chord_mesh::AbstractConnectContext {
     public:
         ConnectContext(Data *data) : m_data(data) {};
         void connect(std::shared_ptr<chord_mesh::Stream> stream) override {
-            chord_mesh::StreamOps streamOps;
-            streamOps.receive = [](const chord_mesh::Envelope &envelope, void *ptr) {
-                auto *data = (Data *) ptr;
-                data->connectorReceived.push_back(envelope);
-                auto &stream = data->connectorStream;
-                if (data->connectorReceived.size() < data->numRounds) {
-                    TU_RAISE_IF_NOT_OK (stream->send(
-                        chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("ping!")));
-                } else {
-                    stream->shutdown();
-                    data->notifyComplete.Notify();
-                }
-            };
-            TU_RAISE_IF_NOT_OK (stream->start(streamOps, m_data));
+            auto ctx = std::make_unique<InitiatorStreamContext>(m_data);
+            TU_RAISE_IF_NOT_OK (stream->start(std::move(ctx)));
             TU_RAISE_IF_NOT_OK (stream->send(
                 chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("ping!")));
             m_data->connectorStream = std::move(stream);

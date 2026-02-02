@@ -42,7 +42,6 @@ namespace chord_mesh {
         tu_uint32 m_currId = 0;
         std::queue<std::pair<tu_uint32,std::shared_ptr<const tempo_utils::ImmutableBytes>>> m_pending;
 
-
         class ReqConnectContext : public AbstractConnectContext {
         public:
             ReqConnectContext(std::weak_ptr<ReqProtocolImpl> impl);
@@ -55,9 +54,23 @@ namespace chord_mesh {
             std::weak_ptr<ReqProtocolImpl> m_impl;
         };
 
+        class ReqStreamContext : public AbstractStreamContext {
+        public:
+            ReqStreamContext(std::weak_ptr<ReqProtocolImpl> impl);
+
+            tempo_utils::Status validate(
+                std::string_view protocolName,
+                std::shared_ptr<tempo_security::X509Certificate> certificate) override;
+            void receive(const Envelope &envelope) override;
+            void error(const tempo_utils::Status &status) override;
+            void cleanup() override;
+
+        private:
+            std::weak_ptr<ReqProtocolImpl> m_impl;
+        };
+
         friend class ReqConnectContext;
-        friend void on_stream_receive(const Envelope &message, void *data);
-        friend void on_stream_error(const tempo_utils::Status &status, void *data);
+        friend class ReqStreamContext;
     };
 
     /**

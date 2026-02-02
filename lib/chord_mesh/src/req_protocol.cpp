@@ -1,8 +1,8 @@
 
 #include <chord_mesh/req_protocol.h>
 
-chord_mesh::ReqProtocolImpl::ReqProtocolImpl(std
-    ::shared_ptr<StreamConnector> connector,
+chord_mesh::ReqProtocolImpl::ReqProtocolImpl(
+    std::shared_ptr<StreamConnector> connector,
     const ReqProtocolOptions &options)
     : m_options(options),
       m_connector(std::move(connector))
@@ -10,20 +10,41 @@ chord_mesh::ReqProtocolImpl::ReqProtocolImpl(std
     TU_ASSERT (m_connector != nullptr);
 }
 
-void
-chord_mesh::on_stream_receive(const Envelope &message, void *data)
+chord_mesh::ReqProtocolImpl::ReqStreamContext::ReqStreamContext(std::weak_ptr<ReqProtocolImpl> impl)
+    : m_impl(std::move(impl))
 {
-    auto *impl = static_cast<ReqProtocolImpl *>(data);
-    impl->receive(0, message.getPayload());
+}
+
+tempo_utils::Status
+chord_mesh::ReqProtocolImpl::ReqStreamContext::validate(
+    std::string_view protocolName,
+    std::shared_ptr<tempo_security::X509Certificate> certificate)
+{
+    return {};
 }
 
 void
-chord_mesh::on_stream_error(const tempo_utils::Status &status, void *data)
+chord_mesh::ReqProtocolImpl::ReqStreamContext::receive(const Envelope &message)
 {
-    auto *impl = static_cast<ReqProtocolImpl *>(data);
-    impl->emitError(status);
+    auto impl = m_impl.lock();
+    if (impl != nullptr) {
+        impl->receive(0, message.getPayload());
+    }
 }
 
+void
+chord_mesh::ReqProtocolImpl::ReqStreamContext::error(const tempo_utils::Status &status)
+{
+    auto impl = m_impl.lock();
+    if (impl != nullptr) {
+        impl->emitError(status);
+    }
+}
+
+void
+chord_mesh::ReqProtocolImpl::ReqStreamContext::cleanup()
+{
+}
 
 chord_mesh::ReqProtocolImpl::ReqConnectContext::ReqConnectContext(std::weak_ptr<ReqProtocolImpl> impl)
     : m_impl(std::move(impl))
@@ -35,10 +56,8 @@ chord_mesh::ReqProtocolImpl::ReqConnectContext::connect(std::shared_ptr<Stream> 
 {
     auto impl = m_impl.lock();
     if (impl != nullptr) {
-        StreamOps ops;
-        ops.receive = on_stream_receive;
-        ops.error = on_stream_error;
-        auto status = stream->start(ops);
+        auto ctx = std::make_unique<ReqStreamContext>(impl);
+        auto status = stream->start(std::move(ctx));
         if (status.notOk()) {
             impl->emitError(status);
             return;

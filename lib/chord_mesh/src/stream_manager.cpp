@@ -2,6 +2,7 @@
 #include <chord_mesh/mesh_result.h>
 #include <chord_mesh/noise.h>
 #include <chord_mesh/stream_manager.h>
+#include <chord_mesh/stream_session.h>
 
 chord_mesh::StreamManager::StreamManager(
     uv_loop_t *loop,
@@ -140,14 +141,14 @@ chord_mesh::StreamManager::allocateAcceptHandle(
 }
 
 chord_mesh::StreamHandle *
-chord_mesh::StreamManager::allocateStreamHandle(uv_stream_t *stream, void *data)
+chord_mesh::StreamManager::allocateStreamHandle(uv_stream_t *stream, bool initiator, bool insecure)
 {
     TU_ASSERT (stream != nullptr);
 
     if (!m_running)
         return nullptr;
 
-    auto *handle = new StreamHandle(stream, this, data);
+    auto *handle = new StreamHandle(stream, this, initiator, insecure);
     stream->data = handle;
     handle->stream = stream;
     handle->manager = this;
@@ -326,8 +327,9 @@ chord_mesh::ConnectHandle::ConnectHandle(
       next(nullptr),
       m_shared(true)
 {
-    TU_ASSERT (req != nullptr);
-    TU_ASSERT (manager != nullptr);
+    TU_ASSERT (this->req != nullptr);
+    TU_ASSERT (this->manager != nullptr);
+    TU_ASSERT (this->ctx != nullptr);
 }
 
 chord_mesh::ConnectHandle::~ConnectHandle()
@@ -406,8 +408,11 @@ chord_mesh::AcceptHandle::AcceptHandle(
       prev(nullptr),
       next(nullptr),
       m_shared(true),
-      m_req(nullptr)
+      m_req{}
 {
+    TU_ASSERT (this->stream != nullptr);
+    TU_ASSERT (this->manager != nullptr);
+    TU_ASSERT (this->ctx != nullptr);
 }
 
 chord_mesh::AcceptHandle::~AcceptHandle()
@@ -495,24 +500,93 @@ chord_mesh::AcceptHandle::release()
     }
 }
 
-chord_mesh::StreamHandle::StreamHandle(uv_stream_t *stream, StreamManager *manager, void *data)
+chord_mesh::StreamHandle::StreamHandle(
+    uv_stream_t *stream,
+    StreamManager *manager,
+    bool initiator,
+    bool insecure)
     : stream(stream),
       manager(manager),
-      data(data),
+      initiator(initiator),
+      insecure(insecure),
+      id(tempo_utils::UUID::randomUUID()),
+      state(StreamState::Initial),
       prev(nullptr),
       next(nullptr),
-      m_closing(false)
+      m_shared(true),
+      m_req{}
 {
-    TU_ASSERT (stream != nullptr);
-    TU_ASSERT (manager != nullptr);
+    TU_ASSERT (this->stream != nullptr);
+    TU_ASSERT (this->manager != nullptr);
+    session = std::make_unique<StreamSession>(this, initiator, insecure);
+}
+
+chord_mesh::StreamHandle::~StreamHandle()
+{
+    if (stream != nullptr) {
+        std::free(stream);
+    }
+}
+
+tempo_utils::Status
+chord_mesh::StreamHandle::start(std::unique_ptr<AbstractStreamContext> &&ctx_)
+{
+    TU_ASSERT (ctx_ != nullptr);
+
+    this->ctx = std::move(ctx_);
+    state = StreamState::Active;
+    return session->start();
+}
+
+tempo_utils::Status
+chord_mesh::StreamHandle::negotiate(std::string_view protocolName)
+{
+    return session->negotiate(protocolName);
+}
+
+tempo_utils::Status
+chord_mesh::StreamHandle::validate(
+    std::string_view protocolName,
+    std::shared_ptr<tempo_security::X509Certificate> certificate)
+{
+    TU_ASSERT (ctx != nullptr);
+    return ctx->validate(protocolName, std::move(certificate));
+}
+
+tempo_utils::Status
+chord_mesh::StreamHandle::send(std::shared_ptr<const tempo_utils::ImmutableBytes> bytes)
+{
+    return session->write(std::move(bytes));
+}
+
+void
+chord_mesh::StreamHandle::receive(const Envelope &envelope)
+{
+    TU_ASSERT (ctx != nullptr);
+    ctx->receive(envelope);
+}
+
+void
+chord_mesh::StreamHandle::error(const tempo_utils::Status &status)
+{
+    TU_ASSERT (ctx != nullptr);
+    ctx->error(status);
 }
 
 void
 chord_mesh::close_stream(uv_handle_t *stream)
 {
     auto *handle = (StreamHandle *) stream->data;
-    auto *manager = handle->manager;
-    manager->freeStreamHandle(handle);
+
+    handle->state = StreamState::Closed;
+    if (handle->ctx != nullptr) {
+        handle->ctx->cleanup();
+    }
+
+    if (!handle->m_shared) {
+        auto *manager = handle->manager;
+        manager->freeStreamHandle(handle);
+    }
 }
 
 void
@@ -526,30 +600,50 @@ chord_mesh::shutdown_stream(uv_shutdown_t *req, int err)
                 "uv_shutdown error: {}", uv_strerror(err)));
     }
     uv_close((uv_handle_t *) req->handle, close_stream);
+    handle->state = StreamState::Closing;
 }
 
 void
 chord_mesh::StreamHandle::shutdown()
 {
-    if (m_closing)
-        return;
+    switch (state) {
+        case StreamState::Initial:
+        case StreamState::Active:
+            break;
+        default:
+            return;
+    }
     memset(&m_req, 0, sizeof(uv_shutdown_t));
     auto ret = uv_shutdown(&m_req, stream, shutdown_stream);
     if (ret < 0) {
         manager->emitError(
             MeshStatus::forCondition(MeshCondition::kMeshInvariant,
                 "uv_shutdown error: {}", uv_strerror(ret)));
-        return;
+        close();
+    } else {
+        state = StreamState::ShuttingDown;
     }
-
-    m_closing = true;
 }
 
 void
 chord_mesh::StreamHandle::close()
 {
-    if (m_closing)
-        return;
+    switch (state) {
+        case StreamState::Initial:
+        case StreamState::Active:
+            break;
+        default:
+            return;
+    }
     uv_close((uv_handle_t *) stream, close_stream);
-    m_closing = true;
+    state = StreamState::Closing;
+}
+
+void
+chord_mesh::StreamHandle::release()
+{
+    m_shared = false;
+    if (state == StreamState::Closed) {
+        manager->freeStreamHandle(this);
+    }
 }

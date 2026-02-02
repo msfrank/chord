@@ -1,10 +1,8 @@
 #ifndef CHORD_MESH_CONNECT_H
 #define CHORD_MESH_CONNECT_H
 
-#include <chord_common/common_conversions.h>
 #include <tempo_utils/uuid.h>
 
-#include "stream.h"
 #include "stream_manager.h"
 
 namespace chord_mesh {

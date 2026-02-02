@@ -175,12 +175,22 @@ TEST_F(StreamAcceptor, ReadAndWaitForUnixAcceptorClose)
         std::shared_ptr<chord_mesh::Stream> stream;
     } data;
 
+    class StreamContext : public chord_mesh::AbstractStreamContext {
+    public:
+        tempo_utils::Status validate(std::string_view,std::shared_ptr<tempo_security::X509Certificate>) override {
+            return {};
+        }
+        void receive(const chord_mesh::Envelope &envelope) override {}
+        void error(const tempo_utils::Status &status) override { TU_RAISE_IF_NOT_OK (status); }
+        void cleanup() override {}
+    };
+
     class AcceptContext : public chord_mesh::AbstractAcceptContext {
     public:
         AcceptContext(Data *data) : m_data(data) {}
         void accept(std::shared_ptr<chord_mesh::Stream> stream) override {
-            chord_mesh::StreamOps streamOps;
-            stream->start(streamOps, m_data);
+            auto ctx = std::make_unique<StreamContext>();
+            stream->start(std::move(ctx));
             stream->send(chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("hello, world!"));
             stream->shutdown();
             m_data->stream = std::move(stream);
@@ -338,12 +348,22 @@ TEST_F(StreamAcceptor, ReadAndWaitForTcp4AcceptorClose)
         std::shared_ptr<chord_mesh::Stream> stream;
     } data;
 
+    class StreamContext : public chord_mesh::AbstractStreamContext {
+    public:
+        tempo_utils::Status validate(std::string_view,std::shared_ptr<tempo_security::X509Certificate>) override {
+            return {};
+        }
+        void receive(const chord_mesh::Envelope &envelope) override {}
+        void error(const tempo_utils::Status &status) override { TU_RAISE_IF_NOT_OK (status); }
+        void cleanup() override {}
+    };
+
     class AcceptContext : public chord_mesh::AbstractAcceptContext {
     public:
         AcceptContext(Data *data): m_data(data) {}
         void accept(std::shared_ptr<chord_mesh::Stream> stream) override {
-            chord_mesh::StreamOps streamOps;
-            stream->start(streamOps, m_data);
+            auto ctx = std::make_unique<StreamContext>();
+            stream->start(std::move(ctx));
             stream->send(chord_mesh::EnvelopeVersion::Version1, tempo_utils::MemoryBytes::copy("hello, world!"));
             stream->shutdown();
             m_data->stream = std::move(stream);

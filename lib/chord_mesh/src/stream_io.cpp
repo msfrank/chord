@@ -539,6 +539,12 @@ chord_mesh::StreamIO::StreamIO(bool initiator, StreamManager *manager, AbstractS
     TU_ASSERT (m_writer != nullptr);
 }
 
+bool
+chord_mesh::StreamIO::isInitiator() const
+{
+    return m_initiator;
+}
+
 chord_mesh::IOState
 chord_mesh::StreamIO::getIOState() const
 {

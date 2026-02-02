@@ -5,13 +5,15 @@
 
 #include <tempo_security/certificate_key_pair.h>
 #include <tempo_security/x509_store.h>
-#include <tempo_utils/result.h>
 #include <tempo_utils/uuid.h>
+
+#include "envelope.h"
 
 namespace chord_mesh {
 
-    class StreamManager;
     class Stream;
+    class StreamManager;
+    class StreamSession;
 
     enum class ConnectState {
         Pending,
@@ -28,11 +30,19 @@ namespace chord_mesh {
         Closed,
     };
 
+    enum class StreamState {
+        Initial,
+        Active,
+        ShuttingDown,
+        Closing,
+        Closed,
+    };
+
     class AbstractConnectContext {
     public:
         virtual ~AbstractConnectContext() = default;
-        virtual void connect(std::shared_ptr<Stream> stream) = 0;
-        virtual void error(const tempo_utils::Status &status) = 0;
+        virtual void connect(std::shared_ptr<Stream>) = 0;
+        virtual void error(const tempo_utils::Status &) = 0;
         virtual void cleanup() = 0;
     };
 
@@ -40,6 +50,15 @@ namespace chord_mesh {
     public:
         virtual ~AbstractAcceptContext() = default;
         virtual void accept(std::shared_ptr<Stream>) = 0;
+        virtual void error(const tempo_utils::Status &) = 0;
+        virtual void cleanup() = 0;
+    };
+
+    class AbstractStreamContext {
+    public:
+        virtual ~AbstractStreamContext() = default;
+        virtual void receive(const Envelope &) = 0;
+        virtual tempo_utils::Status validate(std::string_view, std::shared_ptr<tempo_security::X509Certificate>) = 0;
         virtual void error(const tempo_utils::Status &) = 0;
         virtual void cleanup() = 0;
     };
@@ -104,17 +123,32 @@ namespace chord_mesh {
     struct StreamHandle {
         uv_stream_t *stream;
         StreamManager *manager;
-        void *data;
+        bool initiator;
+        bool insecure;
+        std::unique_ptr<StreamSession> session;
+        std::unique_ptr<AbstractStreamContext> ctx;
+        tempo_utils::UUID id;
+        StreamState state;
         StreamHandle *prev;
         StreamHandle *next;
 
-        StreamHandle(uv_stream_t *stream, StreamManager *manager, void *data);
+        StreamHandle(uv_stream_t *stream, StreamManager *manager, bool initiator, bool insecure);
+        ~StreamHandle();
+        tempo_utils::Status start(std::unique_ptr<AbstractStreamContext> &&ctx);
+        tempo_utils::Status negotiate(std::string_view protocolName);
+        tempo_utils::Status validate(std::string_view protocolName, std::shared_ptr<tempo_security::X509Certificate> certificate);
+        tempo_utils::Status send(std::shared_ptr<const tempo_utils::ImmutableBytes> bytes);
+        void receive(const Envelope &envelope);
+        void error(const tempo_utils::Status &status);
         void shutdown();
         void close();
+        void release();
 
     private:
+        bool m_shared;
         uv_shutdown_t m_req;
-        bool m_closing;
+
+        friend void close_stream(uv_handle_t *stream);
     };
 
     struct StreamManagerOps {
@@ -152,7 +186,8 @@ namespace chord_mesh {
             std::unique_ptr<AbstractAcceptContext> &&ctx);
         StreamHandle *allocateStreamHandle(
             uv_stream_t *stream,
-            void *data = nullptr);
+            bool initiator,
+            bool insecure);
         void shutdown();
 
     private:

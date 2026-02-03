@@ -25,4 +25,6 @@ chord_mesh::Envelope parse_raw_envelope(std::span<const tu_uint8> raw);
 
 ssize_t read_until_eof(int fd, std::vector<tu_uint8> &buf);
 
+bool write_entire_buffer(int fd, std::span<const tu_uint8> buf);
+
 #endif // CHORD_MESH_BASE_MESH_FIXTURE_H

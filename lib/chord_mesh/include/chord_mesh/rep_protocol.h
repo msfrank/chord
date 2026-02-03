@@ -7,11 +7,14 @@
 
 namespace chord_mesh {
 
-    template<class ReqMessage, class RspMessage>
+    template<class ReqMessage, class RepMessage>
     class AbstractRepProtocol {
     public:
         virtual ~AbstractRepProtocol() = default;
-        virtual tempo_utils::Status reply(const ReqMessage &request, RspMessage &reply) = 0;
+        virtual tempo_utils::Status reply(
+            AbstractCloseable *closeable,
+            const ReqMessage &request,
+            RepMessage &reply) = 0;
         virtual tempo_utils::Status validate(
             std::string_view protocolName,
             std::shared_ptr<tempo_security::X509Certificate> certificate) = 0;
@@ -28,14 +31,16 @@ namespace chord_mesh {
         void cleanup() override;
     };
 
-    template<class ReqMessage, class RspMessage>
-    class RepStream : public RepStreamImpl {
+    template<class ReqMessage, class RepMessage>
+    class RepStream : public RepStreamImpl, public AbstractCloseable {
     public:
         RepStream(
-            std::unique_ptr<AbstractRepProtocol<ReqMessage,RspMessage>> &&protocol,
+            std::unique_ptr<AbstractRepProtocol<ReqMessage,RepMessage>> &&protocol,
             std::shared_ptr<Stream> stream)
             : m_protocol(std::move(protocol)),
-              m_stream(std::move(stream))
+              m_stream(std::move(stream)),
+              m_shutdown(false),
+              m_close(false)
         {
             TU_ASSERT (m_protocol != nullptr);
             TU_ASSERT (m_stream != nullptr);
@@ -50,10 +55,14 @@ namespace chord_mesh {
                 error(status);
                 return;
             }
-            RspMessage reply;
-            status = m_protocol->reply(request, reply);
+            RepMessage reply;
+            status = m_protocol->reply(this, request, reply);
             if (status.notOk()) {
                 error(status);
+                return;
+            }
+            if (m_close) {
+                m_stream->close();
                 return;
             }
             auto result = reply.toBytes();
@@ -66,28 +75,38 @@ namespace chord_mesh {
             if (status.notOk()) {
                 error(status);
             }
+            if (m_shutdown) {
+                m_stream->shutdown();
+            }
+        }
+        void shutdown() override {
+            m_shutdown = true;
+        }
+        void close() override {
+            m_close = true;
         }
 
-
     private:
-        std::unique_ptr<AbstractRepProtocol<ReqMessage,RspMessage>> m_protocol;
+        std::unique_ptr<AbstractRepProtocol<ReqMessage,RepMessage>> m_protocol;
         std::shared_ptr<Stream> m_stream;
+        bool m_shutdown;
+        bool m_close;
     };
 
-    template<class ReqMessage, class RspMessage>
-    class RepAcceptor : public AbstractAcceptContext {
+    template<class ReqMessage, class RepMessage>
+    class RepAcceptContext : public AbstractAcceptContext {
     public:
         /**
          *
          * @return
          */
-        virtual std::unique_ptr<AbstractRepProtocol<ReqMessage,RspMessage>> make() = 0;
+        virtual std::unique_ptr<AbstractRepProtocol<ReqMessage,RepMessage>> make() = 0;
 
         void accept(std::shared_ptr<Stream> stream) override
         {
             auto ctx = make();
-            auto protocol = std::make_unique<ReqProtocol<ReqMessage,RspMessage>>(std::move(ctx), stream);
-            auto status = stream->start(std::move(protocol));
+            auto rep = std::make_unique<RepStream<ReqMessage,RepMessage>>(std::move(ctx), stream);
+            auto status = stream->start(std::move(rep));
             if (status.notOk()) {
                 error(status);
             }

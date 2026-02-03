@@ -76,3 +76,9 @@ chord_mesh::Stream::shutdown()
 {
     m_handle->shutdown();
 }
+
+void
+chord_mesh::Stream::close()
+{
+    m_handle->close();
+}

@@ -78,9 +78,9 @@ namespace chord_mesh {
     /**
      *
      * @tparam ReqMessage
-     * @tparam RspMessage
+     * @tparam RepMessage
      */
-    template<class ReqMessage, class RspMessage>
+    template<class ReqMessage, class RepMessage>
     class ReqProtocol : public ReqProtocolImpl {
     public:
 
@@ -88,7 +88,7 @@ namespace chord_mesh {
         public:
             virtual ~AbstractContext() = default;
             virtual void ready(ReqProtocol *protocol) = 0;
-            virtual void receive(ReqProtocol *protocol, const RspMessage &message) = 0;
+            virtual void receive(ReqProtocol *protocol, const RepMessage &message) = 0;
             virtual void error(const tempo_utils::Status &status) = 0;
             virtual void cleanup() = 0;
         };
@@ -145,7 +145,7 @@ namespace chord_mesh {
             tu_uint32 id,
             std::shared_ptr<const tempo_utils::ImmutableBytes> payload) override
         {
-            RspMessage message;
+            RepMessage message;
             TU_RETURN_IF_NOT_OK (message.parse(payload));
             m_ctx->receive(this, message);
             return {};

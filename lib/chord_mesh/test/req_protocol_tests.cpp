@@ -67,7 +67,7 @@ protected:
     }
 };
 
-TEST_F(ReqProtocol, ReadAndWaitForUnixConnectorClose)
+TEST_F(ReqProtocol, ReadAndWaitForReqProtocolClose)
 {
     auto testerDirectory = tempdir->getTempdir();
     auto socketPath = testerDirectory / "test.sock";

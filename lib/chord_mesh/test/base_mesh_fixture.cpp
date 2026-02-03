@@ -73,3 +73,19 @@ read_until_eof(int fd, std::vector<tu_uint8> &buf)
 
     return static_cast<ssize_t>(buf.size());
 }
+
+bool
+write_entire_buffer(int fd, std::span<const tu_uint8> buf)
+{
+    auto *data = buf.data();
+    auto nleft = buf.size();
+
+    while (nleft > 0) {
+        auto ret = write(fd, data, nleft);
+        if (ret <= 0)
+            return false;
+        data += ret;
+        nleft -= ret;
+    }
+    return true;
+}

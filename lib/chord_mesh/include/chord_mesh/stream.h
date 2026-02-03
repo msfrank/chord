@@ -9,10 +9,17 @@
 
 namespace chord_mesh {
 
-    class Stream {
+    class AbstractCloseable {
+    public:
+        virtual ~AbstractCloseable() = default;
+        virtual void shutdown() = 0;
+        virtual void close() = 0;
+    };
+
+    class Stream : public AbstractCloseable {
     public:
         explicit Stream(StreamHandle *handle);
-        virtual ~Stream();
+        ~Stream() override;
 
         bool isInitiator() const;
         bool isSecure() const;
@@ -26,7 +33,8 @@ namespace chord_mesh {
             EnvelopeVersion version,
             std::shared_ptr<const tempo_utils::ImmutableBytes> payload,
             absl::Time timestamp = {});
-        void shutdown();
+        void shutdown() override;
+        void close() override;
 
     private:
         StreamHandle *m_handle;

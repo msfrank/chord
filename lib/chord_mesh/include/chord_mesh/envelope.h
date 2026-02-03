@@ -12,6 +12,7 @@ namespace chord_mesh {
     constexpr tu_uint32 kEnvelopeVersionStream = 0xFF;
     constexpr tu_uint32 kEnvelopeVersion1 = 1;
     constexpr tu_uint32 kEnvelopeSignedFlag = 1;
+    constexpr tu_uint32 kMaxHeaderSize = 8192;
     constexpr tu_uint32 kMaxPayloadSize = 16777216;     // 2^24
 
     enum class EnvelopeVersion {
@@ -39,6 +40,10 @@ namespace chord_mesh {
         absl::Time getTimestamp() const;
         void setTimestamp(absl::Time timestamp);
 
+        bool hasHeader() const;
+        std::shared_ptr<const tempo_utils::ImmutableBytes> getHeader() const;
+        void setHeader(std::shared_ptr<const tempo_utils::ImmutableBytes> header);
+
         bool hasPayload() const;
         std::shared_ptr<const tempo_utils::ImmutableBytes> getPayload() const;
         void setPayload(std::shared_ptr<const tempo_utils::ImmutableBytes> payload);
@@ -52,6 +57,7 @@ namespace chord_mesh {
             tu_uint8 version;
             tu_uint8 flags;
             absl::Time timestamp;
+            std::shared_ptr<const tempo_utils::ImmutableBytes> header;
             std::shared_ptr<const tempo_utils::ImmutableBytes> payload;
             tempo_security::Digest digest;
         };
@@ -71,6 +77,9 @@ namespace chord_mesh {
         absl::Time getTimestamp() const;
         void setTimestamp(absl::Time timestamp);
 
+        std::shared_ptr<const tempo_utils::ImmutableBytes> getHeader() const;
+        tempo_utils::Status setHeader(std::shared_ptr<const tempo_utils::ImmutableBytes> header);
+
         std::shared_ptr<const tempo_utils::ImmutableBytes> getPayload() const;
         tempo_utils::Status setPayload(std::shared_ptr<const tempo_utils::ImmutableBytes> payload);
 
@@ -84,6 +93,7 @@ namespace chord_mesh {
     private:
         EnvelopeVersion m_version;
         absl::Time m_timestamp;
+        std::shared_ptr<const tempo_utils::ImmutableBytes> m_header;
         std::shared_ptr<const tempo_utils::ImmutableBytes> m_payload;
         std::shared_ptr<tempo_security::PrivateKey> m_privateKey;
     };
@@ -112,6 +122,7 @@ namespace chord_mesh {
         tu_uint8 m_envelopeVersion;
         tu_uint8 m_envelopeFlags;
         tu_uint32 m_timestamp;
+        tu_uint16 m_headerSize;
         tu_uint32 m_payloadSize;
         tu_uint8 m_digestSize;
     };

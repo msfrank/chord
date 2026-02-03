@@ -74,6 +74,39 @@ chord_mesh::Envelope::setTimestamp(absl::Time timestamp)
     m_priv->timestamp = timestamp;
 }
 
+bool
+chord_mesh::Envelope::hasHeader() const
+{
+    if (m_priv == nullptr)
+        return false;
+    return m_priv->header != nullptr;
+}
+
+std::shared_ptr<const tempo_utils::ImmutableBytes>
+chord_mesh::Envelope::getHeader() const
+{
+    if (m_priv == nullptr)
+        return {};
+    return m_priv->header;
+}
+
+void
+chord_mesh::Envelope::setHeader(std::shared_ptr<const tempo_utils::ImmutableBytes> header)
+{
+    if (m_priv == nullptr) {
+        m_priv = std::make_shared<Priv>();
+    }
+    m_priv->header = std::move(header);
+}
+
+bool
+chord_mesh::Envelope::hasPayload() const
+{
+    if (m_priv == nullptr)
+        return false;
+    return m_priv->payload != nullptr;
+}
+
 std::shared_ptr<const tempo_utils::ImmutableBytes>
 chord_mesh::Envelope::getPayload() const
 {
@@ -139,6 +172,19 @@ chord_mesh::EnvelopeBuilder::setTimestamp(absl::Time timestamp)
 }
 
 std::shared_ptr<const tempo_utils::ImmutableBytes>
+chord_mesh::EnvelopeBuilder::getHeader() const
+{
+    return m_header;
+}
+
+tempo_utils::Status
+chord_mesh::EnvelopeBuilder::setHeader(std::shared_ptr<const tempo_utils::ImmutableBytes> header)
+{
+    m_header = std::move(header);
+    return {};
+}
+
+std::shared_ptr<const tempo_utils::ImmutableBytes>
 chord_mesh::EnvelopeBuilder::getPayload() const
 {
     return m_payload;
@@ -147,7 +193,7 @@ chord_mesh::EnvelopeBuilder::getPayload() const
 tempo_utils::Status
 chord_mesh::EnvelopeBuilder::setPayload(std::shared_ptr<const tempo_utils::ImmutableBytes> payload)
 {
-    m_payload = payload;
+    m_payload = std::move(payload);
     return {};
 }
 
@@ -160,7 +206,7 @@ chord_mesh::EnvelopeBuilder::getPrivateKey() const
 void
 chord_mesh::EnvelopeBuilder::setPrivateKey(std::shared_ptr<tempo_security::PrivateKey> privateKey)
 {
-    m_privateKey = privateKey;
+    m_privateKey = std::move(privateKey);
 }
 
 tempo_utils::Result<std::shared_ptr<const tempo_utils::ImmutableBytes>>
@@ -173,6 +219,12 @@ chord_mesh::EnvelopeBuilder::toBytes() const
     if (payloadSize > kMaxPayloadSize)
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
             "envelope payload is too large");
+
+    tu_uint32 headerSizeU32 = m_header? m_header->getSize() : 0;
+    if (headerSizeU32 > kMaxHeaderSize)
+        return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
+            "envelope payload is too large");
+    auto headerSize = static_cast<tu_uint16>(headerSizeU32);
 
     tempo_utils::BytesAppender appender;
 
@@ -205,8 +257,16 @@ chord_mesh::EnvelopeBuilder::toBytes() const
     }
     appender.appendU32(timestamp);
 
+    // append the header size field
+    appender.appendU16(headerSize);
+
     // append the payload size field
     appender.appendU32(payloadSize);
+
+    // append the header if present
+    if (headerSize > 0) {
+        appender.appendBytes(m_header->getSpan());
+    }
 
     // append the payload
     appender.appendBytes(m_payload->getSpan());
@@ -294,11 +354,12 @@ chord_mesh::EnvelopeParser::checkReady(bool &ready)
 
     // get the envelope version and payload size if we have read enough input
     if (m_payloadSize == 0) {
-        if (m_pending->getSize() < 10)
+        if (m_pending->getSize() < 12)
             return {};
         auto *ptr = m_pending->getData() + 1;
         m_envelopeFlags = tempo_utils::read_u8_and_advance(ptr);
         m_timestamp = tempo_utils::read_u32_and_advance(ptr);
+        m_headerSize = tempo_utils::read_u16_and_advance(ptr);
         m_payloadSize = tempo_utils::read_u32_and_advance(ptr);
         if (m_payloadSize == 0)
             return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
@@ -312,17 +373,17 @@ chord_mesh::EnvelopeParser::checkReady(bool &ready)
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
             "cannot verify signed envelope");
 
-    // we haven't read enough input to parse the payload
-    if (m_pending->getSize() < 10 + m_payloadSize)
+    // we haven't read enough input to parse the header and payload
+    if (m_pending->getSize() < 12 + m_headerSize + m_payloadSize)
         return {};
 
     if (verificationRequired) {
 
         // get the digest size if we have read enough input
         if (m_digestSize == 0) {
-            if (m_pending->getSize() < 10 + m_payloadSize + 1)
+            if (m_pending->getSize() < 12 + m_headerSize + m_payloadSize + 1)
                 return {};
-            auto *ptr = m_pending->getData() + 10 + m_payloadSize;
+            auto *ptr = m_pending->getData() + 12 + m_headerSize + m_payloadSize;
             m_digestSize = tempo_utils::read_u8_and_advance(ptr);
             if (m_digestSize == 0)
                 return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
@@ -330,7 +391,7 @@ chord_mesh::EnvelopeParser::checkReady(bool &ready)
         }
 
         // we haven't read enough input to parse the digest
-        if (m_pending->getSize() < 10 + m_payloadSize + 1 + m_digestSize)
+        if (m_pending->getSize() < 12 + m_headerSize + m_payloadSize + 1 + m_digestSize)
             return {};
     }
 
@@ -340,7 +401,7 @@ chord_mesh::EnvelopeParser::checkReady(bool &ready)
 }
 
 tempo_utils::Status
-chord_mesh::EnvelopeParser::takeReady(Envelope &envelope)
+chord_mesh::EnvelopeParser::takeReady(Envelope &ready)
 {
     if (!m_ready)
         return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
@@ -351,7 +412,8 @@ chord_mesh::EnvelopeParser::takeReady(Envelope &envelope)
 
     // copy parser state before reset
     auto trailerSize = m_digestSize > 0? m_digestSize + 1 : 0;
-    auto envelopeSize = 10 + m_payloadSize + trailerSize;
+    auto envelopeSize = 12 + m_headerSize + m_payloadSize + trailerSize;
+    auto headerSize = m_headerSize;
     auto payloadSize = m_payloadSize;
     auto digestSize = m_digestSize;
     auto envelopeVersion = m_envelopeVersion;
@@ -369,13 +431,18 @@ chord_mesh::EnvelopeParser::takeReady(Envelope &envelope)
     }
 
     // construct the envelope
-    Envelope envelope_(envelopeVersion, envelopeFlags, timestamp);
-    auto payloadBytes = pending.slice(10, payloadSize).sliceView();
+    Envelope envelope(envelopeVersion, envelopeFlags, timestamp);
+    auto headerBytes = pending.slice(12, headerSize).sliceView();
+    auto payloadBytes = pending.slice(12 + headerSize, payloadSize).sliceView();
 
     // verify the signature against the public key
     if (verificationRequired) {
-        auto verifyBytes = pending.slice(0, 10 + payloadSize).sliceView();
-        auto digestBytes = pending.slice(10 + payloadSize + 1, digestSize).sliceView();
+        auto verifyBytes = pending
+            .slice(0, 12 + headerSize + payloadSize)
+            .sliceView();
+        auto digestBytes = pending
+            .slice(12 + headerSize + payloadSize + 1, digestSize)
+            .sliceView();
         tempo_security::Digest digest(digestBytes);
         bool verified;
         TU_ASSIGN_OR_RETURN (verified, tempo_security::DigestUtils::verify_signed_message_digest(
@@ -383,11 +450,15 @@ chord_mesh::EnvelopeParser::takeReady(Envelope &envelope)
         if (!verified)
             return MeshStatus::forCondition(MeshCondition::kMeshInvariant,
                 "signature verification failed");
-        envelope_.setDigest(digest);
+        envelope.setDigest(digest);
     }
 
-    envelope_.setPayload(tempo_utils::MemoryBytes::copy(payloadBytes));
-    envelope = envelope_;
+    envelope.setPayload(tempo_utils::MemoryBytes::copy(payloadBytes));
+    if (!headerBytes.empty()) {
+        envelope.setHeader(tempo_utils::MemoryBytes::copy(headerBytes));
+    }
+
+    ready = envelope;
 
     return {};
 }
@@ -414,6 +485,7 @@ chord_mesh::EnvelopeParser::reset()
     m_envelopeVersion = 0;
     m_envelopeFlags = 0;
     m_timestamp = 0;
+    m_headerSize = 0;
     m_payloadSize = 0;
     m_digestSize = 0;
 }

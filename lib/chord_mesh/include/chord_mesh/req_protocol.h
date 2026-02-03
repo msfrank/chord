@@ -29,6 +29,8 @@ namespace chord_mesh {
 
         tempo_utils::Result<tu_uint32> send(std::shared_ptr<const tempo_utils::ImmutableBytes> payload);
 
+        virtual void ready() = 0;
+
         virtual tempo_utils::Status receive(
             tu_uint32 id,
             std::shared_ptr<const tempo_utils::ImmutableBytes> payload) = 0;
@@ -85,7 +87,8 @@ namespace chord_mesh {
         class AbstractContext {
         public:
             virtual ~AbstractContext() = default;
-            virtual void receive(const RspMessage &message) = 0;
+            virtual void ready(ReqProtocol *protocol) = 0;
+            virtual void receive(ReqProtocol *protocol, const RspMessage &message) = 0;
             virtual void error(const tempo_utils::Status &status) = 0;
             virtual void cleanup() = 0;
         };
@@ -135,13 +138,16 @@ namespace chord_mesh {
         }
 
     protected:
+        void ready() override {
+            m_ctx->ready(this);
+        }
         tempo_utils::Status receive(
             tu_uint32 id,
             std::shared_ptr<const tempo_utils::ImmutableBytes> payload) override
         {
             RspMessage message;
             TU_RETURN_IF_NOT_OK (message.parse(payload));
-            m_ctx->receive(message);
+            m_ctx->receive(this, message);
             return {};
         }
 

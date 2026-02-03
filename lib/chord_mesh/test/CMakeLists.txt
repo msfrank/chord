@@ -12,6 +12,7 @@ set(TEST_CASES
     insecure_stream_tests.cpp
     envelope_builder_tests.cpp
     envelope_parser_tests.cpp
+    message_tests.cpp
     req_protocol_tests.cpp
     secure_stream_tests.cpp
     stream_acceptor_tests.cpp

@@ -133,7 +133,7 @@ TEST_F(StreamAcceptor, ConnectToUnixAcceptor)
     ASSERT_THAT (acceptor->listenUnix(socketPath.c_str(), 0, std::move(ctx)), tempo_test::IsOk()) << "acceptor listen error";
 
     ASSERT_THAT (startUVThread(), tempo_test::IsOk()) << "failed to start UV thread";
-    uv_sleep(500);
+    uv_sleep(200);
 
     sockaddr_un addr;
     memset(&addr, 0, sizeof(addr));
@@ -144,7 +144,7 @@ TEST_F(StreamAcceptor, ConnectToUnixAcceptor)
     ASSERT_LE (0, fd) << "socket() error: " << strerror(errno);
     auto ret = connect(fd, (sockaddr *) &addr, sizeof(addr));
     ASSERT_EQ (0, ret) << "connect() error: " << strerror(errno);
-    uv_sleep(250);
+    uv_sleep(200);
 
     ASSERT_THAT (stopUVThread(), tempo_test::IsOk()) << "failed to stop UV thread";
     acceptor->shutdown();
@@ -205,7 +205,7 @@ TEST_F(StreamAcceptor, ReadAndWaitForUnixAcceptorClose)
     ASSERT_THAT (acceptor->listenUnix(socketPath.c_str(), 0, std::move(ctx)), tempo_test::IsOk()) << "acceptor listen error";
 
     ASSERT_THAT (startUVThread(), tempo_test::IsOk()) << "failed to start UV thread";
-    uv_sleep(500);
+    uv_sleep(200);
 
     sockaddr_un addr;
     memset(&addr, 0, sizeof(addr));
@@ -262,7 +262,7 @@ TEST_F(StreamAcceptor, CreateTcp4Acceptor)
     ASSERT_THAT (acceptor->listenTcp4(ipAddress, tcpPort, std::move(ctx)), tempo_test::IsOk());
     ASSERT_THAT (startUVThread(), tempo_test::IsOk());
 
-    uv_sleep(500);
+    uv_sleep(200);
     ASSERT_EQ (chord_mesh::AcceptState::Active, acceptor->getAcceptState());
 
     stopUVThread();
@@ -306,7 +306,7 @@ TEST_F(StreamAcceptor, ConnectToTcp4Acceptor)
     ASSERT_THAT (acceptor->listenTcp4(ipAddress, tcpPort, std::move(ctx)), tempo_test::IsOk()) << "acceptor listen error";
 
     ASSERT_THAT (startUVThread(), tempo_test::IsOk()) << "failed to start UV thread";
-    uv_sleep(500);
+    uv_sleep(200);
 
     sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
@@ -316,7 +316,7 @@ TEST_F(StreamAcceptor, ConnectToTcp4Acceptor)
     ASSERT_LE (0, fd) << "socket() error: " << strerror(errno);
     auto ret = connect(fd, (sockaddr *) &addr, sizeof(addr));
     ASSERT_EQ (0, ret) << "connect() error: " << strerror(errno);
-    uv_sleep(250);
+    uv_sleep(200);
 
     ASSERT_THAT (stopUVThread(), tempo_test::IsOk()) << "failed to stop UV thread";
     acceptor->shutdown();
@@ -378,7 +378,7 @@ TEST_F(StreamAcceptor, ReadAndWaitForTcp4AcceptorClose)
     ASSERT_THAT (acceptor->listenTcp4(ipAddress, tcpPort, std::move(ctx)), tempo_test::IsOk()) << "acceptor listen error";
 
     ASSERT_THAT (startUVThread(), tempo_test::IsOk()) << "failed to start UV thread";
-    uv_sleep(500);
+    uv_sleep(200);
 
     sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));

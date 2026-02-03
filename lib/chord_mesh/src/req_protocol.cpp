@@ -74,6 +74,8 @@ chord_mesh::ReqProtocolImpl::ReqConnectContext::connect(std::shared_ptr<Stream> 
         }
 
         impl->m_stream = std::move(stream);
+        impl->ready();
+
     } else {
         stream->shutdown();
     }

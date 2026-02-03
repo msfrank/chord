@@ -49,6 +49,7 @@ set(CHORD_MESH_INCLUDES
     include/chord_mesh/mesh_result.h
     include/chord_mesh/message.h
     include/chord_mesh/envelope.h
+    include/chord_mesh/rep_protocol.h
     include/chord_mesh/req_protocol.h
     include/chord_mesh/stream.h
     include/chord_mesh/stream_buf.h
@@ -67,6 +68,7 @@ target_sources(chord_mesh PRIVATE
     src/message.cpp
     src/noise.cpp
     src/envelope.cpp
+    src/rep_protocol.cpp
     src/req_protocol.cpp
     src/stream.cpp
     src/stream_buf.cpp

@@ -102,7 +102,14 @@ TEST_F(ReqProtocol, ReadAndWaitForUnixConnectorClose)
 
     class TestReqContext : public TestReqProtocol::AbstractContext {
     public:
-        void receive(const chord_mesh::Message<test_generated::Reply> &message) override {}
+        void ready(TestReqProtocol *protocol) override {
+            TestRequest msg;
+            auto root = msg.getRoot();
+            root.setValue("hello, world!");
+            protocol->send(std::move(msg));
+            protocol->shutdown();
+        }
+        void receive(TestReqProtocol *protocol, const chord_mesh::Message<test_generated::Reply> &message) override {}
         void error(const tempo_utils::Status &status) override {
             TU_CONSOLE_ERR << "req error: " << status;
         };
@@ -127,11 +134,6 @@ TEST_F(ReqProtocol, ReadAndWaitForUnixConnectorClose)
     uv_async_init(loop, &data.async, [](uv_async_t *async) {
         auto *data = (Data *) async->data;
         data->req->connect(data->endpoint);
-        TestRequest msg;
-        auto root = msg.getRoot();
-        root.setValue("hello, world!");
-        data->req->send(std::move(msg));
-        //data->req->shutdown();
     });
 
     ASSERT_THAT (startUVThread(), tempo_test::IsOk());
@@ -143,16 +145,22 @@ TEST_F(ReqProtocol, ReadAndWaitForUnixConnectorClose)
     auto connfd = accept(listenfd, (sockaddr *) &addr, &socklen);
     ASSERT_LE (0, connfd) << "accept() error: " << strerror(errno);
 
-    // std::vector<tu_uint8> buffer;
-    // ASSERT_GE (0, read_until_eof(connfd, buffer));
-    //
-    // chord_mesh::EnvelopeParser parser;
-    // ASSERT_THAT (parser.pushBytes(buffer), tempo_test::IsOk());
-    //
-    // ASSERT_TRUE (parser.hasPending());
-    // auto pending = parser.popPending();
-    // TestRequest request;
-    // ASSERT_THAT (request.parse(pending), tempo_test::IsOk());
+    std::vector<tu_uint8> buffer;
+    ASSERT_LE (0, read_until_eof(connfd, buffer));
+
+    chord_mesh::EnvelopeParser parser;
+    ASSERT_THAT (parser.pushBytes(buffer), tempo_test::IsOk());
+
+    bool ready;
+    ASSERT_THAT (parser.checkReady(ready), tempo_test::IsOk());
+    ASSERT_TRUE (ready);
+
+    chord_mesh::Envelope envelope;
+    ASSERT_THAT (parser.takeReady(envelope), tempo_test::IsOk());
+    auto payload = envelope.getPayload();
+
+    TestRequest request;
+    ASSERT_THAT (request.parse(payload), tempo_test::IsOk());
 
     stopUVThread();
 }
